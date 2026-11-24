@@ -1,0 +1,169 @@
+{
+  "status": "stopped_startup_compatibility_failures",
+  "observed_at_beijing": "2026-11-23T00:13:59.721196+08:00",
+  "formal_experiment_started": true,
+  "formal_run_now_active": false,
+  "automatic_rerun": false,
+  "source_modified": false,
+  "request_count": 32,
+  "response_count": 21,
+  "error_count": 11,
+  "usage_events": 28,
+  "reported_model_tokens": 1440804,
+  "usage_not_reported_request_ids": [
+    "f5368f7dc794447182f2ceeae274f04b",
+    "e14bd546bc094f91beb3c0a0f44954eb",
+    "7f24db8098fd494f9ed0216724c6b820",
+    "68b5749e8b94487a9523315fb51c8aef"
+  ],
+  "ofox_calls": 0,
+  "completed_new_attempt_records": 0,
+  "interrupted_new_attempt_records": 1,
+  "main_comparison_eligible": false,
+  "reason": "Backend failures and induced permission refusal prevent a valid comparison.",
+  "issues": [
+    {
+      "kind": "nested_arguments_json",
+      "cause": "Schema validates the outer JSON object, but arguments is a JSON-encoded string. Regex escapes in that string are not guaranteed to be valid JSON. SDK request retries repeated several malformed decisions.",
+      "examples": [
+        {
+          "request_id": "312a666343674d84818e6d22a4d98636",
+          "session": "codex_parallel_10_lane1-igel-persist-feature-schema-shared",
+          "error": "Invalid \\escape: line 1 column 80 (char 79)",
+          "tool": "Bash",
+          "arguments": "{\"command\":\"ls -a /app && find /app -maxdepth 3 -type f | grep -E '(test|CLAUDE\\.md|AGENTS\\.md)'\",\"description\":\"Locate repository instructions and tests\"}"
+        },
+        {
+          "request_id": "d71d2b7888bd499bacbb0cf779349523",
+          "session": "codex_parallel_10_lane1-igel-persist-feature-schema-shared",
+          "error": "Invalid \\escape: line 1 column 38 (char 37)",
+          "tool": "Bash",
+          "arguments": "{\"command\":\"ls -a /app && rg -n 'Igel\\(|export|dataset_props|preprocess|predict' /app/tests /app/igel/servers /app/igel  --glob '*.py'\",\"description\":\"Locate related callers and test coverage\"}"
+        },
+        {
+          "request_id": "538a98e56e5c48b6b4f34f520547b350",
+          "session": "codex_parallel_10_lane0-claude-code-by-agents-recursive-delegation-shared",
+          "error": "Invalid \\escape: line 1 column 62 (char 61)",
+          "tool": "Bash",
+          "arguments": "{\"command\":\"rg -n 'multiAgentChat|availableAgents|executeChat\\(|tool_use|supportsTools' /app/backend /app/shared /app --glob '*test*' --glob '*spec*' --glob '!node_modules/**'\",\"description\":\"Find delegation callers and related tests\"}"
+        },
+        {
+          "request_id": "7cec3e9042a3447c96a99174dcd91503",
+          "session": "codex_parallel_10_lane0-claude-code-by-agents-recursive-delegation-shared",
+          "error": "Invalid \\escape: line 1 column 76 (char 75)",
+          "tool": "Bash",
+          "arguments": "{\"command\":\"rg -n 'multiAgentChat|availableAgents|delegate_task|executeChat\\(' /app/backend /app/shared /app --glob '*test*' --glob '*spec*'\",\"description\":\"Find delegation callers and related tests\"}"
+        },
+        {
+          "request_id": "6c679a2df1e14ca4b81c826ec8c0fbe7",
+          "session": "codex_parallel_10_lane0-claude-code-by-agents-recursive-delegation-shared",
+          "error": "Invalid \\escape: line 1 column 76 (char 75)",
+          "tool": "Bash",
+          "arguments": "{\"command\":\"rg -n 'multiAgentChat|delegate_task|availableAgents|executeChat\\(' /app/backend /app/shared /app --glob '*test*' --glob '*spec*'\",\"description\":\"Find delegation callers and existing tests\"}"
+        },
+        {
+          "request_id": "0ce19dd7c53a4d5481c8047335963139",
+          "session": "codex_parallel_10_lane0-claude-code-by-agents-recursive-delegation-shared",
+          "error": "Invalid \\escape: line 1 column 76 (char 75)",
+          "tool": "Bash",
+          "arguments": "{\"command\":\"rg -n 'multiAgentChat|availableAgents|delegate_task|executeChat\\(' /app/backend /app/shared /app/frontend --glob '!node_modules/**'\",\"description\":\"Find delegation and chat data flows\"}"
+        },
+        {
+          "request_id": "c067b66de3e84fa69e49e57676212021",
+          "session": "codex_parallel_10_lane0-claude-code-by-agents-recursive-delegation-shared",
+          "error": "Invalid \\escape: line 1 column 89 (char 88)",
+          "tool": "Bash",
+          "arguments": "{\"command\":\"rg -n 'availableAgents|handleMultiAgentChatRequest|delegate_task|executeChat\\(' /app/backend /app/shared /app --glob '*test*' --glob '*spec*'\",\"description\":\"Find delegation flow and related tests\"}"
+        }
+      ]
+    },
+    {
+      "kind": "host_readonly_confused_with_sdk_workspace",
+      "session": "codex_parallel_10_lane3-kea-atomic-signal-selectors-B-r1",
+      "model_response": {
+        "role": "assistant",
+        "content": "I can’t implement or commit this change in the current session because the supplied workspace permissions are read-only. Creating a branch, writing the reproduction script or source changes, and committing all require write access.\n\nPlease rerun the task with write access to `/app`; I can then implement the feature and perform the requested build and test verification."
+      },
+      "effect": "Student returned final text without any tool request, citing read-only permissions."
+    }
+  ],
+  "bridge_final_status": {
+    "stopped": true,
+    "stop_reason": "Interrupted",
+    "backend": "stateless_exec_action",
+    "sessions": [],
+    "active_requests": []
+  },
+  "runtime": [
+    {
+      "lane": 0,
+      "worker_process_exists": false,
+      "containers": [
+        {
+          "name": "hint-d3j8x8q7-swe-bench-202605-0968c860",
+          "status": "exited"
+        }
+      ]
+    },
+    {
+      "lane": 1,
+      "worker_process_exists": false,
+      "containers": [
+        {
+          "name": "hint-d3j8x8q7-swe-bench-202605-7970e1ab",
+          "status": "exited"
+        }
+      ]
+    },
+    {
+      "lane": 2,
+      "worker_process_exists": false,
+      "containers": [
+        {
+          "name": "hint-d3j8x8q7-swe-bench-202605-ec7b6356",
+          "status": "exited"
+        }
+      ]
+    },
+    {
+      "lane": 3,
+      "worker_process_exists": false,
+      "containers": [
+        {
+          "name": "clever_lamarr",
+          "status": "exited"
+        },
+        {
+          "name": "cc-d3j8x8q7-swe-bench-202605-935425cb",
+          "status": "exited"
+        }
+      ]
+    },
+    {
+      "lane": 4,
+      "worker_process_exists": false,
+      "containers": [
+        {
+          "name": "hint-d3j8x8q7-swe-bench-202605-c6343a24",
+          "status": "exited"
+        }
+      ]
+    },
+    {
+      "lane": 5,
+      "worker_process_exists": false,
+      "containers": [
+        {
+          "name": "hint-d3j8x8q7-swe-bench-202605-943a5a3e",
+          "status": "exited"
+        }
+      ]
+    }
+  ],
+  "state_path": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_10/experiment_state.json",
+  "required_before_next_launch": [
+    "Use a transport that represents SDK tool arguments as objects without requiring the model to encode inner JSON strings.",
+    "Establish correct model understanding of host versus SDK workspace permissions without changing task tool permissions.",
+    "Replay the captured real requests and escaped regex arguments; exercise actual SDK read/edit/test and six-way real-model behavior before a fresh cohort."
+  ]
+}

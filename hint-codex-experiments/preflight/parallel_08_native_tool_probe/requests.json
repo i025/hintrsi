@@ -1,0 +1,1788 @@
+[
+  {
+    "case": "registered_control",
+    "n": 1,
+    "path": "/v1/responses",
+    "body": {
+      "model": "gpt-6.1-terra",
+      "stream": true,
+      "input": [
+        {
+          "type": "message",
+          "id": "msg_8c632687-bd39-5be5-96fe-4fc43be14176",
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Offline synthetic tool routing test."
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-3e13-7b20-be3c-29fd83a1c531",
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Use only external dynamic tools."
+            },
+            {
+              "type": "input_text",
+              "text": "<skills_instructions>\n## Skills\nA skill is a set of local instructions to follow that is stored in a `SKILL.md` file. Below is the list of skills that can be used. Each entry includes a name, description, and a short path that can be expanded into an absolute path using the skill roots table.\n### Skill roots\n- `r0` = `/srv/lab-disks/disk2/users/xymo/.codex/skills/.system`\n### Available skills\n- imagegen: Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts. Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector. Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas. (file: r0/imagegen/SKILL.md)\n- openai-docs: Use for Codex models/pricing, scheduled tasks, skills, settings, setup, troubleshooting, customization, automations, and self-knowledge\u2014including 'you,' 'your,' 'this app,' or 'this coding agent' when they refer to Codex\u2014and for OpenAI APIs/products and ChatGPT Work. Also use for model choice/migration, prompting, SDKs, Responses, Realtime, agents, evals, and Chat/Work/Codex comparisons. Do not use for generic app/software tasks that merely mention Codex. (file: r0/openai-docs/SKILL.md)\n- skill-creator: Create or update a Codex skill with appropriately scoped instructions and any needed supporting resources. (file: r0/skill-creator/SKILL.md)\n- skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path. Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos). (file: r0/skill-installer/SKILL.md)\n</skills_instructions>"
+            },
+            {
+              "type": "input_text",
+              "text": "<permissions instructions>\nFilesystem sandboxing defines which files can be read or written. `sandbox_mode` is `read-only`: The sandbox only permits reading files. Network access is restricted.\nApproval policy is currently never. Do not provide the `sandbox_permissions` for any reason, commands will be rejected.\n</permissions instructions>"
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-3e13-7b20-be3c-2a0af948fb0f",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "<environment_context>\n  <current_date>2026-11-22</current_date>\n  <timezone>Etc/UTC</timezone>\n</environment_context>"
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-3e13-7b20-be3c-2a2a1319fecc",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Run the synthetic local tool routing case."
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "name": "request_user_input",
+          "description": "Request user input for one to three short questions and wait for the response. This tool is only available in Plan mode.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "questions": {
+                "type": "array",
+                "description": "Questions to show the user. Prefer 1 and do not exceed 3",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "header": {
+                      "type": "string",
+                      "description": "Short header label shown in the UI (12 or fewer chars)."
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "Stable identifier for mapping answers (snake_case)."
+                    },
+                    "options": {
+                      "type": "array",
+                      "description": "Provide 2-3 mutually exclusive choices. Put the recommended option first and suffix its label with \"(Recommended)\". Do not include an \"Other\" option in this list; the client will add a free-form \"Other\" option automatically.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "description": {
+                            "type": "string",
+                            "description": "One short sentence explaining impact/tradeoff if selected."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "User-facing label (1-5 words)."
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "description"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "question": {
+                      "type": "string",
+                      "description": "Single-sentence prompt shown to the user."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "header",
+                    "question",
+                    "options"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "questions"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "get_goal",
+          "description": "Get the current goal for this thread, including status, budgets, token and elapsed-time usage, and remaining token budget.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "create_goal",
+          "description": "Create a goal only when explicitly requested by the user or system/developer instructions; do not infer goals from ordinary tasks.\nSet token_budget only when an explicit token budget is requested. Fails if an unfinished goal exists; use update_goal only for status.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "objective": {
+                "type": "string",
+                "description": "Required. The concrete objective to start pursuing. This starts a new active goal when no goal exists or replaces the current goal when it is complete."
+              },
+              "token_budget": {
+                "type": "integer",
+                "description": "Positive token budget for the new goal. Omit unless explicitly requested."
+              }
+            },
+            "required": [
+              "objective"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "update_goal",
+          "description": "Update the existing goal.\nSet status to `paused` only at the user's explicit request to pause this goal, never on your own initiative. Ask if unclear; a later resume revokes that request. Report the returned status and stop goal work. Budget limits take precedence over pausing.\nSet status to `complete` only when the objective has actually been achieved and no required work remains.\nSet status to `blocked` only when the same blocking condition has repeated for at least three consecutive goal turns, counting the original/user-triggered turn and any automatic continuations, and the agent cannot make meaningful progress without user input or an external-state change.\nIf the user resumes a goal that was previously marked `blocked`, treat the resumed run as a fresh blocked audit. If the same blocking condition then repeats for at least three consecutive resumed goal turns, set status to `blocked` again.\nOnce the blocked threshold is satisfied, do not keep reporting that you are still blocked while leaving the goal active; set status to `blocked`.\nDo not use `blocked` merely because the work is hard, slow, uncertain, incomplete, or would benefit from clarification.\nDo not mark a goal complete merely because its budget is nearly exhausted or because you are stopping work.\nYou cannot use this tool to resume, budget-limit, or usage-limit a goal; those status changes are controlled by the user or system.\nWhen marking a budgeted goal achieved with status `complete`, report the final token usage from the tool result to the user.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "Required. `paused` requires an explicit user request. Set to `complete` only when the objective is achieved and no required work remains. Set to `blocked` only after the same blocking condition has recurred for at least three consecutive goal turns and the agent is at an impasse. After a previously blocked goal is resumed, the resumed run starts a fresh blocked audit.",
+                "enum": [
+                  "complete",
+                  "blocked",
+                  "paused"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "ToolSearch",
+          "description": "Offline search routing fixture.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "Monitor",
+          "description": "Offline monitor routing fixture.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "parallel_tool_calls": true,
+      "reasoning": {
+        "effort": "low",
+        "summary": "auto"
+      },
+      "store": false,
+      "include": [
+        "reasoning.encrypted_content"
+      ],
+      "prompt_cache_key": "01a20201-3909-7920-84d2-b55a37d1f73c",
+      "client_metadata": {
+        "x-codex-installation-id": "9de2f879-d966-47f9-872f-bb75694dba2d",
+        "thread_id": "01a20201-3909-7920-84d2-b55a37d1f73c",
+        "session_id": "01a20201-3909-7920-84d2-b55a37d1f73c",
+        "root_turn_id": "01a20201-393e-7210-a747-02b94c006fa1",
+        "x-codex-window-id": "01a20201-3909-7920-84d2-b55a37d1f73c:0",
+        "turn_id": "01a20201-393e-7210-a747-02b94c006fa1",
+        "x-codex-turn-metadata": "{\"installation_id\":\"9de2f879-d966-47f9-872f-bb75694dba2d\",\"session_id\":\"01a20201-3909-7920-84d2-b55a37d1f73c\",\"thread_id\":\"01a20201-3909-7920-84d2-b55a37d1f73c\",\"agent_name\":\"/root\",\"turn_id\":\"01a20201-393e-7210-a747-02b94c006fa1\",\"window_id\":\"01a20201-3909-7920-84d2-b55a37d1f73c:0\",\"window_number\":0,\"context_window_id\":\"01a20201-390d-7510-ac58-ef1d8834c49c\",\"request_kind\":\"turn\",\"history_initialization\":\"new\",\"root_turn_id\":\"01a20201-393e-7210-a747-02b94c006fa1\",\"sandbox\":\"seccomp\",\"sandbox_mode\":\"read-only\",\"auto_review_enabled\":false,\"node_repl_auto_review_required\":false,\"node_repl_disabled\":false,\"turn_started_at_unix_ms\":1795329964353,\"analytics_enabled\":true,\"model\":\"gpt-6.1-terra\",\"reasoning_effort\":\"low\"}"
+      }
+    }
+  },
+  {
+    "case": "registered_control",
+    "n": 2,
+    "path": "/v1/responses",
+    "body": {
+      "model": "gpt-6.1-terra",
+      "stream": true,
+      "input": [
+        {
+          "type": "message",
+          "id": "msg_8c632687-bd39-5be5-96fe-4fc43be14176",
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Offline synthetic tool routing test."
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-3e13-7b20-be3c-29fd83a1c531",
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Use only external dynamic tools."
+            },
+            {
+              "type": "input_text",
+              "text": "<skills_instructions>\n## Skills\nA skill is a set of local instructions to follow that is stored in a `SKILL.md` file. Below is the list of skills that can be used. Each entry includes a name, description, and a short path that can be expanded into an absolute path using the skill roots table.\n### Skill roots\n- `r0` = `/srv/lab-disks/disk2/users/xymo/.codex/skills/.system`\n### Available skills\n- imagegen: Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts. Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector. Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas. (file: r0/imagegen/SKILL.md)\n- openai-docs: Use for Codex models/pricing, scheduled tasks, skills, settings, setup, troubleshooting, customization, automations, and self-knowledge\u2014including 'you,' 'your,' 'this app,' or 'this coding agent' when they refer to Codex\u2014and for OpenAI APIs/products and ChatGPT Work. Also use for model choice/migration, prompting, SDKs, Responses, Realtime, agents, evals, and Chat/Work/Codex comparisons. Do not use for generic app/software tasks that merely mention Codex. (file: r0/openai-docs/SKILL.md)\n- skill-creator: Create or update a Codex skill with appropriately scoped instructions and any needed supporting resources. (file: r0/skill-creator/SKILL.md)\n- skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path. Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos). (file: r0/skill-installer/SKILL.md)\n</skills_instructions>"
+            },
+            {
+              "type": "input_text",
+              "text": "<permissions instructions>\nFilesystem sandboxing defines which files can be read or written. `sandbox_mode` is `read-only`: The sandbox only permits reading files. Network access is restricted.\nApproval policy is currently never. Do not provide the `sandbox_permissions` for any reason, commands will be rejected.\n</permissions instructions>"
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-3e13-7b20-be3c-2a0af948fb0f",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "<environment_context>\n  <current_date>2026-11-22</current_date>\n  <timezone>Etc/UTC</timezone>\n</environment_context>"
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-3e13-7b20-be3c-2a2a1319fecc",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Run the synthetic local tool routing case."
+            }
+          ]
+        },
+        {
+          "type": "function_call",
+          "status": "completed",
+          "name": "Monitor",
+          "arguments": "{\"description\":\"offline\"}",
+          "call_id": "call-monitor"
+        },
+        {
+          "type": "function_call_output",
+          "id": "fco_01a20201-3e29-7502-9076-46088db9730c",
+          "call_id": "call-monitor",
+          "output": "OFFLINE_TOOL_OK"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "name": "request_user_input",
+          "description": "Request user input for one to three short questions and wait for the response. This tool is only available in Plan mode.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "questions": {
+                "type": "array",
+                "description": "Questions to show the user. Prefer 1 and do not exceed 3",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "header": {
+                      "type": "string",
+                      "description": "Short header label shown in the UI (12 or fewer chars)."
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "Stable identifier for mapping answers (snake_case)."
+                    },
+                    "options": {
+                      "type": "array",
+                      "description": "Provide 2-3 mutually exclusive choices. Put the recommended option first and suffix its label with \"(Recommended)\". Do not include an \"Other\" option in this list; the client will add a free-form \"Other\" option automatically.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "description": {
+                            "type": "string",
+                            "description": "One short sentence explaining impact/tradeoff if selected."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "User-facing label (1-5 words)."
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "description"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "question": {
+                      "type": "string",
+                      "description": "Single-sentence prompt shown to the user."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "header",
+                    "question",
+                    "options"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "questions"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "get_goal",
+          "description": "Get the current goal for this thread, including status, budgets, token and elapsed-time usage, and remaining token budget.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "create_goal",
+          "description": "Create a goal only when explicitly requested by the user or system/developer instructions; do not infer goals from ordinary tasks.\nSet token_budget only when an explicit token budget is requested. Fails if an unfinished goal exists; use update_goal only for status.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "objective": {
+                "type": "string",
+                "description": "Required. The concrete objective to start pursuing. This starts a new active goal when no goal exists or replaces the current goal when it is complete."
+              },
+              "token_budget": {
+                "type": "integer",
+                "description": "Positive token budget for the new goal. Omit unless explicitly requested."
+              }
+            },
+            "required": [
+              "objective"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "update_goal",
+          "description": "Update the existing goal.\nSet status to `paused` only at the user's explicit request to pause this goal, never on your own initiative. Ask if unclear; a later resume revokes that request. Report the returned status and stop goal work. Budget limits take precedence over pausing.\nSet status to `complete` only when the objective has actually been achieved and no required work remains.\nSet status to `blocked` only when the same blocking condition has repeated for at least three consecutive goal turns, counting the original/user-triggered turn and any automatic continuations, and the agent cannot make meaningful progress without user input or an external-state change.\nIf the user resumes a goal that was previously marked `blocked`, treat the resumed run as a fresh blocked audit. If the same blocking condition then repeats for at least three consecutive resumed goal turns, set status to `blocked` again.\nOnce the blocked threshold is satisfied, do not keep reporting that you are still blocked while leaving the goal active; set status to `blocked`.\nDo not use `blocked` merely because the work is hard, slow, uncertain, incomplete, or would benefit from clarification.\nDo not mark a goal complete merely because its budget is nearly exhausted or because you are stopping work.\nYou cannot use this tool to resume, budget-limit, or usage-limit a goal; those status changes are controlled by the user or system.\nWhen marking a budgeted goal achieved with status `complete`, report the final token usage from the tool result to the user.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "Required. `paused` requires an explicit user request. Set to `complete` only when the objective is achieved and no required work remains. Set to `blocked` only after the same blocking condition has recurred for at least three consecutive goal turns and the agent is at an impasse. After a previously blocked goal is resumed, the resumed run starts a fresh blocked audit.",
+                "enum": [
+                  "complete",
+                  "blocked",
+                  "paused"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "ToolSearch",
+          "description": "Offline search routing fixture.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "Monitor",
+          "description": "Offline monitor routing fixture.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "parallel_tool_calls": true,
+      "reasoning": {
+        "effort": "low",
+        "summary": "auto"
+      },
+      "store": false,
+      "include": [
+        "reasoning.encrypted_content"
+      ],
+      "prompt_cache_key": "01a20201-3909-7920-84d2-b55a37d1f73c",
+      "client_metadata": {
+        "root_turn_id": "01a20201-393e-7210-a747-02b94c006fa1",
+        "x-codex-turn-metadata": "{\"installation_id\":\"9de2f879-d966-47f9-872f-bb75694dba2d\",\"session_id\":\"01a20201-3909-7920-84d2-b55a37d1f73c\",\"thread_id\":\"01a20201-3909-7920-84d2-b55a37d1f73c\",\"agent_name\":\"/root\",\"turn_id\":\"01a20201-393e-7210-a747-02b94c006fa1\",\"window_id\":\"01a20201-3909-7920-84d2-b55a37d1f73c:0\",\"window_number\":0,\"context_window_id\":\"01a20201-390d-7510-ac58-ef1d8834c49c\",\"request_kind\":\"turn\",\"history_initialization\":\"new\",\"root_turn_id\":\"01a20201-393e-7210-a747-02b94c006fa1\",\"sandbox\":\"seccomp\",\"sandbox_mode\":\"read-only\",\"auto_review_enabled\":false,\"node_repl_auto_review_required\":false,\"node_repl_disabled\":false,\"turn_started_at_unix_ms\":1795329964353,\"analytics_enabled\":true,\"model\":\"gpt-6.1-terra\",\"reasoning_effort\":\"low\"}",
+        "session_id": "01a20201-3909-7920-84d2-b55a37d1f73c",
+        "x-codex-installation-id": "9de2f879-d966-47f9-872f-bb75694dba2d",
+        "thread_id": "01a20201-3909-7920-84d2-b55a37d1f73c",
+        "turn_id": "01a20201-393e-7210-a747-02b94c006fa1",
+        "x-codex-window-id": "01a20201-3909-7920-84d2-b55a37d1f73c:0"
+      }
+    }
+  },
+  {
+    "case": "injected_before_turn",
+    "n": 1,
+    "path": "/v1/responses",
+    "body": {
+      "model": "gpt-6.1-terra",
+      "stream": true,
+      "input": [
+        {
+          "type": "message",
+          "id": "msg_2cfb10bc-444d-5cd1-a194-ca9d4a1b1a75",
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Offline synthetic tool routing test."
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-434b-73c3-9074-ae39ed59bfa3",
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Use only external dynamic tools."
+            },
+            {
+              "type": "input_text",
+              "text": "<skills_instructions>\n## Skills\nA skill is a set of local instructions to follow that is stored in a `SKILL.md` file. Below is the list of skills that can be used. Each entry includes a name, description, and a short path that can be expanded into an absolute path using the skill roots table.\n### Skill roots\n- `r0` = `/srv/lab-disks/disk2/users/xymo/.codex/skills/.system`\n### Available skills\n- imagegen: Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts. Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector. Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas. (file: r0/imagegen/SKILL.md)\n- openai-docs: Use for Codex models/pricing, scheduled tasks, skills, settings, setup, troubleshooting, customization, automations, and self-knowledge\u2014including 'you,' 'your,' 'this app,' or 'this coding agent' when they refer to Codex\u2014and for OpenAI APIs/products and ChatGPT Work. Also use for model choice/migration, prompting, SDKs, Responses, Realtime, agents, evals, and Chat/Work/Codex comparisons. Do not use for generic app/software tasks that merely mention Codex. (file: r0/openai-docs/SKILL.md)\n- skill-creator: Create or update a Codex skill with appropriately scoped instructions and any needed supporting resources. (file: r0/skill-creator/SKILL.md)\n- skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path. Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos). (file: r0/skill-installer/SKILL.md)\n</skills_instructions>"
+            },
+            {
+              "type": "input_text",
+              "text": "<permissions instructions>\nFilesystem sandboxing defines which files can be read or written. `sandbox_mode` is `read-only`: The sandbox only permits reading files. Network access is restricted.\nApproval policy is currently never. Do not provide the `sandbox_permissions` for any reason, commands will be rejected.\n</permissions instructions>"
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-434b-73c3-9074-ae49104cadcf",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "<environment_context>\n  <current_date>2026-11-22</current_date>\n  <timezone>Etc/UTC</timezone>\n</environment_context>"
+            }
+          ]
+        },
+        {
+          "type": "additional_tools",
+          "id": "at_01a20201-434b-73c3-9074-ae51feaff2f7",
+          "role": "system",
+          "tools": [
+            {
+              "type": "function",
+              "name": "Monitor",
+              "description": "Offline monitor routing fixture.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "description"
+                ],
+                "additionalProperties": false
+              }
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-4352-7782-9fb4-06a367708e90",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Run the synthetic local tool routing case."
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "name": "request_user_input",
+          "description": "Request user input for one to three short questions and wait for the response. This tool is only available in Plan mode.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "questions": {
+                "type": "array",
+                "description": "Questions to show the user. Prefer 1 and do not exceed 3",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "header": {
+                      "type": "string",
+                      "description": "Short header label shown in the UI (12 or fewer chars)."
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "Stable identifier for mapping answers (snake_case)."
+                    },
+                    "options": {
+                      "type": "array",
+                      "description": "Provide 2-3 mutually exclusive choices. Put the recommended option first and suffix its label with \"(Recommended)\". Do not include an \"Other\" option in this list; the client will add a free-form \"Other\" option automatically.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "description": {
+                            "type": "string",
+                            "description": "One short sentence explaining impact/tradeoff if selected."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "User-facing label (1-5 words)."
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "description"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "question": {
+                      "type": "string",
+                      "description": "Single-sentence prompt shown to the user."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "header",
+                    "question",
+                    "options"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "questions"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "get_goal",
+          "description": "Get the current goal for this thread, including status, budgets, token and elapsed-time usage, and remaining token budget.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "create_goal",
+          "description": "Create a goal only when explicitly requested by the user or system/developer instructions; do not infer goals from ordinary tasks.\nSet token_budget only when an explicit token budget is requested. Fails if an unfinished goal exists; use update_goal only for status.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "objective": {
+                "type": "string",
+                "description": "Required. The concrete objective to start pursuing. This starts a new active goal when no goal exists or replaces the current goal when it is complete."
+              },
+              "token_budget": {
+                "type": "integer",
+                "description": "Positive token budget for the new goal. Omit unless explicitly requested."
+              }
+            },
+            "required": [
+              "objective"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "update_goal",
+          "description": "Update the existing goal.\nSet status to `paused` only at the user's explicit request to pause this goal, never on your own initiative. Ask if unclear; a later resume revokes that request. Report the returned status and stop goal work. Budget limits take precedence over pausing.\nSet status to `complete` only when the objective has actually been achieved and no required work remains.\nSet status to `blocked` only when the same blocking condition has repeated for at least three consecutive goal turns, counting the original/user-triggered turn and any automatic continuations, and the agent cannot make meaningful progress without user input or an external-state change.\nIf the user resumes a goal that was previously marked `blocked`, treat the resumed run as a fresh blocked audit. If the same blocking condition then repeats for at least three consecutive resumed goal turns, set status to `blocked` again.\nOnce the blocked threshold is satisfied, do not keep reporting that you are still blocked while leaving the goal active; set status to `blocked`.\nDo not use `blocked` merely because the work is hard, slow, uncertain, incomplete, or would benefit from clarification.\nDo not mark a goal complete merely because its budget is nearly exhausted or because you are stopping work.\nYou cannot use this tool to resume, budget-limit, or usage-limit a goal; those status changes are controlled by the user or system.\nWhen marking a budgeted goal achieved with status `complete`, report the final token usage from the tool result to the user.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "Required. `paused` requires an explicit user request. Set to `complete` only when the objective is achieved and no required work remains. Set to `blocked` only after the same blocking condition has recurred for at least three consecutive goal turns and the agent is at an impasse. After a previously blocked goal is resumed, the resumed run starts a fresh blocked audit.",
+                "enum": [
+                  "complete",
+                  "blocked",
+                  "paused"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "ToolSearch",
+          "description": "Offline search routing fixture.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "parallel_tool_calls": true,
+      "reasoning": {
+        "effort": "low",
+        "summary": "auto"
+      },
+      "store": false,
+      "include": [
+        "reasoning.encrypted_content"
+      ],
+      "prompt_cache_key": "01a20201-3e41-7f41-a342-2b0f47d20bf0",
+      "client_metadata": {
+        "x-codex-turn-metadata": "{\"installation_id\":\"9de2f879-d966-47f9-872f-bb75694dba2d\",\"session_id\":\"01a20201-3e41-7f41-a342-2b0f47d20bf0\",\"thread_id\":\"01a20201-3e41-7f41-a342-2b0f47d20bf0\",\"agent_name\":\"/root\",\"turn_id\":\"01a20201-434d-7cb3-b7fa-cc074f98261c\",\"window_id\":\"01a20201-3e41-7f41-a342-2b0f47d20bf0:0\",\"window_number\":0,\"context_window_id\":\"01a20201-3e44-74a3-8520-fbfacb58fa63\",\"request_kind\":\"turn\",\"history_initialization\":\"new\",\"root_turn_id\":\"01a20201-434d-7cb3-b7fa-cc074f98261c\",\"sandbox\":\"seccomp\",\"sandbox_mode\":\"read-only\",\"auto_review_enabled\":false,\"node_repl_auto_review_required\":false,\"node_repl_disabled\":false,\"turn_started_at_unix_ms\":1795329966927,\"analytics_enabled\":true,\"model\":\"gpt-6.1-terra\",\"reasoning_effort\":\"low\"}",
+        "session_id": "01a20201-3e41-7f41-a342-2b0f47d20bf0",
+        "x-codex-installation-id": "9de2f879-d966-47f9-872f-bb75694dba2d",
+        "thread_id": "01a20201-3e41-7f41-a342-2b0f47d20bf0",
+        "x-codex-window-id": "01a20201-3e41-7f41-a342-2b0f47d20bf0:0",
+        "turn_id": "01a20201-434d-7cb3-b7fa-cc074f98261c",
+        "root_turn_id": "01a20201-434d-7cb3-b7fa-cc074f98261c"
+      }
+    }
+  },
+  {
+    "case": "injected_before_turn",
+    "n": 2,
+    "path": "/v1/responses",
+    "body": {
+      "model": "gpt-6.1-terra",
+      "stream": true,
+      "input": [
+        {
+          "type": "message",
+          "id": "msg_2cfb10bc-444d-5cd1-a194-ca9d4a1b1a75",
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Offline synthetic tool routing test."
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-434b-73c3-9074-ae39ed59bfa3",
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Use only external dynamic tools."
+            },
+            {
+              "type": "input_text",
+              "text": "<skills_instructions>\n## Skills\nA skill is a set of local instructions to follow that is stored in a `SKILL.md` file. Below is the list of skills that can be used. Each entry includes a name, description, and a short path that can be expanded into an absolute path using the skill roots table.\n### Skill roots\n- `r0` = `/srv/lab-disks/disk2/users/xymo/.codex/skills/.system`\n### Available skills\n- imagegen: Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts. Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector. Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas. (file: r0/imagegen/SKILL.md)\n- openai-docs: Use for Codex models/pricing, scheduled tasks, skills, settings, setup, troubleshooting, customization, automations, and self-knowledge\u2014including 'you,' 'your,' 'this app,' or 'this coding agent' when they refer to Codex\u2014and for OpenAI APIs/products and ChatGPT Work. Also use for model choice/migration, prompting, SDKs, Responses, Realtime, agents, evals, and Chat/Work/Codex comparisons. Do not use for generic app/software tasks that merely mention Codex. (file: r0/openai-docs/SKILL.md)\n- skill-creator: Create or update a Codex skill with appropriately scoped instructions and any needed supporting resources. (file: r0/skill-creator/SKILL.md)\n- skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path. Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos). (file: r0/skill-installer/SKILL.md)\n</skills_instructions>"
+            },
+            {
+              "type": "input_text",
+              "text": "<permissions instructions>\nFilesystem sandboxing defines which files can be read or written. `sandbox_mode` is `read-only`: The sandbox only permits reading files. Network access is restricted.\nApproval policy is currently never. Do not provide the `sandbox_permissions` for any reason, commands will be rejected.\n</permissions instructions>"
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-434b-73c3-9074-ae49104cadcf",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "<environment_context>\n  <current_date>2026-11-22</current_date>\n  <timezone>Etc/UTC</timezone>\n</environment_context>"
+            }
+          ]
+        },
+        {
+          "type": "additional_tools",
+          "id": "at_01a20201-434b-73c3-9074-ae51feaff2f7",
+          "role": "system",
+          "tools": [
+            {
+              "type": "function",
+              "name": "Monitor",
+              "description": "Offline monitor routing fixture.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "description"
+                ],
+                "additionalProperties": false
+              }
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-4352-7782-9fb4-06a367708e90",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Run the synthetic local tool routing case."
+            }
+          ]
+        },
+        {
+          "type": "function_call",
+          "status": "completed",
+          "name": "Monitor",
+          "arguments": "{\"description\":\"offline\"}",
+          "call_id": "call-monitor"
+        },
+        {
+          "type": "function_call_output",
+          "id": "fco_01a20201-4363-7b31-85ad-eb45dfbf429b",
+          "call_id": "call-monitor",
+          "output": "unsupported call: Monitor"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "name": "request_user_input",
+          "description": "Request user input for one to three short questions and wait for the response. This tool is only available in Plan mode.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "questions": {
+                "type": "array",
+                "description": "Questions to show the user. Prefer 1 and do not exceed 3",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "header": {
+                      "type": "string",
+                      "description": "Short header label shown in the UI (12 or fewer chars)."
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "Stable identifier for mapping answers (snake_case)."
+                    },
+                    "options": {
+                      "type": "array",
+                      "description": "Provide 2-3 mutually exclusive choices. Put the recommended option first and suffix its label with \"(Recommended)\". Do not include an \"Other\" option in this list; the client will add a free-form \"Other\" option automatically.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "description": {
+                            "type": "string",
+                            "description": "One short sentence explaining impact/tradeoff if selected."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "User-facing label (1-5 words)."
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "description"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "question": {
+                      "type": "string",
+                      "description": "Single-sentence prompt shown to the user."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "header",
+                    "question",
+                    "options"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "questions"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "get_goal",
+          "description": "Get the current goal for this thread, including status, budgets, token and elapsed-time usage, and remaining token budget.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "create_goal",
+          "description": "Create a goal only when explicitly requested by the user or system/developer instructions; do not infer goals from ordinary tasks.\nSet token_budget only when an explicit token budget is requested. Fails if an unfinished goal exists; use update_goal only for status.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "objective": {
+                "type": "string",
+                "description": "Required. The concrete objective to start pursuing. This starts a new active goal when no goal exists or replaces the current goal when it is complete."
+              },
+              "token_budget": {
+                "type": "integer",
+                "description": "Positive token budget for the new goal. Omit unless explicitly requested."
+              }
+            },
+            "required": [
+              "objective"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "update_goal",
+          "description": "Update the existing goal.\nSet status to `paused` only at the user's explicit request to pause this goal, never on your own initiative. Ask if unclear; a later resume revokes that request. Report the returned status and stop goal work. Budget limits take precedence over pausing.\nSet status to `complete` only when the objective has actually been achieved and no required work remains.\nSet status to `blocked` only when the same blocking condition has repeated for at least three consecutive goal turns, counting the original/user-triggered turn and any automatic continuations, and the agent cannot make meaningful progress without user input or an external-state change.\nIf the user resumes a goal that was previously marked `blocked`, treat the resumed run as a fresh blocked audit. If the same blocking condition then repeats for at least three consecutive resumed goal turns, set status to `blocked` again.\nOnce the blocked threshold is satisfied, do not keep reporting that you are still blocked while leaving the goal active; set status to `blocked`.\nDo not use `blocked` merely because the work is hard, slow, uncertain, incomplete, or would benefit from clarification.\nDo not mark a goal complete merely because its budget is nearly exhausted or because you are stopping work.\nYou cannot use this tool to resume, budget-limit, or usage-limit a goal; those status changes are controlled by the user or system.\nWhen marking a budgeted goal achieved with status `complete`, report the final token usage from the tool result to the user.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "Required. `paused` requires an explicit user request. Set to `complete` only when the objective is achieved and no required work remains. Set to `blocked` only after the same blocking condition has recurred for at least three consecutive goal turns and the agent is at an impasse. After a previously blocked goal is resumed, the resumed run starts a fresh blocked audit.",
+                "enum": [
+                  "complete",
+                  "blocked",
+                  "paused"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "ToolSearch",
+          "description": "Offline search routing fixture.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "parallel_tool_calls": true,
+      "reasoning": {
+        "effort": "low",
+        "summary": "auto"
+      },
+      "store": false,
+      "include": [
+        "reasoning.encrypted_content"
+      ],
+      "prompt_cache_key": "01a20201-3e41-7f41-a342-2b0f47d20bf0",
+      "client_metadata": {
+        "turn_id": "01a20201-434d-7cb3-b7fa-cc074f98261c",
+        "x-codex-turn-metadata": "{\"installation_id\":\"9de2f879-d966-47f9-872f-bb75694dba2d\",\"session_id\":\"01a20201-3e41-7f41-a342-2b0f47d20bf0\",\"thread_id\":\"01a20201-3e41-7f41-a342-2b0f47d20bf0\",\"agent_name\":\"/root\",\"turn_id\":\"01a20201-434d-7cb3-b7fa-cc074f98261c\",\"window_id\":\"01a20201-3e41-7f41-a342-2b0f47d20bf0:0\",\"window_number\":0,\"context_window_id\":\"01a20201-3e44-74a3-8520-fbfacb58fa63\",\"request_kind\":\"turn\",\"history_initialization\":\"new\",\"root_turn_id\":\"01a20201-434d-7cb3-b7fa-cc074f98261c\",\"sandbox\":\"seccomp\",\"sandbox_mode\":\"read-only\",\"auto_review_enabled\":false,\"node_repl_auto_review_required\":false,\"node_repl_disabled\":false,\"turn_started_at_unix_ms\":1795329966927,\"analytics_enabled\":true,\"model\":\"gpt-6.1-terra\",\"reasoning_effort\":\"low\"}",
+        "x-codex-window-id": "01a20201-3e41-7f41-a342-2b0f47d20bf0:0",
+        "thread_id": "01a20201-3e41-7f41-a342-2b0f47d20bf0",
+        "root_turn_id": "01a20201-434d-7cb3-b7fa-cc074f98261c",
+        "session_id": "01a20201-3e41-7f41-a342-2b0f47d20bf0",
+        "x-codex-installation-id": "9de2f879-d966-47f9-872f-bb75694dba2d"
+      }
+    }
+  },
+  {
+    "case": "injected_during_search",
+    "n": 1,
+    "path": "/v1/responses",
+    "body": {
+      "model": "gpt-6.1-terra",
+      "stream": true,
+      "input": [
+        {
+          "type": "message",
+          "id": "msg_ff5b5962-77ba-5d66-8c10-dee3bcad1f8f",
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Offline synthetic tool routing test."
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-4817-7191-94c8-32f225216d5a",
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Use only external dynamic tools."
+            },
+            {
+              "type": "input_text",
+              "text": "<skills_instructions>\n## Skills\nA skill is a set of local instructions to follow that is stored in a `SKILL.md` file. Below is the list of skills that can be used. Each entry includes a name, description, and a short path that can be expanded into an absolute path using the skill roots table.\n### Skill roots\n- `r0` = `/srv/lab-disks/disk2/users/xymo/.codex/skills/.system`\n### Available skills\n- imagegen: Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts. Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector. Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas. (file: r0/imagegen/SKILL.md)\n- openai-docs: Use for Codex models/pricing, scheduled tasks, skills, settings, setup, troubleshooting, customization, automations, and self-knowledge\u2014including 'you,' 'your,' 'this app,' or 'this coding agent' when they refer to Codex\u2014and for OpenAI APIs/products and ChatGPT Work. Also use for model choice/migration, prompting, SDKs, Responses, Realtime, agents, evals, and Chat/Work/Codex comparisons. Do not use for generic app/software tasks that merely mention Codex. (file: r0/openai-docs/SKILL.md)\n- skill-creator: Create or update a Codex skill with appropriately scoped instructions and any needed supporting resources. (file: r0/skill-creator/SKILL.md)\n- skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path. Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos). (file: r0/skill-installer/SKILL.md)\n</skills_instructions>"
+            },
+            {
+              "type": "input_text",
+              "text": "<permissions instructions>\nFilesystem sandboxing defines which files can be read or written. `sandbox_mode` is `read-only`: The sandbox only permits reading files. Network access is restricted.\nApproval policy is currently never. Do not provide the `sandbox_permissions` for any reason, commands will be rejected.\n</permissions instructions>"
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-4817-7191-94c8-330c76f6819b",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "<environment_context>\n  <current_date>2026-11-22</current_date>\n  <timezone>Etc/UTC</timezone>\n</environment_context>"
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-4818-7641-b3b3-32a8f89aa928",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Run the synthetic local tool routing case."
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "name": "request_user_input",
+          "description": "Request user input for one to three short questions and wait for the response. This tool is only available in Plan mode.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "questions": {
+                "type": "array",
+                "description": "Questions to show the user. Prefer 1 and do not exceed 3",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "header": {
+                      "type": "string",
+                      "description": "Short header label shown in the UI (12 or fewer chars)."
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "Stable identifier for mapping answers (snake_case)."
+                    },
+                    "options": {
+                      "type": "array",
+                      "description": "Provide 2-3 mutually exclusive choices. Put the recommended option first and suffix its label with \"(Recommended)\". Do not include an \"Other\" option in this list; the client will add a free-form \"Other\" option automatically.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "description": {
+                            "type": "string",
+                            "description": "One short sentence explaining impact/tradeoff if selected."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "User-facing label (1-5 words)."
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "description"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "question": {
+                      "type": "string",
+                      "description": "Single-sentence prompt shown to the user."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "header",
+                    "question",
+                    "options"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "questions"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "get_goal",
+          "description": "Get the current goal for this thread, including status, budgets, token and elapsed-time usage, and remaining token budget.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "create_goal",
+          "description": "Create a goal only when explicitly requested by the user or system/developer instructions; do not infer goals from ordinary tasks.\nSet token_budget only when an explicit token budget is requested. Fails if an unfinished goal exists; use update_goal only for status.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "objective": {
+                "type": "string",
+                "description": "Required. The concrete objective to start pursuing. This starts a new active goal when no goal exists or replaces the current goal when it is complete."
+              },
+              "token_budget": {
+                "type": "integer",
+                "description": "Positive token budget for the new goal. Omit unless explicitly requested."
+              }
+            },
+            "required": [
+              "objective"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "update_goal",
+          "description": "Update the existing goal.\nSet status to `paused` only at the user's explicit request to pause this goal, never on your own initiative. Ask if unclear; a later resume revokes that request. Report the returned status and stop goal work. Budget limits take precedence over pausing.\nSet status to `complete` only when the objective has actually been achieved and no required work remains.\nSet status to `blocked` only when the same blocking condition has repeated for at least three consecutive goal turns, counting the original/user-triggered turn and any automatic continuations, and the agent cannot make meaningful progress without user input or an external-state change.\nIf the user resumes a goal that was previously marked `blocked`, treat the resumed run as a fresh blocked audit. If the same blocking condition then repeats for at least three consecutive resumed goal turns, set status to `blocked` again.\nOnce the blocked threshold is satisfied, do not keep reporting that you are still blocked while leaving the goal active; set status to `blocked`.\nDo not use `blocked` merely because the work is hard, slow, uncertain, incomplete, or would benefit from clarification.\nDo not mark a goal complete merely because its budget is nearly exhausted or because you are stopping work.\nYou cannot use this tool to resume, budget-limit, or usage-limit a goal; those status changes are controlled by the user or system.\nWhen marking a budgeted goal achieved with status `complete`, report the final token usage from the tool result to the user.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "Required. `paused` requires an explicit user request. Set to `complete` only when the objective is achieved and no required work remains. Set to `blocked` only after the same blocking condition has recurred for at least three consecutive goal turns and the agent is at an impasse. After a previously blocked goal is resumed, the resumed run starts a fresh blocked audit.",
+                "enum": [
+                  "complete",
+                  "blocked",
+                  "paused"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "ToolSearch",
+          "description": "Offline search routing fixture.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "parallel_tool_calls": true,
+      "reasoning": {
+        "effort": "low",
+        "summary": "auto"
+      },
+      "store": false,
+      "include": [
+        "reasoning.encrypted_content"
+      ],
+      "prompt_cache_key": "01a20201-437e-7b70-b379-f6040729be4a",
+      "client_metadata": {
+        "x-codex-installation-id": "9de2f879-d966-47f9-872f-bb75694dba2d",
+        "x-codex-window-id": "01a20201-437e-7b70-b379-f6040729be4a:0",
+        "turn_id": "01a20201-43ad-7ef2-9495-2b0e7f3fa762",
+        "x-codex-turn-metadata": "{\"installation_id\":\"9de2f879-d966-47f9-872f-bb75694dba2d\",\"session_id\":\"01a20201-437e-7b70-b379-f6040729be4a\",\"thread_id\":\"01a20201-437e-7b70-b379-f6040729be4a\",\"agent_name\":\"/root\",\"turn_id\":\"01a20201-43ad-7ef2-9495-2b0e7f3fa762\",\"window_id\":\"01a20201-437e-7b70-b379-f6040729be4a:0\",\"window_number\":0,\"context_window_id\":\"01a20201-4381-7f32-8bb5-7b2d8a076e8b\",\"request_kind\":\"turn\",\"history_initialization\":\"new\",\"root_turn_id\":\"01a20201-43ad-7ef2-9495-2b0e7f3fa762\",\"sandbox\":\"seccomp\",\"sandbox_mode\":\"read-only\",\"auto_review_enabled\":false,\"node_repl_auto_review_required\":false,\"node_repl_disabled\":false,\"turn_started_at_unix_ms\":1795329967023,\"analytics_enabled\":true,\"model\":\"gpt-6.1-terra\",\"reasoning_effort\":\"low\"}",
+        "root_turn_id": "01a20201-43ad-7ef2-9495-2b0e7f3fa762",
+        "thread_id": "01a20201-437e-7b70-b379-f6040729be4a",
+        "session_id": "01a20201-437e-7b70-b379-f6040729be4a"
+      }
+    }
+  },
+  {
+    "case": "injected_during_search",
+    "n": 2,
+    "path": "/v1/responses",
+    "body": {
+      "model": "gpt-6.1-terra",
+      "stream": true,
+      "input": [
+        {
+          "type": "message",
+          "id": "msg_ff5b5962-77ba-5d66-8c10-dee3bcad1f8f",
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Offline synthetic tool routing test."
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-4817-7191-94c8-32f225216d5a",
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Use only external dynamic tools."
+            },
+            {
+              "type": "input_text",
+              "text": "<skills_instructions>\n## Skills\nA skill is a set of local instructions to follow that is stored in a `SKILL.md` file. Below is the list of skills that can be used. Each entry includes a name, description, and a short path that can be expanded into an absolute path using the skill roots table.\n### Skill roots\n- `r0` = `/srv/lab-disks/disk2/users/xymo/.codex/skills/.system`\n### Available skills\n- imagegen: Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts. Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector. Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas. (file: r0/imagegen/SKILL.md)\n- openai-docs: Use for Codex models/pricing, scheduled tasks, skills, settings, setup, troubleshooting, customization, automations, and self-knowledge\u2014including 'you,' 'your,' 'this app,' or 'this coding agent' when they refer to Codex\u2014and for OpenAI APIs/products and ChatGPT Work. Also use for model choice/migration, prompting, SDKs, Responses, Realtime, agents, evals, and Chat/Work/Codex comparisons. Do not use for generic app/software tasks that merely mention Codex. (file: r0/openai-docs/SKILL.md)\n- skill-creator: Create or update a Codex skill with appropriately scoped instructions and any needed supporting resources. (file: r0/skill-creator/SKILL.md)\n- skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path. Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos). (file: r0/skill-installer/SKILL.md)\n</skills_instructions>"
+            },
+            {
+              "type": "input_text",
+              "text": "<permissions instructions>\nFilesystem sandboxing defines which files can be read or written. `sandbox_mode` is `read-only`: The sandbox only permits reading files. Network access is restricted.\nApproval policy is currently never. Do not provide the `sandbox_permissions` for any reason, commands will be rejected.\n</permissions instructions>"
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-4817-7191-94c8-330c76f6819b",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "<environment_context>\n  <current_date>2026-11-22</current_date>\n  <timezone>Etc/UTC</timezone>\n</environment_context>"
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-4818-7641-b3b3-32a8f89aa928",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Run the synthetic local tool routing case."
+            }
+          ]
+        },
+        {
+          "type": "function_call",
+          "status": "completed",
+          "name": "ToolSearch",
+          "arguments": "{\"query\":\"select:Monitor\"}",
+          "call_id": "call-search"
+        },
+        {
+          "type": "function_call_output",
+          "id": "fco_01a20201-482c-7070-8300-d1a5d3612028",
+          "call_id": "call-search",
+          "output": "OFFLINE_TOOL_OK"
+        },
+        {
+          "type": "additional_tools",
+          "id": "at_01a20201-482d-7922-b796-e16c5bda6cd7",
+          "role": "system",
+          "tools": [
+            {
+              "type": "function",
+              "name": "Monitor",
+              "description": "Offline monitor routing fixture.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "description"
+                ],
+                "additionalProperties": false
+              }
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "name": "request_user_input",
+          "description": "Request user input for one to three short questions and wait for the response. This tool is only available in Plan mode.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "questions": {
+                "type": "array",
+                "description": "Questions to show the user. Prefer 1 and do not exceed 3",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "header": {
+                      "type": "string",
+                      "description": "Short header label shown in the UI (12 or fewer chars)."
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "Stable identifier for mapping answers (snake_case)."
+                    },
+                    "options": {
+                      "type": "array",
+                      "description": "Provide 2-3 mutually exclusive choices. Put the recommended option first and suffix its label with \"(Recommended)\". Do not include an \"Other\" option in this list; the client will add a free-form \"Other\" option automatically.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "description": {
+                            "type": "string",
+                            "description": "One short sentence explaining impact/tradeoff if selected."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "User-facing label (1-5 words)."
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "description"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "question": {
+                      "type": "string",
+                      "description": "Single-sentence prompt shown to the user."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "header",
+                    "question",
+                    "options"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "questions"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "get_goal",
+          "description": "Get the current goal for this thread, including status, budgets, token and elapsed-time usage, and remaining token budget.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "create_goal",
+          "description": "Create a goal only when explicitly requested by the user or system/developer instructions; do not infer goals from ordinary tasks.\nSet token_budget only when an explicit token budget is requested. Fails if an unfinished goal exists; use update_goal only for status.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "objective": {
+                "type": "string",
+                "description": "Required. The concrete objective to start pursuing. This starts a new active goal when no goal exists or replaces the current goal when it is complete."
+              },
+              "token_budget": {
+                "type": "integer",
+                "description": "Positive token budget for the new goal. Omit unless explicitly requested."
+              }
+            },
+            "required": [
+              "objective"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "update_goal",
+          "description": "Update the existing goal.\nSet status to `paused` only at the user's explicit request to pause this goal, never on your own initiative. Ask if unclear; a later resume revokes that request. Report the returned status and stop goal work. Budget limits take precedence over pausing.\nSet status to `complete` only when the objective has actually been achieved and no required work remains.\nSet status to `blocked` only when the same blocking condition has repeated for at least three consecutive goal turns, counting the original/user-triggered turn and any automatic continuations, and the agent cannot make meaningful progress without user input or an external-state change.\nIf the user resumes a goal that was previously marked `blocked`, treat the resumed run as a fresh blocked audit. If the same blocking condition then repeats for at least three consecutive resumed goal turns, set status to `blocked` again.\nOnce the blocked threshold is satisfied, do not keep reporting that you are still blocked while leaving the goal active; set status to `blocked`.\nDo not use `blocked` merely because the work is hard, slow, uncertain, incomplete, or would benefit from clarification.\nDo not mark a goal complete merely because its budget is nearly exhausted or because you are stopping work.\nYou cannot use this tool to resume, budget-limit, or usage-limit a goal; those status changes are controlled by the user or system.\nWhen marking a budgeted goal achieved with status `complete`, report the final token usage from the tool result to the user.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "Required. `paused` requires an explicit user request. Set to `complete` only when the objective is achieved and no required work remains. Set to `blocked` only after the same blocking condition has recurred for at least three consecutive goal turns and the agent is at an impasse. After a previously blocked goal is resumed, the resumed run starts a fresh blocked audit.",
+                "enum": [
+                  "complete",
+                  "blocked",
+                  "paused"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "ToolSearch",
+          "description": "Offline search routing fixture.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "parallel_tool_calls": true,
+      "reasoning": {
+        "effort": "low",
+        "summary": "auto"
+      },
+      "store": false,
+      "include": [
+        "reasoning.encrypted_content"
+      ],
+      "prompt_cache_key": "01a20201-437e-7b70-b379-f6040729be4a",
+      "client_metadata": {
+        "x-codex-window-id": "01a20201-437e-7b70-b379-f6040729be4a:0",
+        "turn_id": "01a20201-43ad-7ef2-9495-2b0e7f3fa762",
+        "root_turn_id": "01a20201-43ad-7ef2-9495-2b0e7f3fa762",
+        "x-codex-turn-metadata": "{\"installation_id\":\"9de2f879-d966-47f9-872f-bb75694dba2d\",\"session_id\":\"01a20201-437e-7b70-b379-f6040729be4a\",\"thread_id\":\"01a20201-437e-7b70-b379-f6040729be4a\",\"agent_name\":\"/root\",\"turn_id\":\"01a20201-43ad-7ef2-9495-2b0e7f3fa762\",\"window_id\":\"01a20201-437e-7b70-b379-f6040729be4a:0\",\"window_number\":0,\"context_window_id\":\"01a20201-4381-7f32-8bb5-7b2d8a076e8b\",\"request_kind\":\"turn\",\"history_initialization\":\"new\",\"root_turn_id\":\"01a20201-43ad-7ef2-9495-2b0e7f3fa762\",\"sandbox\":\"seccomp\",\"sandbox_mode\":\"read-only\",\"auto_review_enabled\":false,\"node_repl_auto_review_required\":false,\"node_repl_disabled\":false,\"turn_started_at_unix_ms\":1795329967023,\"analytics_enabled\":true,\"model\":\"gpt-6.1-terra\",\"reasoning_effort\":\"low\"}",
+        "x-codex-installation-id": "9de2f879-d966-47f9-872f-bb75694dba2d",
+        "session_id": "01a20201-437e-7b70-b379-f6040729be4a",
+        "thread_id": "01a20201-437e-7b70-b379-f6040729be4a"
+      }
+    }
+  },
+  {
+    "case": "injected_during_search",
+    "n": 3,
+    "path": "/v1/responses",
+    "body": {
+      "model": "gpt-6.1-terra",
+      "stream": true,
+      "input": [
+        {
+          "type": "message",
+          "id": "msg_ff5b5962-77ba-5d66-8c10-dee3bcad1f8f",
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Offline synthetic tool routing test."
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-4817-7191-94c8-32f225216d5a",
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Use only external dynamic tools."
+            },
+            {
+              "type": "input_text",
+              "text": "<skills_instructions>\n## Skills\nA skill is a set of local instructions to follow that is stored in a `SKILL.md` file. Below is the list of skills that can be used. Each entry includes a name, description, and a short path that can be expanded into an absolute path using the skill roots table.\n### Skill roots\n- `r0` = `/srv/lab-disks/disk2/users/xymo/.codex/skills/.system`\n### Available skills\n- imagegen: Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts. Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector. Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas. (file: r0/imagegen/SKILL.md)\n- openai-docs: Use for Codex models/pricing, scheduled tasks, skills, settings, setup, troubleshooting, customization, automations, and self-knowledge\u2014including 'you,' 'your,' 'this app,' or 'this coding agent' when they refer to Codex\u2014and for OpenAI APIs/products and ChatGPT Work. Also use for model choice/migration, prompting, SDKs, Responses, Realtime, agents, evals, and Chat/Work/Codex comparisons. Do not use for generic app/software tasks that merely mention Codex. (file: r0/openai-docs/SKILL.md)\n- skill-creator: Create or update a Codex skill with appropriately scoped instructions and any needed supporting resources. (file: r0/skill-creator/SKILL.md)\n- skill-installer: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path. Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos). (file: r0/skill-installer/SKILL.md)\n</skills_instructions>"
+            },
+            {
+              "type": "input_text",
+              "text": "<permissions instructions>\nFilesystem sandboxing defines which files can be read or written. `sandbox_mode` is `read-only`: The sandbox only permits reading files. Network access is restricted.\nApproval policy is currently never. Do not provide the `sandbox_permissions` for any reason, commands will be rejected.\n</permissions instructions>"
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-4817-7191-94c8-330c76f6819b",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "<environment_context>\n  <current_date>2026-11-22</current_date>\n  <timezone>Etc/UTC</timezone>\n</environment_context>"
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20201-4818-7641-b3b3-32a8f89aa928",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Run the synthetic local tool routing case."
+            }
+          ]
+        },
+        {
+          "type": "function_call",
+          "status": "completed",
+          "name": "ToolSearch",
+          "arguments": "{\"query\":\"select:Monitor\"}",
+          "call_id": "call-search"
+        },
+        {
+          "type": "function_call_output",
+          "id": "fco_01a20201-482c-7070-8300-d1a5d3612028",
+          "call_id": "call-search",
+          "output": "OFFLINE_TOOL_OK"
+        },
+        {
+          "type": "additional_tools",
+          "id": "at_01a20201-482d-7922-b796-e16c5bda6cd7",
+          "role": "system",
+          "tools": [
+            {
+              "type": "function",
+              "name": "Monitor",
+              "description": "Offline monitor routing fixture.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "description"
+                ],
+                "additionalProperties": false
+              }
+            }
+          ]
+        },
+        {
+          "type": "function_call",
+          "status": "completed",
+          "name": "Monitor",
+          "arguments": "{\"description\":\"offline\"}",
+          "call_id": "call-monitor"
+        },
+        {
+          "type": "function_call_output",
+          "id": "fco_01a20201-4840-72f0-9af4-d07e94bd22d6",
+          "call_id": "call-monitor",
+          "output": "unsupported call: Monitor"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "name": "request_user_input",
+          "description": "Request user input for one to three short questions and wait for the response. This tool is only available in Plan mode.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "questions": {
+                "type": "array",
+                "description": "Questions to show the user. Prefer 1 and do not exceed 3",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "header": {
+                      "type": "string",
+                      "description": "Short header label shown in the UI (12 or fewer chars)."
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "Stable identifier for mapping answers (snake_case)."
+                    },
+                    "options": {
+                      "type": "array",
+                      "description": "Provide 2-3 mutually exclusive choices. Put the recommended option first and suffix its label with \"(Recommended)\". Do not include an \"Other\" option in this list; the client will add a free-form \"Other\" option automatically.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "description": {
+                            "type": "string",
+                            "description": "One short sentence explaining impact/tradeoff if selected."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "User-facing label (1-5 words)."
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "description"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "question": {
+                      "type": "string",
+                      "description": "Single-sentence prompt shown to the user."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "header",
+                    "question",
+                    "options"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "questions"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "get_goal",
+          "description": "Get the current goal for this thread, including status, budgets, token and elapsed-time usage, and remaining token budget.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "create_goal",
+          "description": "Create a goal only when explicitly requested by the user or system/developer instructions; do not infer goals from ordinary tasks.\nSet token_budget only when an explicit token budget is requested. Fails if an unfinished goal exists; use update_goal only for status.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "objective": {
+                "type": "string",
+                "description": "Required. The concrete objective to start pursuing. This starts a new active goal when no goal exists or replaces the current goal when it is complete."
+              },
+              "token_budget": {
+                "type": "integer",
+                "description": "Positive token budget for the new goal. Omit unless explicitly requested."
+              }
+            },
+            "required": [
+              "objective"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "update_goal",
+          "description": "Update the existing goal.\nSet status to `paused` only at the user's explicit request to pause this goal, never on your own initiative. Ask if unclear; a later resume revokes that request. Report the returned status and stop goal work. Budget limits take precedence over pausing.\nSet status to `complete` only when the objective has actually been achieved and no required work remains.\nSet status to `blocked` only when the same blocking condition has repeated for at least three consecutive goal turns, counting the original/user-triggered turn and any automatic continuations, and the agent cannot make meaningful progress without user input or an external-state change.\nIf the user resumes a goal that was previously marked `blocked`, treat the resumed run as a fresh blocked audit. If the same blocking condition then repeats for at least three consecutive resumed goal turns, set status to `blocked` again.\nOnce the blocked threshold is satisfied, do not keep reporting that you are still blocked while leaving the goal active; set status to `blocked`.\nDo not use `blocked` merely because the work is hard, slow, uncertain, incomplete, or would benefit from clarification.\nDo not mark a goal complete merely because its budget is nearly exhausted or because you are stopping work.\nYou cannot use this tool to resume, budget-limit, or usage-limit a goal; those status changes are controlled by the user or system.\nWhen marking a budgeted goal achieved with status `complete`, report the final token usage from the tool result to the user.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "Required. `paused` requires an explicit user request. Set to `complete` only when the objective is achieved and no required work remains. Set to `blocked` only after the same blocking condition has recurred for at least three consecutive goal turns and the agent is at an impasse. After a previously blocked goal is resumed, the resumed run starts a fresh blocked audit.",
+                "enum": [
+                  "complete",
+                  "blocked",
+                  "paused"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "ToolSearch",
+          "description": "Offline search routing fixture.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "parallel_tool_calls": true,
+      "reasoning": {
+        "effort": "low",
+        "summary": "auto"
+      },
+      "store": false,
+      "include": [
+        "reasoning.encrypted_content"
+      ],
+      "prompt_cache_key": "01a20201-437e-7b70-b379-f6040729be4a",
+      "client_metadata": {
+        "thread_id": "01a20201-437e-7b70-b379-f6040729be4a",
+        "x-codex-installation-id": "9de2f879-d966-47f9-872f-bb75694dba2d",
+        "x-codex-window-id": "01a20201-437e-7b70-b379-f6040729be4a:0",
+        "turn_id": "01a20201-43ad-7ef2-9495-2b0e7f3fa762",
+        "root_turn_id": "01a20201-43ad-7ef2-9495-2b0e7f3fa762",
+        "session_id": "01a20201-437e-7b70-b379-f6040729be4a",
+        "x-codex-turn-metadata": "{\"installation_id\":\"9de2f879-d966-47f9-872f-bb75694dba2d\",\"session_id\":\"01a20201-437e-7b70-b379-f6040729be4a\",\"thread_id\":\"01a20201-437e-7b70-b379-f6040729be4a\",\"agent_name\":\"/root\",\"turn_id\":\"01a20201-43ad-7ef2-9495-2b0e7f3fa762\",\"window_id\":\"01a20201-437e-7b70-b379-f6040729be4a:0\",\"window_number\":0,\"context_window_id\":\"01a20201-4381-7f32-8bb5-7b2d8a076e8b\",\"request_kind\":\"turn\",\"history_initialization\":\"new\",\"root_turn_id\":\"01a20201-43ad-7ef2-9495-2b0e7f3fa762\",\"sandbox\":\"seccomp\",\"sandbox_mode\":\"read-only\",\"auto_review_enabled\":false,\"node_repl_auto_review_required\":false,\"node_repl_disabled\":false,\"turn_started_at_unix_ms\":1795329967023,\"analytics_enabled\":true,\"model\":\"gpt-6.1-terra\",\"reasoning_effort\":\"low\"}"
+      }
+    }
+  }
+]

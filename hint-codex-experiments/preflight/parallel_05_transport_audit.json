@@ -1,0 +1,687 @@
+{
+  "observed_at_utc": "2026-11-22T04:58:50.705550+00:00",
+  "scope": "Existing parallel05 artifacts/source read-only audit; authorized transport fix and offline tests are in new parallel06 copies only.",
+  "failure": {
+    "experiment": "codex_parallel_05",
+    "task": "claude-code-by-agents-recursive-delegation",
+    "group": "I",
+    "round": 1,
+    "stage": "fresh teacher review",
+    "reported_user_prompt_chars": 202118,
+    "reported_trajectory_chars": 163405,
+    "reported_hint_chars": 4064,
+    "reported_patch_chars": 34118,
+    "caveat": "The logged user-prompt count excludes review system text and the requested-output suffix also sent through the same argument.",
+    "worker_log": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/worker_logs/codex_parallel_05_lane0.log",
+    "log_evidence": [
+      {
+        "line": 661,
+        "text": "2026-11-22 04:40:08,464 [INFO] user prompt 总长: 202118 chars (traj=163405, hint=4064, diff=34118) | 模式: 失败诊断"
+      },
+      {
+        "line": 676,
+        "text": "2026-11-22 04:42:45,592 [ERROR] hint agent exit=126"
+      },
+      {
+        "line": 677,
+        "text": "/bin/bash: line 1: /opt/python3.12-tmp/bin/python3: Argument list too long"
+      },
+      {
+        "line": 701,
+        "text": "    raise RuntimeError(f\"Teacher review failed: {task}/{group}/{round_num}\")"
+      },
+      {
+        "line": 702,
+        "text": "RuntimeError: Teacher review failed: claude-code-by-agents-recursive-delegation/I/1"
+      }
+    ],
+    "exit_code": 126,
+    "cause": "The shell expanded the complete prompt file into one Python argv value; exec failed before Python/SDK startup because that argument exceeded the OS single-argument limit.",
+    "failed_review_bridge_session": "codex_parallel_05_lane0-claude-code-by-agents-recursive-delegation-I-review-r1",
+    "failed_review_model_request_count": 0,
+    "global_stop_reason": "Teacher review failed: claude-code-by-agents-recursive-delegation/I/1"
+  },
+  "transport_paths": [
+    {
+      "source": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/source_parallel/benchmark/deepswe/get_hint_by_task.py",
+      "lines": [
+        557,
+        567,
+        569,
+        571,
+        580,
+        585
+      ],
+      "use": "Initial teacher generation and all fresh/resumed teacher reviews pass problem_statement through shell command substitution; resume repeats the same file in extra_message."
+    },
+    {
+      "source": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/source_parallel/run_multi_turn_loop.py",
+      "lines": [
+        492,
+        508,
+        615,
+        625
+      ],
+      "use": "Student issue and resumed-feedback text use the same shell-to-argv boundary."
+    },
+    {
+      "source": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/source_parallel/run_cc_trajs_swe_pro.py",
+      "lines": [
+        340,
+        353,
+        480,
+        495
+      ],
+      "use": "Original single-run student entry also expands the complete file into argv."
+    },
+    {
+      "source": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/source_parallel/run_cc_sdk.py",
+      "lines": [
+        668,
+        711
+      ],
+      "use": "Shared SDK CLI previously accepted only inline problem_statement/extra_message; SDK query consumes parsed text directly."
+    }
+  ],
+  "unaffected_paths": [
+    "compress_hint.py passes assembled prompts in an HTTP JSON body via litellm.completion.",
+    "review_hint_traj.py CLI receives artifact paths; its active container-teacher branch reaches the failing get_hint_by_task.py boundary; its fallback HTTP branch does not use prompt argv.",
+    "teacher_progress.py passes progress prompts by Python/HTTP JSON bodies.",
+    "System prompts already use files. Codex bridge stdio JSON-RPC is a different transport with a 16MiB stream limit."
+  ],
+  "parallel06_fix": {
+    "source_root": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/source_parallel_06",
+    "production_files": [
+      "benchmark/deepswe/get_hint_by_task.py",
+      "run_cc_sdk.py",
+      "run_multi_turn_loop.py",
+      "run_cc_trajs_swe_pro.py"
+    ],
+    "new_flags": [
+      "--problem_statement_file",
+      "--extra_message_file"
+    ],
+    "effective_text_semantics": "Read UTF-8 with newline=\"\" and strip trailing LF characters only via rstrip(\"\\n\"), matching the former shell command-substitution value. Preserve CR, internal CRLF, other whitespace, Unicode, quotes and shell expressions as data. Direct inline flags remain unchanged.",
+    "original_prompt_files_preserved": true,
+    "prompt_truncation": false,
+    "model_tool_or_prompt_template_changes": false,
+    "offline_regression": {
+      "path": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/tests_parallel_06/test_prompt_file_transport.py",
+      "log": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/preflight/offline_tests_parallel_06_transport.log",
+      "tests": 4,
+      "seconds": 6.637,
+      "status": "passed",
+      "actual_models": 0,
+      "coverage": [
+        "Actual local teacher fresh/resume command templates with >128KiB text.",
+        "Actual local multiround-student fresh/resume and original single-run student command templates.",
+        "Complete original file bytes retained; effective text exactly checked after SDK CLI parsing through run_sdk capture substitute.",
+        "Short LF/CRLF examples compared with real former Bash command substitution; inline fresh/resume flags retain trailing newlines."
+      ]
+    },
+    "additional_sdk_gate_owner": "root; separate network-none real-SDK fake-endpoint verification, not performed by this audit."
+  },
+  "teacher_recovery": {
+    "runtime_audit": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/preflight/parallel_05_poststop_runtime_audit.json",
+    "prior_successful_same_session_evidence": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/preflight/parallel_05_teacher_resume_audit.json",
+    "teacher_state_files": [
+      {
+        "path": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane0/codex_parallel_05_lane0_H/reviews/claude-code-by-agents-recursive-delegation/round_1/teacher/teacher_state.json",
+        "saved_fields": [
+          "container_name",
+          "session_id",
+          "base_commit",
+          "initial_artifacts",
+          "arguments"
+        ],
+        "sdk_session_id": "7dfafce7-b68a-4833-b9d3-3e70aaff90bd",
+        "container_name": "hint-d3j8x8q7-swe-bench-202605-de069c33",
+        "initial_artifacts": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane0/codex_parallel_05_lane0_H/reviews/claude-code-by-agents-recursive-delegation/round_1/teacher",
+        "run_config_exists": true
+      },
+      {
+        "path": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane0/codex_parallel_05_lane0_M/reviews/claude-code-by-agents-recursive-delegation/round_1/teacher/teacher_state.json",
+        "saved_fields": [
+          "container_name",
+          "session_id",
+          "base_commit",
+          "initial_artifacts",
+          "arguments"
+        ],
+        "sdk_session_id": "f01394fa-135e-492d-8695-38db08fd7df9",
+        "container_name": "hint-d3j8x8q7-swe-bench-202605-f2acfc33",
+        "initial_artifacts": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane0/codex_parallel_05_lane0_M/reviews/claude-code-by-agents-recursive-delegation/round_1/teacher",
+        "run_config_exists": true
+      },
+      {
+        "path": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane0/codex_parallel_05_lane0_shared/hint_gen/claude-code-by-agents-recursive-delegation/teacher_state.json",
+        "saved_fields": [
+          "container_name",
+          "session_id",
+          "base_commit",
+          "initial_artifacts",
+          "arguments"
+        ],
+        "sdk_session_id": "f01394fa-135e-492d-8695-38db08fd7df9",
+        "container_name": "hint-d3j8x8q7-swe-bench-202605-f2acfc33",
+        "initial_artifacts": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane0/codex_parallel_05_lane0_M/reviews/claude-code-by-agents-recursive-delegation/round_1/teacher",
+        "run_config_exists": true
+      },
+      {
+        "path": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane1/codex_parallel_05_lane1_H/reviews/igel-persist-feature-schema/round_1/teacher/teacher_state.json",
+        "saved_fields": [
+          "container_name",
+          "session_id",
+          "base_commit",
+          "initial_artifacts",
+          "arguments"
+        ],
+        "sdk_session_id": "cdc35a79-0de8-47cd-98e9-033da1d6fa32",
+        "container_name": "hint-d3j8x8q7-swe-bench-202605-b5e58473",
+        "initial_artifacts": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane1/codex_parallel_05_lane1_H/reviews/igel-persist-feature-schema/round_1/teacher",
+        "run_config_exists": true
+      },
+      {
+        "path": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane1/codex_parallel_05_lane1_M/reviews/igel-persist-feature-schema/round_1/teacher/teacher_state.json",
+        "saved_fields": [
+          "container_name",
+          "session_id",
+          "base_commit",
+          "initial_artifacts",
+          "arguments"
+        ],
+        "sdk_session_id": "beda1466-615b-4390-8b47-f94443c36c68",
+        "container_name": "hint-d3j8x8q7-swe-bench-202605-f19bd51f",
+        "initial_artifacts": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane1/codex_parallel_05_lane1_M/reviews/igel-persist-feature-schema/round_1/teacher",
+        "run_config_exists": true
+      },
+      {
+        "path": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane1/codex_parallel_05_lane1_shared/hint_gen/igel-persist-feature-schema/teacher_state.json",
+        "saved_fields": [
+          "container_name",
+          "session_id",
+          "base_commit",
+          "initial_artifacts",
+          "arguments"
+        ],
+        "sdk_session_id": "beda1466-615b-4390-8b47-f94443c36c68",
+        "container_name": "hint-d3j8x8q7-swe-bench-202605-f19bd51f",
+        "initial_artifacts": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane1/codex_parallel_05_lane1_M/reviews/igel-persist-feature-schema/round_1/teacher",
+        "run_config_exists": true
+      },
+      {
+        "path": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane2/codex_parallel_05_lane2_I/reviews/ink-grid-box-layout/round_1/teacher/teacher_state.json",
+        "saved_fields": [
+          "container_name",
+          "session_id",
+          "base_commit",
+          "initial_artifacts",
+          "arguments"
+        ],
+        "sdk_session_id": "309daee5-eac2-4b45-b630-0cf1e776812a",
+        "container_name": "hint-d3j8x8q7-swe-bench-202605-7810b2ec",
+        "initial_artifacts": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane2/codex_parallel_05_lane2_I/reviews/ink-grid-box-layout/round_1/teacher",
+        "run_config_exists": true
+      },
+      {
+        "path": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane2/codex_parallel_05_lane2_shared/hint_gen/ink-grid-box-layout/teacher_state.json",
+        "saved_fields": [
+          "container_name",
+          "session_id",
+          "base_commit",
+          "initial_artifacts",
+          "arguments"
+        ],
+        "sdk_session_id": "a858814b-d8fe-4ff7-9a09-4c99b8254a36",
+        "container_name": "hint-d3j8x8q7-swe-bench-202605-7eee12ac",
+        "initial_artifacts": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane2/codex_parallel_05_lane2_shared/hint_gen/ink-grid-box-layout",
+        "run_config_exists": true
+      },
+      {
+        "path": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane3/codex_parallel_05_lane3_shared/hint_gen/kea-atomic-signal-selectors/teacher_state.json",
+        "saved_fields": [
+          "container_name",
+          "session_id",
+          "base_commit",
+          "initial_artifacts",
+          "arguments"
+        ],
+        "sdk_session_id": "b6058d35-16fe-4745-8cfd-6c7f4f902cc8",
+        "container_name": "hint-d3j8x8q7-swe-bench-202605-542d9007",
+        "initial_artifacts": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane3/codex_parallel_05_lane3_shared/hint_gen/kea-atomic-signal-selectors",
+        "run_config_exists": true
+      },
+      {
+        "path": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane4/codex_parallel_05_lane4_H/reviews/obsidian-linter-auto-table-of-contents/round_1/teacher/teacher_state.json",
+        "saved_fields": [
+          "container_name",
+          "session_id",
+          "base_commit",
+          "initial_artifacts",
+          "arguments"
+        ],
+        "sdk_session_id": "465723b6-8c03-4d98-a5bd-b9be7d2f865c",
+        "container_name": "hint-d3j8x8q7-swe-bench-202605-d30b0469",
+        "initial_artifacts": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane4/codex_parallel_05_lane4_H/reviews/obsidian-linter-auto-table-of-contents/round_1/teacher",
+        "run_config_exists": true
+      },
+      {
+        "path": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane4/codex_parallel_05_lane4_M/reviews/obsidian-linter-auto-table-of-contents/round_1/teacher/teacher_state.json",
+        "saved_fields": [
+          "container_name",
+          "session_id",
+          "base_commit",
+          "initial_artifacts",
+          "arguments"
+        ],
+        "sdk_session_id": "e2487a4b-903e-4056-8ea4-0371ba81d51c",
+        "container_name": "hint-d3j8x8q7-swe-bench-202605-ad9913c2",
+        "initial_artifacts": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane4/codex_parallel_05_lane4_M/reviews/obsidian-linter-auto-table-of-contents/round_1/teacher",
+        "run_config_exists": true
+      },
+      {
+        "path": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane4/codex_parallel_05_lane4_shared/hint_gen/obsidian-linter-auto-table-of-contents/teacher_state.json",
+        "saved_fields": [
+          "container_name",
+          "session_id",
+          "base_commit",
+          "initial_artifacts",
+          "arguments"
+        ],
+        "sdk_session_id": "e2487a4b-903e-4056-8ea4-0371ba81d51c",
+        "container_name": "hint-d3j8x8q7-swe-bench-202605-ad9913c2",
+        "initial_artifacts": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane4/codex_parallel_05_lane4_M/reviews/obsidian-linter-auto-table-of-contents/round_1/teacher",
+        "run_config_exists": true
+      },
+      {
+        "path": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane5/codex_parallel_05_lane5_H/reviews/sqlfmt-create-table-ddl-formatting/round_1/teacher/teacher_state.json",
+        "saved_fields": [
+          "container_name",
+          "session_id",
+          "base_commit",
+          "initial_artifacts",
+          "arguments"
+        ],
+        "sdk_session_id": "07efe20f-f99d-4879-b195-fefe4a93372f",
+        "container_name": "hint-d3j8x8q7-swe-bench-202605-2f65ad33",
+        "initial_artifacts": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane5/codex_parallel_05_lane5_H/reviews/sqlfmt-create-table-ddl-formatting/round_1/teacher",
+        "run_config_exists": true
+      },
+      {
+        "path": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane5/codex_parallel_05_lane5_M/reviews/sqlfmt-create-table-ddl-formatting/round_1/teacher/teacher_state.json",
+        "saved_fields": [
+          "container_name",
+          "session_id",
+          "base_commit",
+          "initial_artifacts",
+          "arguments"
+        ],
+        "sdk_session_id": "d5241875-e713-48f5-a75b-33b2673e9e5f",
+        "container_name": "hint-d3j8x8q7-swe-bench-202605-614eda67",
+        "initial_artifacts": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane5/codex_parallel_05_lane5_M/reviews/sqlfmt-create-table-ddl-formatting/round_1/teacher",
+        "run_config_exists": true
+      },
+      {
+        "path": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane5/codex_parallel_05_lane5_shared/hint_gen/sqlfmt-create-table-ddl-formatting/teacher_state.json",
+        "saved_fields": [
+          "container_name",
+          "session_id",
+          "base_commit",
+          "initial_artifacts",
+          "arguments"
+        ],
+        "sdk_session_id": "d5241875-e713-48f5-a75b-33b2673e9e5f",
+        "container_name": "hint-d3j8x8q7-swe-bench-202605-614eda67",
+        "initial_artifacts": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane5/codex_parallel_05_lane5_M/reviews/sqlfmt-create-table-ddl-formatting/round_1/teacher",
+        "run_config_exists": true
+      }
+    ],
+    "teacher_state_file_count": 15,
+    "sdk_layer": {
+      "status": "not recoverable from current ordinary host exports alone",
+      "observations": [
+        "save_teacher_state exports IDs, base commit, artifact path and sanitized arguments/config, not the native Claude CLI persisted conversation files.",
+        "Existing runtime audit found no SDK session JSONL files or session-named exports in the batch and no remaining original kept-teacher containers.",
+        "run_teacher_review(resume=True) first obtains the original named Docker container, then passes the saved SDK session ID to ClaudeAgentOptions.resume."
+      ],
+      "required_for_genuine_resume": [
+        "Original persisted Claude CLI session tree/transcript and associated subagent state needed by that exact SDK/CLI version, at the correct project working directory.",
+        "Original SDK session ID and original session-compatible runtime/tool configuration; required saved files and project base must also be restored.",
+        "A faithful SDK session restore must be validated before claiming continuation; teacher_state.json plus simplified trajs.json are insufficient by themselves."
+      ],
+      "caveat": "A separate preexisting rootfs/container/VM snapshot preserving the CLI session tree could change feasibility; none is established by current retained exports/runtime audit."
+    },
+    "native_layer": {
+      "status": "original rollout files exist, but bridge restart recovery is not implemented",
+      "teacher_thread_count": 16,
+      "rollouts_existing": 16,
+      "shared_main_thread_count": 6,
+      "threads": [
+        {
+          "bridge_session": "codex_parallel_05_lane4-obsidian-linter-auto-table-of-contents-shared",
+          "last_phase": "review_r1",
+          "native_thread_id": "01a2016b-1085-7ed3-bd69-23a0580ed9ac",
+          "event_line": 22899,
+          "event_timestamp": 1795320123.582451,
+          "rollout_path": "/srv/lab-disks/disk2/users/xymo/.codex/sessions/2026/11/22/rollout-2026-11-22T04-02-03-01a2016b-1085-7ed3-bd69-23a0580ed9ac.jsonl",
+          "rollout_exists": true,
+          "rollout_bytes": 471635,
+          "active_at_stop_snapshot": false,
+          "pending_at_stop_snapshot": [],
+          "persisted_session_metadata": {
+            "record_type": "session_meta",
+            "id": "01a2016b-1085-7ed3-bd69-23a0580ed9ac",
+            "cli_version": "0.163.0",
+            "has_base_instructions": true,
+            "has_dynamic_tools": true
+          }
+        },
+        {
+          "bridge_session": "codex_parallel_05_lane5-sqlfmt-create-table-ddl-formatting-shared",
+          "last_phase": "review_r1",
+          "native_thread_id": "01a2016b-1e61-7ca1-ac27-9b4bc006aa4e",
+          "event_line": 22910,
+          "event_timestamp": 1795320127.12727,
+          "rollout_path": "/srv/lab-disks/disk2/users/xymo/.codex/sessions/2026/11/22/rollout-2026-11-22T04-02-07-01a2016b-1e61-7ca1-ac27-9b4bc006aa4e.jsonl",
+          "rollout_exists": true,
+          "rollout_bytes": 633629,
+          "active_at_stop_snapshot": false,
+          "pending_at_stop_snapshot": [],
+          "persisted_session_metadata": {
+            "record_type": "session_meta",
+            "id": "01a2016b-1e61-7ca1-ac27-9b4bc006aa4e",
+            "cli_version": "0.163.0",
+            "has_base_instructions": true,
+            "has_dynamic_tools": true
+          }
+        },
+        {
+          "bridge_session": "codex_parallel_05_lane1-igel-persist-feature-schema-shared",
+          "last_phase": "review_r1",
+          "native_thread_id": "01a2016b-208e-7cc0-8cfe-85cc6ea49a81",
+          "event_line": 22915,
+          "event_timestamp": 1795320127.6828437,
+          "rollout_path": "/srv/lab-disks/disk2/users/xymo/.codex/sessions/2026/11/22/rollout-2026-11-22T04-02-07-01a2016b-208e-7cc0-8cfe-85cc6ea49a81.jsonl",
+          "rollout_exists": true,
+          "rollout_bytes": 484819,
+          "active_at_stop_snapshot": false,
+          "pending_at_stop_snapshot": [],
+          "persisted_session_metadata": {
+            "record_type": "session_meta",
+            "id": "01a2016b-208e-7cc0-8cfe-85cc6ea49a81",
+            "cli_version": "0.163.0",
+            "has_base_instructions": true,
+            "has_dynamic_tools": true
+          }
+        },
+        {
+          "bridge_session": "codex_parallel_05_lane2-ink-grid-box-layout-shared",
+          "last_phase": "generate",
+          "native_thread_id": "01a2016b-2e38-75d1-b550-2ac4a7277d69",
+          "event_line": 22966,
+          "event_timestamp": 1795320131.1775153,
+          "rollout_path": "/srv/lab-disks/disk2/users/xymo/.codex/sessions/2026/11/22/rollout-2026-11-22T04-02-11-01a2016b-2e38-75d1-b550-2ac4a7277d69.jsonl",
+          "rollout_exists": true,
+          "rollout_bytes": 216744,
+          "active_at_stop_snapshot": false,
+          "pending_at_stop_snapshot": [],
+          "persisted_session_metadata": {
+            "record_type": "session_meta",
+            "id": "01a2016b-2e38-75d1-b550-2ac4a7277d69",
+            "cli_version": "0.163.0",
+            "has_base_instructions": true,
+            "has_dynamic_tools": true
+          }
+        },
+        {
+          "bridge_session": "codex_parallel_05_lane0-claude-code-by-agents-recursive-delegation-shared",
+          "last_phase": "review_r1",
+          "native_thread_id": "01a2016b-38b4-74d3-bc97-9c0f99a52704",
+          "event_line": 22985,
+          "event_timestamp": 1795320133.8611703,
+          "rollout_path": "/srv/lab-disks/disk2/users/xymo/.codex/sessions/2026/11/22/rollout-2026-11-22T04-02-13-01a2016b-38b4-74d3-bc97-9c0f99a52704.jsonl",
+          "rollout_exists": true,
+          "rollout_bytes": 834878,
+          "active_at_stop_snapshot": false,
+          "pending_at_stop_snapshot": [],
+          "persisted_session_metadata": {
+            "record_type": "session_meta",
+            "id": "01a2016b-38b4-74d3-bc97-9c0f99a52704",
+            "cli_version": "0.163.0",
+            "has_base_instructions": true,
+            "has_dynamic_tools": true
+          }
+        },
+        {
+          "bridge_session": "codex_parallel_05_lane2-ink-grid-box-layout-I-r1_progress_1_candidate",
+          "last_phase": "progress_1_candidate",
+          "native_thread_id": "01a20172-81df-7770-893b-2a98116a3527",
+          "event_line": 32722,
+          "event_timestamp": 1795320612.7550576,
+          "rollout_path": "/srv/lab-disks/disk2/users/xymo/.codex/sessions/2026/11/22/rollout-2026-11-22T04-10-12-01a20172-81df-7770-893b-2a98116a3527.jsonl",
+          "rollout_exists": true,
+          "rollout_bytes": 933782,
+          "active_at_stop_snapshot": false,
+          "pending_at_stop_snapshot": [],
+          "persisted_session_metadata": {
+            "record_type": "session_meta",
+            "id": "01a20172-81df-7770-893b-2a98116a3527",
+            "cli_version": "0.163.0",
+            "has_base_instructions": true,
+            "has_dynamic_tools": false
+          }
+        },
+        {
+          "bridge_session": "codex_parallel_05_lane0-claude-code-by-agents-recursive-delegation-H-review-r1",
+          "last_phase": "review_r1",
+          "native_thread_id": "01a2017b-eefe-7c50-a128-efdea3c40fac",
+          "event_line": 34667,
+          "event_timestamp": 1795321229.1071353,
+          "rollout_path": "/srv/lab-disks/disk2/users/xymo/.codex/sessions/2026/11/22/rollout-2026-11-22T04-20-29-01a2017b-eefe-7c50-a128-efdea3c40fac.jsonl",
+          "rollout_exists": true,
+          "rollout_bytes": 318399,
+          "active_at_stop_snapshot": false,
+          "pending_at_stop_snapshot": [],
+          "persisted_session_metadata": {
+            "record_type": "session_meta",
+            "id": "01a2017b-eefe-7c50-a128-efdea3c40fac",
+            "cli_version": "0.163.0",
+            "has_base_instructions": true,
+            "has_dynamic_tools": true
+          }
+        },
+        {
+          "bridge_session": "codex_parallel_05_lane2-ink-grid-box-layout-I-r1_progress_2_candidate",
+          "last_phase": "progress_2_candidate",
+          "native_thread_id": "01a2017c-85e0-7db2-afa5-f92676f7b3a3",
+          "event_line": 34703,
+          "event_timestamp": 1795321267.7249856,
+          "rollout_path": "/srv/lab-disks/disk2/users/xymo/.codex/sessions/2026/11/22/rollout-2026-11-22T04-21-07-01a2017c-85e0-7db2-afa5-f92676f7b3a3.jsonl",
+          "rollout_exists": true,
+          "rollout_bytes": 1359868,
+          "active_at_stop_snapshot": false,
+          "pending_at_stop_snapshot": [],
+          "persisted_session_metadata": {
+            "record_type": "session_meta",
+            "id": "01a2017c-85e0-7db2-afa5-f92676f7b3a3",
+            "cli_version": "0.163.0",
+            "has_base_instructions": true,
+            "has_dynamic_tools": false
+          }
+        },
+        {
+          "bridge_session": "codex_parallel_05_lane1-igel-persist-feature-schema-H-review-r1",
+          "last_phase": "review_r1",
+          "native_thread_id": "01a2017c-ebb7-7471-b9da-a0e541617e78",
+          "event_line": 34940,
+          "event_timestamp": 1795321293.8027594,
+          "rollout_path": "/srv/lab-disks/disk2/users/xymo/.codex/sessions/2026/11/22/rollout-2026-11-22T04-21-33-01a2017c-ebb7-7471-b9da-a0e541617e78.jsonl",
+          "rollout_exists": true,
+          "rollout_bytes": 307637,
+          "active_at_stop_snapshot": false,
+          "pending_at_stop_snapshot": [],
+          "persisted_session_metadata": {
+            "record_type": "session_meta",
+            "id": "01a2017c-ebb7-7471-b9da-a0e541617e78",
+            "cli_version": "0.163.0",
+            "has_base_instructions": true,
+            "has_dynamic_tools": true
+          }
+        },
+        {
+          "bridge_session": "codex_parallel_05_lane5-sqlfmt-create-table-ddl-formatting-H-review-r1",
+          "last_phase": "review_r1",
+          "native_thread_id": "01a20180-79d6-7101-ba99-5367b4750522",
+          "event_line": 38307,
+          "event_timestamp": 1795321526.7954004,
+          "rollout_path": "/srv/lab-disks/disk2/users/xymo/.codex/sessions/2026/11/22/rollout-2026-11-22T04-25-26-01a20180-79d6-7101-ba99-5367b4750522.jsonl",
+          "rollout_exists": true,
+          "rollout_bytes": 282161,
+          "active_at_stop_snapshot": false,
+          "pending_at_stop_snapshot": [],
+          "persisted_session_metadata": {
+            "record_type": "session_meta",
+            "id": "01a20180-79d6-7101-ba99-5367b4750522",
+            "cli_version": "0.163.0",
+            "has_base_instructions": true,
+            "has_dynamic_tools": true
+          }
+        },
+        {
+          "bridge_session": "codex_parallel_05_lane3-kea-atomic-signal-selectors-shared",
+          "last_phase": "generate",
+          "native_thread_id": "01a20180-9a6c-7680-b734-017bdde38405",
+          "event_line": 38317,
+          "event_timestamp": 1795321535.1361754,
+          "rollout_path": "/srv/lab-disks/disk2/users/xymo/.codex/sessions/2026/11/22/rollout-2026-11-22T04-25-35-01a20180-9a6c-7680-b734-017bdde38405.jsonl",
+          "rollout_exists": true,
+          "rollout_bytes": 330713,
+          "active_at_stop_snapshot": false,
+          "pending_at_stop_snapshot": [],
+          "persisted_session_metadata": {
+            "record_type": "session_meta",
+            "id": "01a20180-9a6c-7680-b734-017bdde38405",
+            "cli_version": "0.163.0",
+            "has_base_instructions": true,
+            "has_dynamic_tools": true
+          }
+        },
+        {
+          "bridge_session": "codex_parallel_05_lane4-obsidian-linter-auto-table-of-contents-H-review-r1",
+          "last_phase": "review_r1",
+          "native_thread_id": "01a20183-bcb3-78c3-9d52-56dbd9d22fdb",
+          "event_line": 44907,
+          "event_timestamp": 1795321740.515264,
+          "rollout_path": "/srv/lab-disks/disk2/users/xymo/.codex/sessions/2026/11/22/rollout-2026-11-22T04-29-00-01a20183-bcb3-78c3-9d52-56dbd9d22fdb.jsonl",
+          "rollout_exists": true,
+          "rollout_bytes": 271559,
+          "active_at_stop_snapshot": false,
+          "pending_at_stop_snapshot": [],
+          "persisted_session_metadata": {
+            "record_type": "session_meta",
+            "id": "01a20183-bcb3-78c3-9d52-56dbd9d22fdb",
+            "cli_version": "0.163.0",
+            "has_base_instructions": true,
+            "has_dynamic_tools": true
+          }
+        },
+        {
+          "bridge_session": "codex_parallel_05_lane2-ink-grid-box-layout-I-review-r1",
+          "last_phase": "review_r1",
+          "native_thread_id": "01a20185-94c9-7c00-bd3d-7ba5eee27ab2",
+          "event_line": 47483,
+          "event_timestamp": 1795321861.3746138,
+          "rollout_path": "/srv/lab-disks/disk2/users/xymo/.codex/sessions/2026/11/22/rollout-2026-11-22T04-31-01-01a20185-94c9-7c00-bd3d-7ba5eee27ab2.jsonl",
+          "rollout_exists": true,
+          "rollout_bytes": 267664,
+          "active_at_stop_snapshot": false,
+          "pending_at_stop_snapshot": [],
+          "persisted_session_metadata": {
+            "record_type": "session_meta",
+            "id": "01a20185-94c9-7c00-bd3d-7ba5eee27ab2",
+            "cli_version": "0.163.0",
+            "has_base_instructions": true,
+            "has_dynamic_tools": true
+          }
+        },
+        {
+          "bridge_session": "codex_parallel_05_lane0-claude-code-by-agents-recursive-delegation-I-r1_progress_1_candidate",
+          "last_phase": "progress_1_candidate",
+          "native_thread_id": "01a2018b-20bd-7592-8540-c364c5023f1f",
+          "event_line": 52036,
+          "event_timestamp": 1795322226.205912,
+          "rollout_path": "/srv/lab-disks/disk2/users/xymo/.codex/sessions/2026/11/22/rollout-2026-11-22T04-37-06-01a2018b-20bd-7592-8540-c364c5023f1f.jsonl",
+          "rollout_exists": true,
+          "rollout_bytes": 1341985,
+          "active_at_stop_snapshot": false,
+          "pending_at_stop_snapshot": [],
+          "persisted_session_metadata": {
+            "record_type": "session_meta",
+            "id": "01a2018b-20bd-7592-8540-c364c5023f1f",
+            "cli_version": "0.163.0",
+            "has_base_instructions": true,
+            "has_dynamic_tools": false
+          }
+        },
+        {
+          "bridge_session": "codex_parallel_05_lane1-igel-persist-feature-schema-I-r1_progress_1_candidate",
+          "last_phase": "progress_1_candidate",
+          "native_thread_id": "01a2018d-cca7-72c2-a40c-385580d4a6c9",
+          "event_line": 52788,
+          "event_timestamp": 1795322399.9586155,
+          "rollout_path": "/srv/lab-disks/disk2/users/xymo/.codex/sessions/2026/11/22/rollout-2026-11-22T04-39-59-01a2018d-cca7-72c2-a40c-385580d4a6c9.jsonl",
+          "rollout_exists": true,
+          "rollout_bytes": 1008408,
+          "active_at_stop_snapshot": false,
+          "pending_at_stop_snapshot": [],
+          "persisted_session_metadata": {
+            "record_type": "session_meta",
+            "id": "01a2018d-cca7-72c2-a40c-385580d4a6c9",
+            "cli_version": "0.163.0",
+            "has_base_instructions": true,
+            "has_dynamic_tools": false
+          }
+        },
+        {
+          "bridge_session": "codex_parallel_05_lane4-obsidian-linter-auto-table-of-contents-I-r1_progress_1_candidate",
+          "last_phase": "progress_1_candidate",
+          "native_thread_id": "01a2018e-99b8-7bd2-a184-80ba5a3287f2",
+          "event_line": 53117,
+          "event_timestamp": 1795322452.464039,
+          "rollout_path": "/srv/lab-disks/disk2/users/xymo/.codex/sessions/2026/11/22/rollout-2026-11-22T04-40-52-01a2018e-99b8-7bd2-a184-80ba5a3287f2.jsonl",
+          "rollout_exists": true,
+          "rollout_bytes": 1279315,
+          "active_at_stop_snapshot": false,
+          "pending_at_stop_snapshot": [],
+          "persisted_session_metadata": {
+            "record_type": "session_meta",
+            "id": "01a2018e-99b8-7bd2-a184-80ba5a3287f2",
+            "cli_version": "0.163.0",
+            "has_base_instructions": true,
+            "has_dynamic_tools": false
+          }
+        }
+      ],
+      "bridge_source": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/source_parallel/codex_cli_bridge.py",
+      "observations": [
+        "CodexBridge initializes empty sessions/by_thread/by_call mappings; checkpoint only writes status and there is no checkpoint load path.",
+        "_open uses thread/start, not thread/resume. Pending history, user_inputs and usage accounting state are not fully rehydrated by the current checkpoint.",
+        "A persisted rollout and matching native thread ID do not prove the current HTTP bridge can resume it correctly."
+      ],
+      "required_for_genuine_resume": [
+        "Resume the original native thread ID from its persisted rollout instead of creating thread/start.",
+        "Restore matching SDK-to-native route/source identity, base instructions, dynamic tool schemas, acknowledged user/tool history and pending call mappings.",
+        "Restore usage-deduplication/accounting checkpoints and handle interrupted native turns explicitly so history and cost are neither replayed nor silently lost."
+      ]
+    },
+    "decision_boundary": "Neither a new SDK conversation nor reconstructed summary in a fresh native thread may be labeled as original M-teacher continuation. Native persistence alone does not replace the missing SDK session layer."
+  },
+  "actions": {
+    "model_calls": 0,
+    "service_restarts": 0,
+    "docker_or_vm_changes": 0,
+    "formal_reruns": 0,
+    "frozen05_source_or_results_modified": false,
+    "writes": "Only authorized06 source/tests edits, one06 offline test log and this new observation JSON."
+  }
+}

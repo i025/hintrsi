@@ -1,0 +1,580 @@
+import os
+import re
+import json
+import time
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Set, Union
+import pandas as pd
+import numpy as np
+import litellm
+import logging
+import threading
+import docker
+import threading
+import subprocess
+from concurrent.futures import ThreadPoolExecutor
+import concurrent.futures
+from constant_zhy import (
+    IMAGE_NAME,
+    LLM_SUMMARY_CHECK_MAX_RETRIES,
+    LLM_SUMMARY_CHECK_BACKOFF_BASE_SEC,
+    LLM_SUMMARY_CHECK_BACKOFF_MAX_SEC,
+)
+
+
+# 环境变量读取的结果是字符串，超时时间需要转换为 int
+TASK_TIMEOUT_SEC = int(os.getenv("TASK_TIMEOUT_SEC", "7200"))
+DOCKER_CLIENT_TIMEOUT_SEC = int(
+    os.getenv("DOCKER_CLIENT_TIMEOUT_SEC", str(max(TASK_TIMEOUT_SEC + 300, 600)))
+)
+
+# Per-attempt docker pull subprocess timeout (default 30 min).
+IMAGE_PULL_TIMEOUT_SEC = int(os.getenv("IMAGE_PULL_TIMEOUT_SEC", "1800"))
+# How many times to retry docker pull / wait_for before giving up.
+IMAGE_PULL_MAX_RETRIES = max(1, int(os.getenv("IMAGE_PULL_MAX_RETRIES", "3")))
+# Initial backoff between retries (exponential).
+IMAGE_PULL_BACKOFF_BASE_SEC = float(os.getenv("IMAGE_PULL_BACKOFF_BASE_SEC", "5"))
+# Max time wait_for blocks on a single future before resubmitting.
+IMAGE_WAIT_TIMEOUT_SEC = int(
+    os.getenv(
+        "IMAGE_WAIT_TIMEOUT_SEC",
+        str(IMAGE_PULL_TIMEOUT_SEC * IMAGE_PULL_MAX_RETRIES + 60),
+    )
+)
+
+
+class ImagePullFailedError(RuntimeError):
+    """Raised when an image cannot be fetched after all retries."""
+
+
+def safe_cmd(val) -> str:
+    if val is None:
+        return ""
+    if isinstance(val, float):
+        return ""
+    s = str(val).strip()
+    return s if s else ""
+
+
+def _backend_value(backend: Any, key: str) -> str:
+    if isinstance(backend, dict):
+        value = backend.get(key)
+    else:
+        value = getattr(backend, key, None)
+    if value is None:
+        raise ValueError(f"backend.{key} is required")
+    return str(value)
+
+
+def save_json(dir_path: Path, filename: str, data: Any) -> None:
+    if hasattr(data, "to_dict"):
+        data = data.to_dict()
+    with open(dir_path / filename, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+
+def safe_to_list(raw) -> list:
+    """Coerce parquet F2P/P2P value to a list of individual command strings.
+
+    Supports three input shapes observed in the wild:
+
+      1) numpy array / python list of strings   ← "old" parquets, e.g.
+         passes_1k_merged.parquet stores each command as its own array
+         element. Straight cast.
+
+      2) JSON-encoded string of a list, e.g.
+             '["cmd1", "cmd2"]'
+         emitted by mining_output_v2 (validate_final.py writes
+         `json.dumps(r.verified_f2p)`). Without json.loads this ends up
+         as a single-element list where the ONE element is the raw
+         JSON text — cc-run then shell-execs that literal `["…"]`
+         string, which fails with exit 127 ("No such file or directory").
+
+      3) Plain string that isn't a JSON list — single command, wrap
+         it as a one-element list.
+
+      4) None / NaN / empty — empty list.
+    """
+    # 1) Already a sequence
+    if isinstance(raw, (list, tuple, np.ndarray)):
+        return list(raw)
+    # 4) Missing values
+    try:
+        if raw is None or (not isinstance(raw, str) and not pd.notna(raw)):
+            return []
+    except (TypeError, ValueError):
+        # pd.notna doesn't know what to do — treat as present
+        pass
+    # 2) String that looks like a JSON list — decode it
+    if isinstance(raw, str):
+        stripped = raw.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            try:
+                parsed = json.loads(stripped)
+                if isinstance(parsed, list):
+                    return parsed
+            except (ValueError, json.JSONDecodeError):
+                pass  # fall through: treat as one long cmd
+        # 3) Plain string command
+        return [raw] if stripped else []
+    # Fallback: unrecognised, treat as single element
+    return [raw]
+
+
+def shard_dataframe(df: pd.DataFrame, world_size: int, node_rank: int) -> pd.DataFrame:
+    if node_rank < 0 or node_rank >= world_size:
+        raise ValueError(f"node_rank ({node_rank}) must be in range [0, {world_size - 1}]")
+
+    df_sorted = df.sort_values(by="instance_id").reset_index(drop=True)
+    total = len(df_sorted)
+    shard_size = total // world_size
+    remainder = total % world_size
+
+    if node_rank < remainder:
+        start = node_rank * (shard_size + 1)
+        end = start + shard_size + 1
+    else:
+        start = remainder * (shard_size + 1) + (node_rank - remainder) * shard_size
+        end = start + shard_size
+
+    return df_sorted.iloc[start:end].reset_index(drop=True)
+
+
+class LLMUtils:
+    @staticmethod
+    def is_text_a_summary(text: str, backend: Any) -> bool:
+        system_prompt = (
+            "You are an expert text analyzer. "
+            "Your task is to determine whether the provided text is a "
+            "'task completion summary' generated by an AI assistant/LLM "
+            "at the end of a workflow or task."
+        )
+        user_prompt = (
+            f"Analyze the following text:\n"
+            f'"""\n{text}\n"""\n\n'
+            f"Does this text represent an LLM's task completion summary "
+            f"(e.g., summarizing what was done, reporting success/failure, or concluding the task)?\n"
+            f"Strictly follow these output rules:\n"
+            f"1. You must wrap your final boolean answer inside <ans> tags.\n"
+            f"2. If it IS a task completion summary, output exactly: <ans>true</ans>\n"
+            f"3. If it is NOT, output exactly: <ans>false</ans>"
+        )
+
+        provider = _backend_value(backend, "provider")
+        model = _backend_value(backend, "model")
+        api_key = _backend_value(backend, "api_key")
+        base_url = _backend_value(backend, "api_base")
+
+        last_exc: Optional[Exception] = None
+        for attempt in range(1, LLM_SUMMARY_CHECK_MAX_RETRIES + 1):
+            try:
+                response = litellm.completion(
+                    model=f"{provider}/{model}",
+                    base_url=base_url,
+                    api_key=api_key,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    verbose=False,
+                    extra_body = {
+                        "chat_template_kwargs": {
+                            "enable_thinking": True,
+                            "clear_thinking": False,
+                        },
+                        "allow_external": True,
+                    }
+                )
+                content = response.choices[0].message.content.strip()
+                logging.debug(f"LLM summary check response: {content}")
+                match = re.search(r"<ans>\s*(true|false)\s*</ans>", content, re.IGNORECASE)
+                logging.debug(f"LLM summary check regex match: {match.group(1) if match else 'None'}")
+                return match.group(1).lower() == "true" if match else False
+            except Exception as e:
+                last_exc = e
+                logging.warning(
+                    f"Error calling LLM for summary check "
+                    f"(attempt {attempt}/{LLM_SUMMARY_CHECK_MAX_RETRIES}): {e}"
+                )
+                if attempt < LLM_SUMMARY_CHECK_MAX_RETRIES:
+                    backoff = min(
+                        LLM_SUMMARY_CHECK_BACKOFF_BASE_SEC * (2 ** (attempt - 1)),
+                        LLM_SUMMARY_CHECK_BACKOFF_MAX_SEC,
+                    )
+                    logging.info(f"Retrying summary check in {backoff:.1f}s ...")
+                    time.sleep(backoff)
+
+        logging.error(
+            f"All {LLM_SUMMARY_CHECK_MAX_RETRIES} attempts failed for summary check: {last_exc}"
+        )
+        return False
+
+
+class ImagePrefetcher:
+    def __init__(
+        self,
+        max_workers: int,
+        pull_timeout_sec: int = IMAGE_PULL_TIMEOUT_SEC,
+        max_retries: int = IMAGE_PULL_MAX_RETRIES,
+        backoff_base_sec: float = IMAGE_PULL_BACKOFF_BASE_SEC,
+        wait_timeout_sec: int = IMAGE_WAIT_TIMEOUT_SEC,
+    ):
+        self.max_workers = max(1, max_workers)
+        self.pull_timeout_sec = pull_timeout_sec
+        self.max_retries = max(1, max_retries)
+        self.backoff_base_sec = max(0.0, backoff_base_sec)
+        self.wait_timeout_sec = wait_timeout_sec
+        self._executor = ThreadPoolExecutor(
+            max_workers=self.max_workers,
+            thread_name_prefix="image-prefetch",
+        )
+        self._lock = threading.Lock()
+        self._futures: Dict[str, concurrent.futures.Future] = {}
+        # Track active docker pull subprocesses so close() can kill them and
+        # release worker threads on shutdown.
+        self._active_procs: Dict[str, subprocess.Popen] = {}
+        self._closed = False
+
+
+    def prime(self, df_or_images: Union[pd.DataFrame, Iterable[str]], max_queued: int = 0) -> None:
+        """Queue prefetch for images in ta<YOUR_API_KEY> order.
+
+        Accepts a DataFrame (column ``IMAGE_NAME``) or any ordered iterable of
+        image names. Callers should pass the same iteration order in which
+        tasks will be submitted to the task ThreadPoolExecutor, so prefetch
+        priority matches execution priority.
+
+        If *max_queued* > 0, only the first *max_queued* unique images are
+        submitted eagerly; the rest will be pulled on demand by ``wait_for``.
+        """
+        ordered_images = self._build_priority_order(df_or_images)
+        if max_queued > 0:
+            ordered_images = ordered_images[:max_queued]
+        for image_name in ordered_images:
+            self._submit(image_name)
+        if ordered_images:
+            logging.info(
+                "Queued %d unique images for prefetch in submission order (workers=%d)",
+                len(ordered_images),
+                self.max_workers,
+            )
+
+    def wait_for(self, image_name: str) -> None:
+        normalized = safe_cmd(image_name)
+        if not normalized:
+            raise ValueError("IMAGE_NAME is empty")
+
+        last_exc: Optional[BaseException] = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                future = self._submit(normalized)
+            except RuntimeError:
+                logging.warning("ImagePrefetcher closed, pulling %s directly", normalized)
+                self._pull_image_with_retry(normalized)
+                return
+            try:
+                future.result(timeout=self.wait_timeout_sec)
+                return
+            except concurrent.futures.TimeoutError as e:
+                last_exc = e
+                logging.warning(
+                    "wait_for(%s) timed out after %ss (attempt %d/%d); resubmitting",
+                    normalized,
+                    self.wait_timeout_sec,
+                    attempt,
+                    self.max_retries,
+                )
+                self._discard_future(normalized, future)
+            except ImagePullFailedError as e:
+                last_exc = e
+                logging.warning(
+                    "wait_for(%s) pull failed (attempt %d/%d): %s",
+                    normalized,
+                    attempt,
+                    self.max_retries,
+                    e,
+                )
+                self._discard_future(normalized, future)
+                if attempt < self.max_retries and self.backoff_base_sec > 0:
+                    time.sleep(self.backoff_base_sec)
+            except Exception as e:  # noqa: BLE001 - propagate as pull failure
+                last_exc = e
+                logging.warning(
+                    "wait_for(%s) errored (attempt %d/%d): %r",
+                    normalized,
+                    attempt,
+                    self.max_retries,
+                    e,
+                )
+                self._discard_future(normalized, future)
+                if attempt < self.max_retries and self.backoff_base_sec > 0:
+                    time.sleep(self.backoff_base_sec)
+
+        raise ImagePullFailedError(
+            f"Failed to obtain image {normalized} after {self.max_retries} wait attempts: {last_exc!r}"
+        )
+
+    def close(self) -> None:
+        with self._lock:
+            self._closed = True
+            procs = list(self._active_procs.items())
+            self._active_procs.clear()
+
+        # Kill any in-flight `docker pull` so worker threads can exit promptly.
+        for image_name, proc in procs:
+            try:
+                proc.kill()
+            except Exception as e:  # noqa: BLE001
+                logging.warning("Failed to kill docker pull for %s: %s", image_name, e)
+
+        try:
+            self._executor.shutdown(wait=False, cancel_futures=True)
+        except TypeError:
+            # cancel_futures is only available on Python >=3.9; older runtimes
+            # fall back to a non-blocking shutdown.
+            self._executor.shutdown(wait=False)
+
+    def _discard_future(
+        self, image_name: str, future: concurrent.futures.Future
+    ) -> None:
+        with self._lock:
+            if self._futures.get(image_name) is future:
+                del self._futures[image_name]
+
+    def _submit(self, image_name: str) -> concurrent.futures.Future:
+        normalized = safe_cmd(image_name)
+        if not normalized:
+            raise ValueError("IMAGE_NAME is empty")
+
+        with self._lock:
+            if self._closed:
+                raise RuntimeError("ImagePrefetcher is closed")
+            future = self._futures.get(normalized)
+            if future is None or future.cancelled():
+                future = self._executor.submit(self._pull_image_with_retry, normalized)
+                self._futures[normalized] = future
+        return future
+
+    def _build_priority_order(
+        self, df_or_images: Union[pd.DataFrame, Iterable[str]]
+    ) -> List[str]:
+        if isinstance(df_or_images, pd.DataFrame):
+            raw_iter: Iterable[Any] = df_or_images[IMAGE_NAME].tolist()
+        else:
+            raw_iter = list(df_or_images)
+        scheduled_images = [safe_cmd(raw) for raw in raw_iter]
+        scheduled_images = [image for image in scheduled_images if image]
+        if not scheduled_images:
+            return []
+
+        seen: Set[str] = set()
+        ordered_images: List[str] = []
+        for image_name in scheduled_images:
+            if image_name not in seen:
+                ordered_images.append(image_name)
+                seen.add(image_name)
+
+        return ordered_images
+
+    def _pull_image_with_retry(self, image_name: str) -> str:
+        # Fast path: image already present locally.
+        try:
+            client = docker.from_env(timeout=DOCKER_CLIENT_TIMEOUT_SEC)
+            try:
+                client.images.get(image_name)
+                logging.info("Image already present locally: %s", image_name)
+                return image_name
+            except docker.errors.ImageNotFound:
+                pass
+            finally:
+                client.close()
+        except Exception as e:  # noqa: BLE001
+            logging.warning(
+                "Image presence check failed for %s: %r (will attempt pull)",
+                image_name,
+                e,
+            )
+
+        last_err: Optional[BaseException] = None
+        for attempt in range(1, self.max_retries + 1):
+            if self._closed:
+                raise ImagePullFailedError(
+                    f"ImagePrefetcher closed during pull of {image_name}"
+                )
+            try:
+                self._run_docker_pull(image_name)
+                logging.info(
+                    "Prefetch completed image: %s (attempt %d)",
+                    image_name,
+                    attempt,
+                )
+                return image_name
+            except subprocess.TimeoutExpired as e:
+                last_err = e
+                logging.warning(
+                    "docker pull %s timed out after %ss (attempt %d/%d)",
+                    image_name,
+                    self.pull_timeout_sec,
+                    attempt,
+                    self.max_retries,
+                )
+            except subprocess.CalledProcessError as e:
+                last_err = e
+                stderr_raw = e.stderr
+                if isinstance(stderr_raw, (bytes, bytearray)):
+                    stderr_text = stderr_raw.decode("utf-8", errors="replace")
+                else:
+                    stderr_text = stderr_raw or ""
+                logging.warning(
+                    "docker pull %s failed (attempt %d/%d, exit=%s): %s",
+                    image_name,
+                    attempt,
+                    self.max_retries,
+                    e.returncode,
+                    stderr_text.strip()[:1024],
+                )
+            except Exception as e:  # noqa: BLE001
+                last_err = e
+                logging.warning(
+                    "docker pull %s errored (attempt %d/%d): %r",
+                    image_name,
+                    attempt,
+                    self.max_retries,
+                    e,
+                )
+
+            if attempt < self.max_retries and self.backoff_base_sec > 0:
+                backoff = self.backoff_base_sec * (2 ** (attempt - 1))
+                time.sleep(backoff)
+
+        raise ImagePullFailedError(
+            f"docker pull failed for {image_name} after {self.max_retries} attempts: {last_err!r}"
+        )
+
+    def _run_docker_pull(self, image_name: str) -> None:
+        logging.info(
+            "Prefetch pulling image: %s (timeout=%ss)",
+            image_name,
+            self.pull_timeout_sec,
+        )
+        proc = subprocess.Popen(
+            ["docker", "pull", image_name],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+        )
+        with self._lock:
+            self._active_procs[image_name] = proc
+        try:
+            try:
+                _, stderr = proc.communicate(timeout=self.pull_timeout_sec)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                try:
+                    proc.communicate(timeout=10)
+                except Exception:  # noqa: BLE001
+                    pass
+                raise
+            if proc.returncode != 0:
+                raise subprocess.CalledProcessError(
+                    proc.returncode,
+                    ["docker", "pull", image_name],
+                    output=None,
+                    stderr=stderr,
+                )
+        finally:
+            with self._lock:
+                if self._active_procs.get(image_name) is proc:
+                    del self._active_procs[image_name]
+
+
+class ImageGarbageCollector:
+    @staticmethod
+    def remove_image_if_unused(image_ref: str) -> bool:
+        normalized = safe_cmd(image_ref)
+        if not normalized:
+            return False
+
+        client = docker.from_env(timeout=DOCKER_CLIENT_TIMEOUT_SEC)
+        try:
+            try:
+                image = client.images.get(normalized)
+            except docker.errors.ImageNotFound:
+                logging.info("[ImageGC] Image already absent: %s", normalized)
+                return False
+
+            running_containers = client.containers.list(all=False)
+            if any(container.image and container.image.id == image.id for container in running_containers):
+                logging.info("[ImageGC] Skip removing in-use image: %s", normalized)
+                return False
+
+            client.images.remove(image.id, force=True)
+            logging.info("[ImageGC] Removed image: %s", normalized)
+            return True
+        except docker.errors.APIError as e:
+            logging.warning("[ImageGC] Failed to remove image %s: %s", normalized, e)
+            return False
+        finally:
+            client.close()
+
+
+
+# --------------------------------------------------------------------------
+# Problem-statement sanitizer: strip upstream URLs / PR numbers / commit SHAs
+# so the model can't just look up the fix. Kept in utils.py so both
+# run_cc_trajs_swe_pro and run_cc_trajs_zhy share the same rules.
+# --------------------------------------------------------------------------
+_UPSTREAM_LINK_RX = re.compile(
+    r"""(?ix)
+    \b
+    (?:
+        https?://(?:www\.)?
+            (?:github\.com|gitlab\.com|bitbucket\.org)
+            /[^\s)>\]"']+
+      |
+        https?://(?:raw\.githubusercontent|patch-diff\.githubusercontent|
+                    gist\.githubusercontent|objects\.githubusercontent)\.com
+            /[^\s)>\]"']+
+      |
+        (?:PR|pull\ request|issue|fix(?:ed)?\ in)\s*\#?\d+
+      |
+        \bpull/\d+
+      |
+        \bcommit/[0-9a-f]{7,40}
+    )
+    """
+)
+# Bare git commit SHAs (10-12 or 40 hex). Careful with 8-9-char hex — they hit
+# unrelated hex strings (colors, addresses). 10 chars is safer.
+_BARE_SHA_RX = re.compile(r"\b[0-9a-f]{40}\b|\b[0-9a-f]{10,12}\b")
+
+
+def sanitize_problem_statement(ps: str, instance_id: Optional[str] = None) -> str:
+    """Strip upstream URLs / PR#s / commit SHAs from the problem statement so
+    the model can't trivially look up the fix. `instance_id`'s @<sha> suffix
+    (e.g. `130403592@ab5a58af31` -> commit `ab5a58af31…`) is also redacted."""
+    if not ps:
+        return ps
+    redacted = _UPSTREAM_LINK_RX.sub("[REDACTED-upstream-link]", ps)
+    redacted = _BARE_SHA_RX.sub("[REDACTED-sha]", redacted)
+    if instance_id and "@" in instance_id:
+        suffix = instance_id.split("@", 1)[1]
+        if suffix and len(suffix) >= 7:
+            redacted = redacted.replace(suffix, "[REDACTED-sha]")
+    return redacted
+
+
+
+# --------------------------------------------------------------------------
+# Anti-cheat symbols moved to anticheat.py — re-export for backwards compat.
+# New code should `from anticheat import ...` directly.
+# --------------------------------------------------------------------------
+from anticheat import (  # noqa: E402, F401
+    ANTICHEAT_SCRUB_LOG_PATH,
+    ANTICHEAT_REBUILD_LOG_PATH,
+    ANTICHEAT_BLOCKS_LOG_PATH,
+    ANTICHEAT_FIREWALL_LOG_PATH,
+    REBUILD_GIT,
+    STRICT_SCRUB,
+    git_scrub_command,
+    git_rebuild_command,
+)

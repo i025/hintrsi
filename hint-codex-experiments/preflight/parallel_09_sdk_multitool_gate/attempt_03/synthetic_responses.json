@@ -1,0 +1,154 @@
+[
+  {
+    "path": "/v1/messages?beta=true",
+    "main": true,
+    "response": {
+      "id": "chatcmpl-offline-0",
+      "object": "chat.completion",
+      "created": 1795335806,
+      "model": "gpt-6.1-terra",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "Execute the three independent local checks; preserve café Ω, quotes, and backslashes.",
+            "tool_calls": [
+              {
+                "id": "initial-read",
+                "type": "function",
+                "function": {
+                  "name": "Read",
+                  "arguments": "{\"file_path\": \"/app/fixture Ω \\\"quoted\\\".txt\"}"
+                }
+              },
+              {
+                "id": "initial-inspect",
+                "type": "function",
+                "function": {
+                  "name": "Bash",
+                  "arguments": "{\"command\": \"/opt/python3.12-tmp/bin/python3 -c 'from pathlib import Path; print(Path('\\\"'\\\"'/app/fixture Ω \\\"quoted\\\".txt'\\\"'\\\"').read_text(), end=\\\"\\\")'\", \"description\": \"Read the independent Unicode fixture\", \"timeout\": 30000}"
+                }
+              },
+              {
+                "id": "initial-write",
+                "type": "function",
+                "function": {
+                  "name": "Bash",
+                  "arguments": "{\"command\": \"/opt/python3.12-tmp/bin/python3 -c 'from pathlib import Path; Path('\\\"'\\\"'/app/initial_marker.txt'\\\"'\\\"').write_text('\\\"'\\\"'initial marker café Ω\\\\nA literal \\\"quote\\\" and backslash \\\\\\\\ preserved.\\\\n'\\\"'\\\"'); print(\\\"OFFLINE_WRITE_OK\\\")'\", \"description\": \"Write an independent escaped-text fixture\", \"timeout\": 30000}"
+                }
+              }
+            ]
+          },
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 100,
+        "completion_tokens": 25,
+        "total_tokens": 125
+      }
+    }
+  },
+  {
+    "path": "/v1/messages?beta=true",
+    "main": true,
+    "response": {
+      "id": "chatcmpl-offline-1",
+      "object": "chat.completion",
+      "created": 1795335814,
+      "model": "gpt-6.1-terra",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "OFFLINE_MULTITOOL_COMPLETE_INITIAL"
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 100,
+        "completion_tokens": 25,
+        "total_tokens": 125
+      }
+    }
+  },
+  {
+    "path": "/v1/messages?beta=true",
+    "main": true,
+    "response": {
+      "id": "chatcmpl-offline-2",
+      "object": "chat.completion",
+      "created": 1795335854,
+      "model": "gpt-6.1-terra",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "Execute the three independent local checks; preserve café Ω, quotes, and backslashes.",
+            "tool_calls": [
+              {
+                "id": "resume-read",
+                "type": "function",
+                "function": {
+                  "name": "Read",
+                  "arguments": "{\"file_path\": \"/app/initial_marker.txt\"}"
+                }
+              },
+              {
+                "id": "resume-inspect",
+                "type": "function",
+                "function": {
+                  "name": "Bash",
+                  "arguments": "{\"command\": \"/opt/python3.12-tmp/bin/python3 -c 'from pathlib import Path; print(Path('\\\"'\\\"'/app/fixture Ω \\\"quoted\\\".txt'\\\"'\\\"').read_text(), end=\\\"\\\")'\", \"description\": \"Read the independent Unicode fixture\", \"timeout\": 30000}"
+                }
+              },
+              {
+                "id": "resume-write",
+                "type": "function",
+                "function": {
+                  "name": "Bash",
+                  "arguments": "{\"command\": \"/opt/python3.12-tmp/bin/python3 -c 'from pathlib import Path; Path('\\\"'\\\"'/app/resume_marker.txt'\\\"'\\\"').write_text('\\\"'\\\"'resume marker café Ω\\\\nA literal \\\"quote\\\" and backslash \\\\\\\\ preserved.\\\\n'\\\"'\\\"'); print(\\\"OFFLINE_WRITE_OK\\\")'\", \"description\": \"Write an independent escaped-text fixture\", \"timeout\": 30000}"
+                }
+              }
+            ]
+          },
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 100,
+        "completion_tokens": 25,
+        "total_tokens": 125
+      }
+    }
+  },
+  {
+    "path": "/v1/messages?beta=true",
+    "main": true,
+    "response": {
+      "id": "chatcmpl-offline-3",
+      "object": "chat.completion",
+      "created": 1795335861,
+      "model": "gpt-6.1-terra",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "OFFLINE_MULTITOOL_COMPLETE_RESUME"
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 100,
+        "completion_tokens": 25,
+        "total_tokens": 125
+      }
+    }
+  }
+]

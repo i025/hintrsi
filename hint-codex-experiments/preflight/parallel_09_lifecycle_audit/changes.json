@@ -1,0 +1,39 @@
+{
+  "source_unchanged": "source_parallel_09",
+  "candidate": "preflight/parallel_09_lifecycle_audit/candidate/codex_cli_bridge.py",
+  "real_model_calls": 0,
+  "regressions": {
+    "existing_bridge_tests": 20,
+    "new_lifecycle_tests": 7,
+    "teacher_hook_and_service_tests": 18,
+    "report_tests": 15
+  },
+  "new_files": [
+    "fixture_multiple.py",
+    "probe_cancel.py",
+    "probe_candidate.py",
+    "probe_candidate_multiple.py",
+    "probe_code_mode.py",
+    "probe_tool_output.py",
+    "test_late_results.py",
+    "candidate/codex_cli_bridge.py"
+  ],
+  "behavior_changes": [
+    "Cancelled native RPC calls retain the actual SDK observation via turn/start toolOutput in the same thread.",
+    "If native already ended, a new native turn is required; otherwise the active turn consumes the observation.",
+    "No SDK operation is executed twice; unsuccessful SDK results retain is_error and exact content in the tool-output envelope.",
+    "Earlier native final messages are withheld from the SDK during result recovery.",
+    "Recovery model work is counted in existing token and native-turn ledgers; tool_result_recoveries.jsonl records call attribution."
+  ],
+  "limitations": [
+    "Real CLI protocol and local provider were tested; no real-model semantic behavior is claimed.",
+    "The first multiple-call fixture assumed both calls would arrive in one initial HTTP response; it failed that fixture assumption. Its result is retained in candidate_native_multiple.",
+    "Recovered native turns are an explicit compatibility behavior, not strict equivalence to the original stateless model API.",
+    "The second multiple-call fixture waited for two callbacks inside one exec; this CLI serialized those callbacks. Its failed fixture result is retained in candidate_native_multiple_batched. The passing multiple-cell fixture models two separately yielded exec cells and records callback coalescing explicitly."
+  ],
+  "native_cli_cases": {
+    "single_cancel_active_and_completed": "preflight/parallel_09_lifecycle_audit/candidate_native/result.json",
+    "multiple_cancel_active_and_completed": "preflight/parallel_09_lifecycle_audit/candidate_native_multiple_cells/result.json",
+    "passed": 4
+  }
+}

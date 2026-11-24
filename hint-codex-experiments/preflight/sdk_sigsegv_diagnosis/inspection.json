@@ -1,0 +1,21 @@
+{
+  "sdk": "0.2.186",
+  "claude_cli": "2.1.329",
+  "binary_kind": "ELF x86_64 with Bun note; no GNU CPU minimum note found",
+  "host_node_available": false,
+  "same_version_node_alternative": false,
+  "npm_finding": "Official2.1.329 package has no cli.js application. cli-wrapper.cjs/install.cjs delegate to native optional platform packages. Node would still launch the native backend.",
+  "production_changed": false,
+  "model_calls": 0,
+  "related_sources": [
+    "https://github.com/anthropics/claude-code/issues/87974",
+    "https://github.com/oven-sh/bun/issues/22901"
+  ],
+  "interpretation": "Reports motivate comparing the same native CLI with BUN_JSC_useJIT=0; they do not prove this is the observed crash cause.",
+  "minimum_cpu_context": {
+    "source": "https://bun.com/docs/installation#cpu-requirements",
+    "current_official_bun_docs": "Current x64 Bun targets Nehalem/SSE4.2 and selects AVX paths at runtime.",
+    "observed_guest": "SSE4.2 and CX16 present; AVX absent.",
+    "limitation": "The bundled CLI Bun revision is not yet independently identified. Lack of AVX alone does not establish an unsupported CPU or the crash cause."
+  }
+}

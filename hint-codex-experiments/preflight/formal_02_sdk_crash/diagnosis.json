@@ -1,0 +1,66 @@
+{
+  "created_at": 1795308709.3947577,
+  "conclusion": "Claude SDK bundled native CLI 2.1.329 died with SIGSEGV after init and before first model HTTP request; underlying faulty instruction or engine cause not established",
+  "scope": "Read-only diagnosis; no model calls, service restart, runtime edits or competing fixtures",
+  "first_observed_error_utc": "2026-11-22T00:46:02.684Z",
+  "sdk_exit_code": -11,
+  "sdk_session_id": "d77eb3ff-3512-41d2-990a-5d115b6fda0d",
+  "sdk_cli_version": "2.1.329",
+  "sdk_wall_seconds": 13.96660329300039,
+  "main_agent_empty": true,
+  "subagent_groups": 0,
+  "has_result_message": false,
+  "metadata_status": "incomplete",
+  "patch_bytes": 0,
+  "h_model_requests": 0,
+  "proxy_http_post_lines": 0,
+  "proxy_http_get_lines": [
+    "INFO:     127.0.0.1:33658 - \"GET /health/liveliness HTTP/1.1\" 200 OK"
+  ],
+  "actual_append_char_count": 3785,
+  "actual_append_mode": "append",
+  "original_hint_path": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_formal_02/codex_formal_02_shared/hint_gen/anko-default-function-arguments/hint_compact_r1.md",
+  "actual_wrapped_hint_specimen": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/preflight/formal_02_sdk_crash/H1_artifacts/turn_1/system_prompt_config.json",
+  "problem_source": "hint-baseline-run/data/deep_swe_tasks.parquet instance_id=anko-default-function-arguments row.problem_statement",
+  "user_prompt_template": "source/benchmark/deepswe/prompts/deep_swe_user_prompt.md",
+  "request_counts_by_session_role_phase": {
+    "codex_formal_02-anko-default-function-arguments-B-r1|student|solve": 27,
+    "codex_formal_02-anko-default-function-arguments-shared|teacher|generate": 11,
+    "codex_formal_02-anko-default-function-arguments-shared-compress_r1|compressor|compress_r1": 1
+  },
+  "raw_stdout_crash_clues": [
+    "  [sdk] 2026-11-22 00:46:02,684 - ERROR - [MainThread] - Fatal error in message reader: Command failed with exit code -11 (exit code: -11)"
+  ],
+  "instruction_pointer": null,
+  "kernel_segfault_entry": null,
+  "guest_journal_note": "Kernel journal 00:35-00:49 and full journal 00:45:30-00:46:30 UTC contain no claude/SIGSEGV/IP/Bun panic line. No OOM or kernel panic shown in captured windows.",
+  "stderr_transport": {
+    "sdk_default": "options.stderr=None; stderr inherited from Python parent",
+    "pipe_condition": "subprocess_cli.py825-826: PIPE only if options.stderr is not None",
+    "error_detail": "subprocess_cli.py1113-1117 uses fixed ProcessError stderr text Check stderr output for details; this is not captured native stderr",
+    "production_options": "source/run_cc_sdk.py create_agent_options does not install stderr callback",
+    "debug_stderr": "types.py2610 deprecated, ignored by transport; use stderr callback",
+    "probe_recommendation": "Explicit stderr callback to append actual lines, plus probe-only extra_args debug-file; retain stdout and original ProcessError exit code"
+  },
+  "offline_stress_plan": {
+    "owner": "plan_cli_capabilities",
+    "real_model_calls": 0,
+    "network": "network_mode=none; deterministic local fake Anthropic endpoint, including count_tokens and auxiliary requests",
+    "reuse": [
+      "preflight/sdk_hook_fixture/probe.py SSE handler, original create_agent_options and OnlineTeacher",
+      "preflight/sdk_hook_fixture/host_probe.py isolation/runtime mount pattern",
+      "preflight/probe_sdk_bridge.py Read/Edit/Bash-test/resume checks only; do not run its actual model endpoint path"
+    ],
+    "controls": "Preserve native 2.1.329 default-engine control, compare BUN_JSC_useJIT=0 with same SDK/version/QEMU/8CPU128g/runtime mount",
+    "sessions": "20 fresh candidate sessions including no append, exact H append and long input; same-session second turn must retain edited file/context",
+    "checks": [
+      "Intended tool calls actually execute and tool_use_id matches",
+      "Read original file, Edit source, Bash meaningful unittest; exit0 and completed ResultMessage",
+      "Same SDK session_id on resume; persisted fix and second change verified independently",
+      "Exact H append_text equality, hook checkpoint and original tool output retained",
+      "Per-attempt stdout, native stderr/debug, elapsed time and request counts",
+      "Synthetic usage excluded from formal tokens; stop on first real crash"
+    ],
+    "limit": "A passing sample reduces observed startup failure risk but does not prove all engine/runtime faults eliminated"
+  }
+}

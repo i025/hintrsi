@@ -1,0 +1,59 @@
+{
+  "original": "executeChat(\nCLAUDE.md\nquote \"Omega Ω\" literal \\n \\u263a C:\\data\\sample\n",
+  "expected": "executeChat(\nCLAUDE.md\nquote \"Updated Ω\" literal \\n \\u263a C:\\data\\sample\nadded pattern \\( and dot \\.\n",
+  "cases": {
+    "initial": [
+      {
+        "name": "Read",
+        "arguments": {
+          "file_path": "/app/fixture.txt"
+        }
+      },
+      {
+        "name": "Bash",
+        "arguments": {
+          "command": "grep -E 'executeChat\\(|CLAUDE\\.md' /app/fixture.txt",
+          "description": "Search literal parentheses and dots",
+          "timeout": 30000
+        }
+      },
+      {
+        "name": "Bash",
+        "arguments": {
+          "command": "printf '%s\\n' 'spaces \"quote\" Ω \\n \\u263a C:\\data\\file' ",
+          "description": "Print literal escape sequences",
+          "timeout": 30000
+        }
+      },
+      {
+        "name": "Bash",
+        "arguments": {
+          "command": "printf 'EXPECTED_FAILURE\\n' >&2; exit 7",
+          "description": "Return a controlled tool failure",
+          "timeout": 30000
+        }
+      }
+    ],
+    "edit": [
+      {
+        "name": "Edit",
+        "arguments": {
+          "file_path": "/app/fixture.txt",
+          "old_string": "quote \"Omega Ω\" literal \\n \\u263a C:\\data\\sample",
+          "new_string": "quote \"Updated Ω\" literal \\n \\u263a C:\\data\\sample\nadded pattern \\( and dot \\.",
+          "replace_all": false
+        }
+      }
+    ],
+    "verify": [
+      {
+        "name": "Bash",
+        "arguments": {
+          "command": "/opt/python3.12-tmp/bin/python3 -c 'from pathlib import Path; value=Path('\"'\"'/app/fixture.txt'\"'\"').read_text(); assert value=='\"'\"'executeChat(\\nCLAUDE.md\\nquote \"Updated Ω\" literal \\\\n \\\\u263a C:\\\\data\\\\sample\\nadded pattern \\\\( and dot \\\\.\\n'\"'\"'; print('\"'\"'SDK_ARGUMENTS_CHECK_OK'\"'\"')'",
+          "description": "Check exact edited content",
+          "timeout": 30000
+        }
+      }
+    ]
+  }
+}

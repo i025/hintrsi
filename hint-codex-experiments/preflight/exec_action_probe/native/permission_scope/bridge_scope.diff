@@ -1,0 +1,14 @@
+--- before/codex_exec_bridge.py
++++ after/codex_exec_bridge.py
+@@ -21,6 +21,11 @@
+ Follow its system and developer instructions and the chronological user, assistant, and
+ external tool observations. Do not invent or omit prior observations. Tool definitions
+ in the tools array describe operations available through that SDK, not native Codex tools.
++The local Codex process and the external SDK workspace are separate environments.
++The read-only sandbox applies to this local process, which only returns JSON.
++Requests in tool_calls are executed by the SDK under the supplied conversation's permissions.
++Preserve explicit SDK restrictions and tool denials; do not infer that the SDK workspace
++is read-only from the local sandbox mode.
+ Return only the structured response required by the output schema. To request operations,
+ put their exact names and JSON-encoded argument objects in tool_calls. The original SDK
+ will execute them and supply their actual results in a subsequent request. Do not execute

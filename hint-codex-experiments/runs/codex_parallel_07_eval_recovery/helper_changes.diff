@@ -1,0 +1,23 @@
+--- /srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05_eval_recovery/run_verifier_recovery.py
++++ /srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_07_eval_recovery/run_verifier_recovery.py
+@@ -5,15 +5,15 @@
+ N=Path("/srv/lab-disks/disk2/users/xymo/hint-codex-experiments")
+ W=Path("/srv/lab-disks/disk2/users/xymo/hint-baseline-run")
+ lane=int(sys.argv[1]);task=sys.argv[2];group=sys.argv[3]
+-directory=N/"runs/codex_parallel_05_eval_recovery"/f"lane{lane}"
+-original_run=N/"runs/codex_parallel_05/lanes"/f"codex_parallel_05_lane{lane}"/f"codex_parallel_05_lane{lane}_{group}_r1"
++directory=N/"runs/codex_parallel_07_eval_recovery"/f"lane{lane}"
++original_run=N/"runs/codex_parallel_07/lanes"/f"codex_parallel_07_lane{lane}"/f"codex_parallel_07_lane{lane}_{group}_r1"
+ patch=original_run/"infer_logs"/task/"patch.diff"
+ original=patch.read_bytes();copy=directory/"original_patch.diff";copy.write_bytes(original)
+-sys.path.insert(0,str(N/"source_parallel/benchmark/deepswe"))
++sys.path.insert(0,str(N/"source_parallel_07/benchmark/deepswe"))
+ from eval_deep_swe import evaluate_task
+-parameters={"task_dir":W/"data/tasks"/task,"task_id":task,"patches_dir":original_run/"infer_logs","output_dir":directory/"eval_output","delete_image":True}
++parameters={"task_dir":W/"data/tasks"/task,"task_id":task,"patches_dir":original_run/"infer_logs","output_dir":directory/"eval_output","delete_image":False}
+ start=time.monotonic()
+-record={"lane":lane,"task":task,"group":group,"round":1,"origin_experiment":f"codex_parallel_05_lane{lane}","started_at_utc":datetime.now(timezone.utc).isoformat(),"source_patch":str(patch),"source_patch_bytes":len(original),"source_patch_copy":str(copy),"source_trajectory":str(original_run/"infer_logs"/task/"trajs.json"),"original_formal_result_existed":(original_run/"eval_output"/task/"eval_result.json").exists(),"parameters":{key:str(value) if isinstance(value,Path) else value for key,value in parameters.items()},"docker_host":os.environ["DOCKER_HOST"],"label":os.environ["HINT_EXPERIMENT_NAME"],"verifier_memory":"8g","network_mode":"none","guest_vcpus":8,"real_model_calls":0,"student_rerun":False,"prior_attempt_status":"student_completed_grading_interrupted","status":"running"}
++record={"pid":os.getpid(),"lane":lane,"task":task,"group":group,"round":1,"origin_experiment":f"codex_parallel_07_lane{lane}","started_at_utc":datetime.now(timezone.utc).isoformat(),"source_patch":str(patch),"source_patch_bytes":len(original),"source_patch_copy":str(copy),"source_trajectory":str(original_run/"infer_logs"/task/"trajs.json"),"original_formal_result_existed":(original_run/"eval_output"/task/"eval_result.json").exists(),"parameters":{key:str(value) if isinstance(value,Path) else value for key,value in parameters.items()},"docker_host":os.environ["DOCKER_HOST"],"label":os.environ["HINT_EXPERIMENT_NAME"],"verifier_memory":"8g","network_mode":"none","guest_vcpus":8,"verifier_nano_cpus":0,"real_model_calls":0,"student_rerun":False,"prior_attempt_status":"student_completed_grading_interrupted","status":"running"}
+ meta=directory/"metadata.json";meta.write_text(json.dumps(record,indent=2)+"\n")
+ print(json.dumps({"event":"verifier_recovery_started","lane":lane,"task":task,"parameters":record["parameters"]}),flush=True)
+ try:

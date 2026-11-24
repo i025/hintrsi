@@ -1,0 +1,60 @@
+{
+  "formal_09_started": false,
+  "frozen_source_modified": false,
+  "real_model_calls": 0,
+  "blocking_compatibility_issue": {
+    "issue": "Native Code Mode wait termination closes the dynamic-tool RPC while the SDK command continues.",
+    "observed_08": "Obsidian I1: native call cancelled 15:55:27 CST; SDK success 59/59 suites and 1190/1190 tests at 15:57:41 was absent from native history.",
+    "candidate": "candidate/codex_cli_bridge.py",
+    "candidate_diff": "candidate.diff",
+    "new_behavior": "Deliver the actual SDK observation via native turn/start toolOutput; keep the thread; withhold earlier final; never rerun the SDK tool.",
+    "equivalence_limit": "Recovery can add a native model turn and stores a named tool output envelope containing original call ID, arguments, error flag and exact output. This is an explicit adapter behavior, not strict stateless-API equivalence.",
+    "rejected_setting": "code_mode_interrupt=false did not prevent terminate=true or retain late results."
+  },
+  "completion_and_grading": {
+    "sdk_completion_gate": "run_cc_sdk.py:612-624 requires ResultMessage with is_error=false and no online-teacher error.",
+    "export": "Patch and collected trajectory are saved in finally; incomplete remains incomplete.",
+    "formal_grade_gate": "run_multi_turn_loop.py:964-995 skips grading on SDK/API execution errors when experiment_session is set.",
+    "existing_gap": "A native cancelled subtool followed by successful native final previously looked like normal SDK completion; recovery addresses the observation loss before that final."
+  },
+  "teacher_and_timeout": {
+    "checkpoints": "20 completed main-agent tools, wait for inflight set empty, maximum 3 checks per actual attempt.",
+    "handoff": "Only screened hint is added as hook context; original tool output stays intact.",
+    "08_checks": 6,
+    "student_tool_or_agent_completion_events_during_exact_student_wait_intervals": 0,
+    "accounting_detail": "Runner timeout subtracts host teacher-service wait; report subtracts the SDK hook HTTP wait. Observed SDK waits exceeded service waits by about 0.3-0.6 seconds per check. No observed 08 attempt approached the 7200-second limit.",
+    "impact": "Document timing definitions; no demonstrated score change from this small measurement difference."
+  },
+  "usage_and_elapsed": {
+    "08_token_events": 793,
+    "08_native_threads": 53,
+    "08_native_turns": 58,
+    "08_total_tokens": 39160506,
+    "negative_deltas": 0,
+    "delta_sum_equals_sum_of_final_thread_totals": true,
+    "token_phase_mismatches": 0,
+    "attempt_elapsed": "Driver elapsed_seconds includes setup, student and formal verifier. It is not pure model time.",
+    "student_active": "SDK wall time minus online-teacher HTTP wait; includes SDK/tool execution overhead.",
+    "model_request_seconds": "Sum of bridge HTTP request waiting time; can overlap across lanes and is not experiment makespan.",
+    "recovered_08_evals": "Independent recovered elapsed values explicitly sum original student SDK wall plus recovered verifier wall; exclude stop wait and must not be silently pooled with driver whole-attempt wall.",
+    "shared_HM": "Shared first-round tokens/outcome are counted once, branch references are separately represented."
+  },
+  "validation": {
+    "new_lifecycle_tests": 7,
+    "existing_bridge_tests": 20,
+    "teacher_tests": 18,
+    "report_tests": 15,
+    "real_cli_candidate_cases": 4,
+    "native_result_paths": [
+      "candidate_native/result.json",
+      "candidate_native_multiple_cells/result.json"
+    ]
+  },
+  "source_references": [
+    "source_parallel_09/codex_cli_bridge.py",
+    "source_parallel_09/run_cc_sdk.py",
+    "source_parallel_09/run_multi_turn_loop.py",
+    "source_parallel_09/teacher_progress.py",
+    "source_parallel_09/report_codex_experiments.py"
+  ]
+}

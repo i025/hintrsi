@@ -1,0 +1,42 @@
+{
+  "status": "candidate_verified_not_deployed",
+  "recorded_at_unix": 1795337386.9350457,
+  "formal09_started": false,
+  "real_model_calls": 0,
+  "containers_started": 0,
+  "frozen_bridge_matches_archive": true,
+  "import_paths_passed": true,
+  "original_test_count": 106,
+  "six_lane_concurrent_tests_passed": 6,
+  "candidate_regression_tests_passed": 128,
+  "candidate": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/preflight/parallel_09_concurrency_audit/candidate/codex_cli_bridge.py",
+  "diff": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/preflight/parallel_09_concurrency_audit/candidate.diff",
+  "confirmed_gap": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/preflight/parallel_09_concurrency_audit/lost_response_retry.json",
+  "normal_concurrency_result": "No cross-session tool, token, or guidance mixing observed in six-lane interleaved simulation.",
+  "candidate_scope": [
+    "Same bridge process, same resolved Session and phase: replay the immediately previous complete response for identical messages.",
+    "Partial SDK history: resend only served, incomplete tool calls missing from assistant tool_calls, before newer arrivals.",
+    "Replay emits no native turn, no duplicate tool result and no token ledger entry; returned API usage repeats the original response.",
+    "Last request/response use deep copies and stay in memory; teacher checkpoint field format is unchanged.",
+    "Respect native ErrorNotification.willRetry: transient non-quota notification does not set a permanent session error; quota still stops all lanes."
+  ],
+  "remaining_boundaries": [
+    "Existing completed haiku one_shot auxiliary routing can select a fresh Session before replay lookup; independent audit is checking this path.",
+    "No cache across bridge restart, and no general replay of older requests after newer conversation progress.",
+    "Cancellation of an HTTP wait does not automatically interrupt the native turn; native cancellation/late result behavior is a separate candidate under root review.",
+    "Account/transport/native-tool/guidance failures can intentionally stop all lanes through the shared bridge."
+  ],
+  "retry_notification_tests_passed": 5,
+  "retry_notification_probe": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/preflight/parallel_09_concurrency_audit/retry_notification_probe.json",
+  "real_cli_retry_probe": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/preflight/parallel_09_concurrency_audit/native_retry/result.json",
+  "real_cli_retry_probe_passed": true,
+  "native_retry_evidence": {
+    "provider_requests": 2,
+    "native_turn_starts": 1,
+    "willRetry": true,
+    "native_cli_process_closed": true,
+    "loopback_server_closed": true,
+    "synthetic_tokens": 25,
+    "formal_token_ledger_modified": false
+  }
+}

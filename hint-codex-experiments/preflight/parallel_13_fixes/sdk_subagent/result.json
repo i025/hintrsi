@@ -1,0 +1,218 @@
+{
+  "kind": "offline_sdk_subagent_fixture",
+  "mode": "fork",
+  "real_model_calls": 0,
+  "synthetic_model_usage": true,
+  "main_model_requests": 5,
+  "all_fake_http_requests": 5,
+  "requests": [
+    {
+      "index": 1,
+      "model": "gpt-6.1-terra",
+      "metadata": {
+        "user_id": "{\"device_id\":\"5dc3eae845c9feb452ca48fdd9e352602e34c3f0d38e93fb255da403edc239b8\",\"account_uuid\":\"\",\"session_id\":\"ed7c93d2-8fda-46a2-b867-674ae8238f21\"}"
+      },
+      "roles": [
+        "user",
+        "system"
+      ],
+      "history_tool_uses": [],
+      "history_tool_results": []
+    },
+    {
+      "index": 2,
+      "model": "gpt-6.1-terra",
+      "metadata": {
+        "user_id": "{\"device_id\":\"5dc3eae845c9feb452ca48fdd9e352602e34c3f0d38e93fb255da403edc239b8\",\"account_uuid\":\"\",\"session_id\":\"ed7c93d2-8fda-46a2-b867-674ae8238f21\"}"
+      },
+      "roles": [
+        "user",
+        "system",
+        "assistant",
+        "user"
+      ],
+      "history_tool_uses": [
+        "fixture-parent-read"
+      ],
+      "history_tool_results": [
+        "fixture-parent-read"
+      ]
+    },
+    {
+      "index": 3,
+      "model": "gpt-6.1-terra",
+      "metadata": {
+        "user_id": "{\"device_id\":\"5dc3eae845c9feb452ca48fdd9e352602e34c3f0d38e93fb255da403edc239b8\",\"account_uuid\":\"\",\"session_id\":\"ed7c93d2-8fda-46a2-b867-674ae8238f21\"}"
+      },
+      "roles": [
+        "user",
+        "system",
+        "assistant",
+        "user"
+      ],
+      "history_tool_uses": [
+        "fixture-parent-read",
+        "fixture-parent-agent"
+      ],
+      "history_tool_results": [
+        "fixture-parent-read",
+        "fixture-parent-agent"
+      ]
+    },
+    {
+      "index": 4,
+      "model": "gpt-6.1-terra",
+      "metadata": {
+        "user_id": "{\"device_id\":\"5dc3eae845c9feb452ca48fdd9e352602e34c3f0d38e93fb255da403edc239b8\",\"account_uuid\":\"\",\"session_id\":\"ed7c93d2-8fda-46a2-b867-674ae8238f21\"}"
+      },
+      "roles": [
+        "user",
+        "system",
+        "assistant",
+        "user"
+      ],
+      "history_tool_uses": [
+        "fixture-parent-read",
+        "fixture-parent-agent",
+        "fixture-child-read"
+      ],
+      "history_tool_results": [
+        "fixture-parent-read",
+        "fixture-parent-agent",
+        "fixture-child-read"
+      ]
+    },
+    {
+      "index": 5,
+      "model": "gpt-6.1-terra",
+      "metadata": {
+        "user_id": "{\"device_id\":\"5dc3eae845c9feb452ca48fdd9e352602e34c3f0d38e93fb255da403edc239b8\",\"account_uuid\":\"\",\"session_id\":\"ed7c93d2-8fda-46a2-b867-674ae8238f21\"}"
+      },
+      "roles": [
+        "user",
+        "system",
+        "assistant",
+        "user"
+      ],
+      "history_tool_uses": [
+        "fixture-parent-read",
+        "fixture-parent-agent"
+      ],
+      "history_tool_results": [
+        "fixture-parent-read",
+        "fixture-parent-agent"
+      ]
+    }
+  ],
+  "sdk_child_parent_tool_use_ids": [
+    "fixture-parent-agent"
+  ],
+  "hook_main_tool_count": 2,
+  "teacher_checks": 0,
+  "sdk_hook_events": [
+    {
+      "session_id": "ed7c93d2-8fda-46a2-b867-674ae8238f21",
+      "transcript_path": "/root/.claude/projects/-app/ed7c93d2-8fda-46a2-b867-674ae8238f21.jsonl",
+      "cwd": "/app",
+      "prompt_id": "f4dba5a9-206a-45e9-a130-5d2907314fba",
+      "permission_mode": "bypassPermissions",
+      "effort": {
+        "level": "high"
+      },
+      "hook_event_name": "PostToolUse",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": "/app/fixture_parent.txt"
+      },
+      "tool_response": {
+        "type": "text",
+        "file": {
+          "filePath": "/app/fixture_parent.txt",
+          "content": "ORIGINAL_PARENT_FIXTURE_CONTENT\n",
+          "numLines": 2,
+          "startLine": 1,
+          "totalLines": 2
+        }
+      },
+      "tool_use_id": "fixture-parent-read",
+      "duration_ms": 682
+    },
+    {
+      "session_id": "ed7c93d2-8fda-46a2-b867-674ae8238f21",
+      "transcript_path": "/root/.claude/projects/-app/ed7c93d2-8fda-46a2-b867-674ae8238f21.jsonl",
+      "cwd": "/app",
+      "prompt_id": "f4dba5a9-206a-45e9-a130-5d2907314fba",
+      "permission_mode": "bypassPermissions",
+      "effort": {
+        "level": "high"
+      },
+      "hook_event_name": "PostToolUse",
+      "tool_name": "Agent",
+      "tool_input": {
+        "description": "Inspect fixture child file",
+        "prompt": "SUBAGENT_FIXTURE_CHILD_MARKER: Read /app/fixture_child.txt and return its exact content.",
+        "subagent_type": "fork",
+        "run_in_background": false
+      },
+      "tool_response": {
+        "status": "completed",
+        "prompt": "SUBAGENT_FIXTURE_CHILD_MARKER: Read /app/fixture_child.txt and return its exact content.",
+        "agentId": "a573cbe9afa3fb56f",
+        "agentType": "fork",
+        "toolsUsed": [
+          "Read"
+        ],
+        "harnessNoteCount": 0,
+        "harnessTailCount": 0,
+        "harnessSectionHash": "49b0cf2da4a1e019",
+        "content": [
+          {
+            "type": "text",
+            "text": "CHILD_SUMMARY_MARKER: child fixture inspected."
+          }
+        ],
+        "resolvedModel": "gpt-6.1-terra",
+        "totalDurationMs": 2618,
+        "totalTokens": 120,
+        "totalToolUseCount": 1,
+        "usage": {
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          },
+          "input_tokens": 100,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 20,
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "toolStats": {
+          "readCount": 1,
+          "searchCount": 0,
+          "bashCount": 0,
+          "editFileCount": 0,
+          "linesAdded": 0,
+          "linesRemoved": 0,
+          "otherToolCount": 0
+        },
+        "canContinueAgent": true
+      },
+      "tool_use_id": "fixture-parent-agent",
+      "duration_ms": 2640
+    }
+  ],
+  "child_summary_received": true,
+  "parent_final_received": true,
+  "passed": true
+}

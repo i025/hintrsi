@@ -1,0 +1,686 @@
+--- source_parallel/benchmark/deepswe/get_hint_by_task.py
++++ source_parallel_06/benchmark/deepswe/get_hint_by_task.py
+@@ -564,11 +564,11 @@
+             f"--base_commit {self.base_commit}",
+             f"--log_path {SDK_SCRIPT_LOG_PATH}",
+             f"--output_dir {output_dir_in_container}",
+-            f'--problem_statement "$(cat {HINT_PS_CONTAINER_PATH})"',
++            f"--problem_statement_file {HINT_PS_CONTAINER_PATH}",
+         ]
+         if resume_session_id:
+             cmd_parts += [f"--resume_session_id {shlex.quote(resume_session_id)}",
+-                          f'--extra_message "$(cat {HINT_PS_CONTAINER_PATH})"']
++                          f"--extra_message_file {HINT_PS_CONTAINER_PATH}"]
+         cmd_str = " ".join(cmd_parts)
+         log.info("运行 hint agent (timeout=%ds)", HINT_TASK_TIMEOUT_SEC)
+         log.info("命令: %s", cmd_str[:300])
+--- source_parallel/report_codex_experiments.py
++++ source_parallel_06/report_codex_experiments.py
+@@ -428,6 +428,9 @@
+             "parallel_new_totals": parallel_new,
+             "parallel_workers": state.get("workers", []),
+             "parallelism": state.get("parallelism"),
++            "selected_tasks": state.get("selected_tasks"),
++            "deferred_prior_tasks": state.get("deferred_prior_tasks", []),
++            "available_runtime_lanes": state.get("available_runtime_lanes"),
+             "protocol_group_totals": {name: dict(groups) for name, groups in protocol_group_totals.items()},
+             "group_totals": dict(group_totals), "bridge_scope_totals": dict(scope_totals),
+             "stages": selected, "attempts": attempt_rows, "outcomes": outcomes(state, attempts),
+@@ -457,6 +460,11 @@
+         lines += ["本次是执行路径演练，所有占位成绩均排除，不计入实验结果。", ""]
+     elif metrics["stage"] == "integration":
+         lines += ["H 与 I 在各自指定题上验证流程，题目不同，不据此比较组间效果。", ""]
++    if metrics.get("selected_tasks") is not None:
++        lines += ["本批结果主表仅统计所选新题：" + "、".join(metrics["selected_tasks"]) + "。",
++                  "历史观察保留在逐次尝试明细；旧批延后题仍未完成，不计作新批已完成。实际用量覆盖明确引用的全部来源。", ""]
++        if metrics.get("deferred_prior_tasks"):
++            lines += ["延后题：" + "、".join(metrics["deferred_prior_tasks"]) + "。", ""]
+     lines += ["## 解题结果", "", "各组首轮与累计结果分开统计。未完成和未跑满轮次不等同正常失败。", "",
+               "| 组别 | 协议题数 | 已尝试题数 | 首轮通过 | 累计通过 | 跑满仍失败题数 | 未完成尝试 | 尚未结束题数 |",
+               "|---|---:|---:|---:|---:|---:|---:|---:|"]
+@@ -514,7 +522,7 @@
+         lines.append("v1/v2的费用归属另见 metrics.json.protocol_group_totals，避免将过渡题费用用于v2分支效果比较。")
+     if metrics.get("included_experiment_states"):
+         lines += ["", "## 按题并行与来源", "",
+-                  f"本次按题固定分配{metrics['parallelism']}路，每路独立运行原有题内流程；实际学生与教师仍为8CPU/128GiB。Anko保留旧批已完成结果，其余九题各执行一次，不跨路复用学生代码。",
++                  f"本次按题固定分配{metrics['parallelism']}路，每路独立运行原有题内流程；实际学生与教师仍为8CPU/128GiB。" + ("本批只启动上述新选题，旧批观察只读保留，不续接旧教师、不跨路复用学生代码。" if metrics.get("selected_tasks") is not None else "Anko保留旧批已完成结果，其余九题各执行一次，不跨路复用学生代码。"),
+                   f"本并行段新增实际用量：{metrics['parallel_new_totals']['total_tokens']} Token。上文报告总量还覆盖明确承接的历史来源，不能再次与旧批总量相加。",
+                   "各路共用账户额度和宿主机；整批墙钟、每次SDK/有效时间、教师等待须分别解释，不能把并行墙钟当作纯模型提速。", "",
+                   "| 路 | 实验 | 固定题目 | 状态 |", "|---:|---|---|---|"]
+--- source_parallel/run_cc_sdk.py
++++ source_parallel_06/run_cc_sdk.py
+@@ -668,8 +668,11 @@
+ def parse_args() -> argparse.Namespace:
+     """解析命令行参数"""
+     parser = argparse.ArgumentParser(description="Claude Code SDK Quick Start")
+-    parser.add_argument("--problem_statement", default=None, type=str,
+-                        help="问题描述(首轮必填;resume 时可省略)")
++    problem = parser.add_mutually_exclusive_group()
++    problem.add_argument("--problem_statement", default=None, type=str,
++                         help="问题描述(首轮必填;resume 时可省略)")
++    problem.add_argument("--problem_statement_file", default=None, type=str,
++                         help="UTF-8 file containing the complete problem statement")
+     parser.add_argument("--cwd", required=True, type=str, help="工作目录")
+     parser.add_argument("--base_commit", default=None,
+                         help="基础 commit(resume 时用于兜底生成累积 patch)")
+@@ -680,9 +683,20 @@
+                         help="恢复指定会话继续对话(多轮反馈 loop 使用)")
+     parser.add_argument("--fork_session", action="store_true",
+                         help="配合 --resume_session_id,分叉出新会话而不污染原会话")
+-    parser.add_argument("--extra_message", default=None, type=str,
+-                        help="resume 时发送的额外消息(即 reviewer hint)")
+-    return parser.parse_args()
++    extra = parser.add_mutually_exclusive_group()
++    extra.add_argument("--extra_message", default=None, type=str,
++                       help="resume 时发送的额外消息(即 reviewer hint)")
++    extra.add_argument("--extra_message_file", default=None, type=str,
++                       help="UTF-8 file containing the complete resume message")
++    args = parser.parse_args()
++    if args.problem_statement_file is not None:
++        # Match the previous $(cat file) argument: strip trailing LF only.
++        with Path(args.problem_statement_file).open(encoding="utf-8", newline="") as stream:
++            args.problem_statement = stream.read().rstrip("\n")
++    if args.extra_message_file is not None:
++        with Path(args.extra_message_file).open(encoding="utf-8", newline="") as stream:
++            args.extra_message = stream.read().rstrip("\n")
++    return args
+ 
+ 
+ async def main():
+@@ -693,9 +707,9 @@
+ 
+     is_resume = bool(args.resume_session_id)
+     if not is_resume and not args.problem_statement:
+-        raise SystemExit("--problem_statement is required when not resuming")
++        raise SystemExit("--problem_statement or --problem_statement_file is required when not resuming")
+     if is_resume and not args.extra_message:
+-        raise SystemExit("--extra_message is required when --resume_session_id is set")
++        raise SystemExit("--extra_message or --extra_message_file is required when --resume_session_id is set")
+ 
+     problem_statement = args.problem_statement or ""
+ 
+--- source_parallel/run_cc_trajs_swe_pro.py
++++ source_parallel_06/run_cc_trajs_swe_pro.py
+@@ -491,7 +491,7 @@
+             f'/opt/python3.12-tmp/bin/python3 /tmp/sdk_script.py '
+             f'--cwd /app --base_commit {base_commit} {init_flag}'
+             f'--log_path {SDK_SCRIPT_LOG_PATH} --output_dir /tmp '
+-            f'--problem_statement "$(cat /tmp/ps.txt)"'
++            f'--problem_statement_file /tmp/ps.txt'
+         )
+         logging.info(f"[{instance_id}] Starting task execution...")
+         if output_dir is not None:
+--- source_parallel/run_multi_turn_loop.py
++++ source_parallel_06/run_multi_turn_loop.py
+@@ -604,7 +604,7 @@
+         output_dir_in_container = f"/tmp/turn_{turn}"
+         self.container.exec_run(f"mkdir -p {output_dir_in_container}")
+ 
+-        # 构造命令(与 run_cc_trajs_swe_pro.py 一致: bash -c 包裹, 长文本用 $(cat ...) 读取)
++        # 构造命令(与 run_cc_trajs_swe_pro.py 一致: 正文由 SDK 从文件读取,避免 argv 长度上限)
+         cmd_parts = [
+             "/opt/python3.12-tmp/bin/python3 /tmp/sdk_script.py",
+             "--cwd /app",
+@@ -614,7 +614,7 @@
+         ]
+         if turn == 1:
+             # ps.txt 在 inject_files 中已写入格式化后的完整 prompt
+-            cmd_parts.append('--problem_statement "$(cat /tmp/ps.txt)"')
++            cmd_parts.append("--problem_statement_file /tmp/ps.txt")
+             if self.args.first_init:
+                 cmd_parts.append("--init")
+         else:
+@@ -622,7 +622,7 @@
+             hint_path = f"/tmp/hint_turn_{turn}.txt"
+             inject_file_to_container(self.container, (hint or "").encode("utf-8"), hint_path)
+             cmd_parts.append(f"--resume_session_id {self.session_id}")
+-            cmd_parts.append(f'--extra_message "$(cat {hint_path})"')
++            cmd_parts.append(f"--extra_message_file {hint_path}")
+             log.info("Turn %d: resume 会话 %s", turn, self.session_id)
+ 
+         cmd_str = " ".join(cmd_parts)
+--- source_parallel/run_parallel_experiments.py
++++ source_parallel_06/run_parallel_experiments.py
+@@ -27,6 +27,10 @@
+ class ParallelExperiments:
+     def __init__(self, args):
+         self.args = args
++        requested = getattr(args, "task_ids", None)
++        self.subset = requested is not None
++        self.selected_task_ids = [task for task in TASKS[1:]
++                                  if requested is None or task in requested]
+         self.prior_path = Path(args.prior_state).resolve()
+         if self.prior_path.is_dir():
+             self.prior_path /= "experiment_state.json"
+@@ -44,9 +48,12 @@
+         queues = task_queues(self.lanes)
+         self.workers = []
+         for lane in self.lanes:
++            selected = [task for task in queues[lane["lane"]] if task in self.selected_task_ids]
++            if not selected:
++                continue
+             name = f"{args.experiment_name}_lane{lane['lane']}"
+             self.workers.append({
+-                "lane": lane["lane"], "experiment": name, "task_ids": queues[lane["lane"]],
++                "lane": lane["lane"], "experiment": name, "task_ids": selected,
+                 "docker_host": lane["docker_host"],
+                 "state_path": str(self.output / "lanes" / name / "experiment_state.json"),
+                 "log_path": str(self.output / "worker_logs" / (name + ".log")),
+@@ -60,22 +67,36 @@
+             "container_http_proxy", "quota_policy")}
+         self.state.update(
+             experiment=args.experiment_name, stage="formal", status="running", dry_run=args.dry_run,
+-            started_at=time.time(), groups=list(GROUPS), tasks=list(TASKS),
++            started_at=time.time(), groups=list(GROUPS), tasks=list(self.prior.get("tasks", TASKS)),
+             protocol_version="shared_first_v2_with_anko_v1_transition_parallel",
+             shared_first_attempt=True, initial_hints_shared=True,
+             student_attempts_independent=False, fresh_student_state_each_actual_attempt=True,
+-            task_protocols={task: "v1_transition" if task == TASKS[0] else "shared_first_v2"
+-                            for task in TASKS},
++            task_protocols={task: self.prior.get("task_protocols", {}).get(
++                task, "v1_transition" if task == TASKS[0] else "shared_first_v2") for task in TASKS},
+             continuation={"source_experiment": self.prior["experiment"],
+                           "state_path": str(self.prior_path)},
+             included_experiment_states=[worker["state_path"] for worker in self.workers],
+             excluded_prior_attempts=self.prior.get("excluded_prior_attempts", []),
+-            parallelism=6, runtime_manifest=str(Path(args.runtime_manifest).resolve()),
++            parallelism=len(self.workers), available_runtime_lanes=6,
++            runtime_manifest=str(Path(args.runtime_manifest).resolve()),
+             worker_assignment="Fixed round-robin of TASKS[1:] across lanes0..5; original task indices retained",
+             workers=self.workers, shared={}, shared_first_attempts={}, attempts=[],
+             prior_task_segment="Anko v1 transition; completed observations adopted without reruns",
+             timing_note="Parallel batch wall time is distinct from per-attempt SDK/active/teacher-wait time; lanes share the host and account quota.",
+         )
++        if self.subset:
++            observed = {row["task"] for row in self.prior.get("attempts", [])}
++            observed.update(self.prior.get("shared", {}))
++            self.state.update(
++                selected_tasks=self.selected_task_ids,
++                deferred_prior_tasks=[task for task in TASKS[1:] if task in observed],
++                unselected_unstarted_tasks=[task for task in TASKS[1:]
++                                           if task not in observed and task not in self.selected_task_ids],
++                completion_scope="selected_tasks_only",
++                deferred_prior_tasks_completed=False,
++                selection_note="Only never-started selected tasks run in this segment; prior observations are retained read-only, prior running entries become interrupted only in this derived state. Deferred tasks remain unfinished and outside the selected-task outcome denominator.",
++                prior_task_segment="All prior observations retained; selected new tasks only, no deferred task rerun",
++            )
+         self.processes = {}
+         self.logs = []
+         self.refresh()
+@@ -87,10 +108,15 @@
+         if self.prior["status"] != "stopped" or any(word in reason for word in quota_words):
+             raise ValueError("Parallel handoff requires a stopped non-quota prior experiment")
+         attempts = self.prior.get("attempts", [])
+-        if any(row["task"] != TASKS[0] for row in attempts):
++        observed = {row["task"] for row in attempts}
++        observed.update(self.prior.get("shared", {}))
++        if self.subset:
++            if any(task in observed for task in self.selected_task_ids):
++                raise ValueError("Selected tasks must have no prior attempt or shared initial Hint")
++        elif any(task != TASKS[0] for task in observed):
+             raise ValueError("The prior experiment must stop before any next-task attempt")
+         for group in ("B", "H", "I"):
+-            rows = [row for row in attempts if row["group"] == group]
++            rows = [row for row in attempts if row["task"] == TASKS[0] and row["group"] == group]
+             finished = any(row["status"] == "solved" for row in rows) or any(
+                 row["round"] == 5 and row["status"] == "not_solved" for row in rows)
+             if not finished or any(row["status"] not in ("solved", "not_solved") for row in rows):
+@@ -131,12 +157,18 @@
+         self.save()
+ 
+     def refresh(self):
+-        self.state["attempts"] = [dict(row, origin_experiment=row.get(
+-            "origin_experiment", self.prior["experiment"])) for row in self.prior["attempts"]
+-            if row["task"] == TASKS[0] and row["status"] in ("solved", "not_solved")]
+-        self.state["shared"] = {task: dict(value) for task, value in self.prior.get("shared", {}).items()
+-                                if task == TASKS[0]}
+-        self.state["shared_first_attempts"] = {}
++        self.state["attempts"] = []
++        for original in self.prior["attempts"]:
++            row = dict(original, origin_experiment=original.get("origin_experiment", self.prior["experiment"]))
++            if row["status"] == "running":
++                row.update(original_status="running", status="interrupted")
++            self.state["attempts"].append(row)
++        self.state["shared"] = {task: dict(value) for task, value in self.prior.get("shared", {}).items()}
++        self.state["shared_first_attempts"] = {task: dict(value) for task, value in
++                                              self.prior.get("shared_first_attempts", {}).items()}
++        for reference in self.state["shared_first_attempts"].values():
++            if reference.get("status") == "running":
++                reference.update(original_status="running", status="interrupted")
+         for worker in self.workers:
+             path = Path(worker["state_path"])
+             if not path.exists():
+@@ -242,6 +274,8 @@
+     parser.add_argument("--bridge_dir", default=str(ROOT / "logs/bridge"))
+     parser.add_argument("--progress_dir", default=str(ROOT / "logs/progress"))
+     parser.add_argument("--poll_seconds", type=float, default=30)
++    parser.add_argument("--task_ids", nargs="+", choices=TASKS[1:],
++                        help="Only select never-started tasks, retaining their original lane assignments")
+     parser.add_argument("--dry_run", action="store_true")
+     return parser
+ 
+--- tests_parallel/test_codex_cli_bridge.py
++++ tests_parallel_06/test_codex_cli_bridge.py
+@@ -10,7 +10,7 @@
+ 
+ import httpx
+ 
+-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "source_parallel"))
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "source_parallel_06"))
+ from codex_cli_bridge import (  # noqa: E402
+     CodexBridge, CodexBridgeError, CodexRPCClient, EXTERNAL_TOOL_INSTRUCTIONS,
+     MODEL, SDK_FORK_RESULT, SDK_FORK_MARKER, create_app, default_command,
+--- tests_parallel/test_eval_deep_swe.py
++++ tests_parallel_06/test_eval_deep_swe.py
+@@ -8,7 +8,7 @@
+ from unittest import mock
+ 
+ 
+-SOURCE = Path(__file__).resolve().parents[1] / "source/benchmark/deepswe/eval_deep_swe.py"
++SOURCE = Path(__file__).resolve().parents[1] / "source_parallel_06/benchmark/deepswe/eval_deep_swe.py"
+ SPEC = importlib.util.spec_from_file_location("empty_patch_evaluator", SOURCE)
+ evaluator = importlib.util.module_from_spec(SPEC)
+ SPEC.loader.exec_module(evaluator)
+--- tests_parallel/test_online_teacher.py
++++ tests_parallel_06/test_online_teacher.py
+@@ -9,7 +9,7 @@
+ from pathlib import Path
+ from unittest.mock import Mock, patch
+ 
+-sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"source"))
++sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"source_parallel_06"))
+ from run_cc_sdk import OnlineTeacher  # noqa: E402
+ 
+ 
+--- tests_parallel/test_paired_experiments.py
++++ tests_parallel_06/test_paired_experiments.py
+@@ -8,7 +8,7 @@
+ from types import SimpleNamespace
+ from unittest.mock import Mock, patch
+ 
+-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "source_parallel"))
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "source_parallel_06"))
+ from benchmark.deepswe import run_loop_by_hint as hint_loop  # noqa: E402
+ import run_codex_experiments as paired  # noqa: E402
+ import report_codex_experiments as reporting  # noqa: E402
+--- tests_parallel/test_parallel_experiments.py
++++ tests_parallel_06/test_parallel_experiments.py
+@@ -9,7 +9,7 @@
+ from types import SimpleNamespace
+ from unittest.mock import patch
+ 
+-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "source_parallel"))
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "source_parallel_06"))
+ import run_parallel_experiments as parallel
+ import report_codex_experiments as reporting
+ from report_codex_experiments import aggregate_experiment
+@@ -128,7 +128,7 @@
+         self.assertEqual(len(self.commands),6)
+         request.assert_not_called()
+         for lane,(command,options) in enumerate(self.commands):
+-            self.assertIn("source_parallel/run_codex_experiments.py",command[3])
++            self.assertIn("source_parallel_06/run_codex_experiments.py",command[3])
+             self.assertIn("--shared_first_attempt",command)
+             self.assertIn("--dry_run",command)
+             self.assertNotIn("--continue_from",command)
+@@ -213,6 +213,106 @@
+         labels=[calls[0]["filters"]["label"] for _,calls in clients]
+         self.assertEqual(labels,[f"hint.experiment_name=codex_parallel_05_lane{lane}" for lane in range(6)])
+         self.assertFalse(any("formal_04" in label or "formal_03" in label for label in labels))
++
++    def create_prior05(self):
++        source = json.loads(self.prior4.read_text())
++        path = self.root / "runs/codex_parallel_05/experiment_state.json"
++        path.parent.mkdir(parents=True)
++        source.update(experiment="codex_parallel_05", status="stopped",
++                      stop_reason="Teacher review failed: stopped fixture",
++                      continuation={"source_experiment":"codex_formal_04", "state_path":str(self.prior4)},
++                      included_experiment_states=[], shared_first_attempts={})
++        queues = parallel.task_queues(json.loads(self.manifest.read_text())["lanes"])
++        for lane in range(6):
++            task = queues[lane][0]
++            name = f"codex_parallel_05_lane{lane}"
++            row = {"task":task,"group":"H","round":1,
++                   "status":"not_solved" if lane in (0,5) else "running",
++                   "origin_experiment":name,"shared_with":["H","M"],
++                   "attribution_group":"HM","stage":"shared_first_student"}
++            source["attempts"].append(row)
++            source["shared"][task] = {"full_hint":"retained-old-hint","origin_experiment":name}
++            worker = path.parent/"lanes"/name/"experiment_state.json"
++            worker.parent.mkdir(parents=True)
++            worker.write_text(json.dumps({"experiment":name,"stage":"formal","status":"stopped",
++                "tasks":queues[lane],"attempts":[row]}))
++            source["included_experiment_states"].append(str(worker))
++            source["shared_first_attempts"][task] = {"origin_experiment":name,"group":"H","round":1,
++                                                      "status":row["status"]}
++        path.write_text(json.dumps(source))
++        self.args.prior_state = str(path)
++        self.args.experiment_name = "codex_parallel_06"
++        self.args.task_ids = list(parallel.TASKS[7:])
++        return path
++
++    def test_new_task_subset_keeps_original_lanes_and_all_prior_observations(self):
++        prior05 = self.create_prior05()
++        before = {path:path.read_bytes() for path in (self.prior3,self.prior4,prior05)}
++        self.args.dry_run = True
++        driver = self.driver()
++        self.assertEqual([(row["lane"],row["task_ids"]) for row in driver.workers],
++                         [(0,[parallel.TASKS[7]]),(1,[parallel.TASKS[8]]),(2,[parallel.TASKS[9]])])
++        self.assertEqual(driver.state["tasks"],list(parallel.TASKS))
++        self.assertEqual(driver.state["selected_tasks"],list(parallel.TASKS[7:]))
++        self.assertEqual(driver.state["deferred_prior_tasks"],list(parallel.TASKS[1:7]))
++        self.assertEqual(driver.state["available_runtime_lanes"],6)
++        self.assertEqual(driver.state["parallelism"],3)
++        self.assertEqual(driver.state["completion_scope"],"selected_tasks_only")
++        self.assertFalse(driver.state["deferred_prior_tasks_completed"])
++        self.assertEqual(len(driver.state["attempts"]),10)
++        interrupted=[row for row in driver.state["attempts"] if row["status"] == "interrupted"]
++        self.assertEqual(len(interrupted),4)
++        self.assertTrue(all(row["original_status"] == "running" for row in interrupted))
++        self.assertEqual(driver.state["shared_first_attempts"][parallel.TASKS[2]]["status"],"interrupted")
++        with patch.object(parallel.subprocess,"Popen",side_effect=self.fake_popen), \
++                patch.object(parallel,"request_json") as request:
++            self.assertEqual(driver.run(),0)
++        self.assertEqual(len(self.commands),3)
++        self.assertTrue(all(path.read_bytes() == value for path,value in before.items()))
++        self.assertFalse(driver.state["deferred_prior_tasks_completed"])
++        request.assert_not_called()
++
++    def test_subset_rejects_prepared_hint_even_without_student_attempt(self):
++        prior05 = self.create_prior05()
++        source = json.loads(prior05.read_text())
++        source["shared"][parallel.TASKS[8]] = {"full_hint":"already-prepared"}
++        prior05.write_text(json.dumps(source))
++        with patch.object(parallel.subprocess,"Popen") as popen:
++            with self.assertRaisesRegex(ValueError,"no prior attempt or shared"):
++                self.driver()
++            self.args.task_ids = [parallel.TASKS[1]]
++            with self.assertRaisesRegex(ValueError,"no prior attempt or shared"):
++                self.driver()
++            popen.assert_not_called()
++
++    def test_subset_recursive_usage_keeps_old_workers_once_and_new_cost_separate(self):
++        prior05 = self.create_prior05()
++        before = prior05.read_bytes()
++        anko = parallel.TASKS[0]
++        logs = [
++            self.usage(f"codex_formal_03-{anko}-B-r1","student","solve",10),
++            self.usage(f"codex_formal_03-{anko}-M-r1","student","solve",30),
++            self.usage(f"codex_formal_04-{anko}-I-r1","student","solve",20),
++            self.usage(f"codex_parallel_05_lane0-{parallel.TASKS[1]}-H-r1","student","solve",30),
++            self.usage(f"codex_parallel_05_lane1-{parallel.TASKS[2]}-H-r1","student","solve",40),
++            self.usage(f"codex_parallel_06_lane0-{parallel.TASKS[7]}-I-r1","student","solve",50),
++        ]
++        (self.bridge/"token_usage.jsonl").write_text("".join(json.dumps(row)+"\n" for row in logs))
++        driver = self.driver()
++        with patch.object(parallel.subprocess,"Popen",side_effect=self.fake_popen), \
++                patch.object(parallel,"request_json",return_value={"stopped":False}):
++            self.assertEqual(driver.run(),0)
++        result = aggregate_experiment(driver.state_path,self.bridge,self.progress)
++        self.assertEqual(result["totals"]["total_tokens"],180)
++        self.assertEqual(result["parallel_new_totals"]["total_tokens"],50)
++        self.assertEqual(result["cancelled_prior_totals"]["total_tokens"],30)
++        self.assertEqual(result["origin_totals"]["codex_formal_03"]["total_tokens"],40)
++        self.assertEqual(result["origin_totals"]["codex_formal_04"]["total_tokens"],20)
++        self.assertEqual(result["origin_totals"]["codex_parallel_05_lane0"]["total_tokens"],30)
++        self.assertEqual(result["origin_totals"]["codex_parallel_05_lane1"]["total_tokens"],40)
++        self.assertEqual(len(result["included_experiments"]),13)
++        self.assertTrue(all(row["planned_tasks"] == 3 for row in result["outcomes"]))
++        self.assertEqual(prior05.read_bytes(),before)
+ 
+     def usage(self, session, role, phase, total):
+         return {"session":session,"role":role,"phase":phase,"delta":{
+--- tests_parallel/test_prompt_file_transport.py
++++ tests_parallel_06/test_prompt_file_transport.py
+@@ -0,0 +1,178 @@
++"""Execute the SDK CLI's long-prompt transport without starting a model."""
++
++import json
++import os
++import shlex
++import shutil
++import subprocess
++import sys
++import tempfile
++import unittest
++from collections import namedtuple
++from pathlib import Path
++from types import SimpleNamespace
++from unittest.mock import patch
++
++SOURCE = Path(__file__).resolve().parents[1] / "source_parallel_06"
++sys.path.insert(0, str(SOURCE))
++sys.path.insert(0, str(SOURCE / "benchmark" / "deepswe"))
++import get_hint_by_task  # noqa: E402
++import run_multi_turn_loop  # noqa: E402
++import run_cc_trajs_swe_pro  # noqa: E402
++
++ExecResult = namedtuple("ExecResult", "exit_code output")
++
++
++class LocalContainer:
++    """Run the existing command templates locally with only run_sdk replaced."""
++
++    name = "offline-prompt-transport"
++
++    def __init__(self, root):
++        self.root = root
++        self.path("/app").mkdir(parents=True)
++        self.path("/tmp").mkdir(parents=True)
++        self.path("/tmp/sdk_script.py").write_text(
++            "import json,sys\n"
++            "from pathlib import Path\n"
++            f"sys.path.insert(0, {str(SOURCE)!r})\n"
++            "import run_cc_sdk\n"
++            "async def capture(**kwargs):\n"
++            "    output = kwargs['output_dir']\n"
++            "    output.mkdir(parents=True, exist_ok=True)\n"
++            "    values = {key: kwargs[key] for key in "
++            "('problem_statement', 'extra_message', 'resume_session_id')}\n"
++            "    (output/'captured.json').write_text(json.dumps(values), encoding='utf-8')\n"
++            "    (output/'trajs.json').write_text(json.dumps({'metadata': "
++            "{'status':'completed','ResultMessage':{'is_error':False,'session_id':'offline'}}}))\n"
++            "run_cc_sdk.run_sdk = capture\n"
++            "run_cc_sdk.anyio.run(run_cc_sdk.main)\n"
++        )
++
++    def path(self, remote):
++        return self.root / remote.lstrip("/")
++
++    def translate(self, text):
++        return (text.replace("/opt/python3.12-tmp/bin/python3", shlex.quote(sys.executable))
++                    .replace("/tmp", str(self.path("/tmp")))
++                    .replace("/app", str(self.path("/app"))))
++
++    def exec_run(self, command, workdir=None, environment=None):
++        if isinstance(command, list):
++            command = [self.translate(part) for part in command]
++            use_shell = False
++        else:
++            command = self.translate(command)
++            use_shell = True
++        result = subprocess.run(command, shell=use_shell, capture_output=True,
++                                env={**os.environ, **(environment or {})}, timeout=20)
++        return ExecResult(result.returncode, result.stdout + result.stderr)
++
++    def inject(self, container, data, remote):
++        path = self.path(remote)
++        path.parent.mkdir(parents=True, exist_ok=True)
++        path.write_bytes(data)
++
++    def copy(self, container, remote, destination):
++        shutil.copy2(self.path(remote), Path(destination) / Path(remote).name)
++        return True
++
++
++class PromptFileTransportTests(unittest.TestCase):
++    def setUp(self):
++        self.temp = tempfile.TemporaryDirectory()
++        self.root = Path(self.temp.name)
++        self.container = LocalContainer(self.root / "guest")
++        # The payload is above Linux's single-argument limit. Quotes and shell
++        # expressions must remain data, including internal and trailing CRLF.
++        self.payload = (("Unicode 教师; 'quotes' \"double\" $(printf wrong) `printf wrong`\r\n" * 3500)
++                        + "final space \t\r\n\n").encode("utf-8")
++        self.assertGreater(len(self.payload), 128 * 1024)
++        self.expected = self.payload.decode("utf-8").rstrip("\n")
++
++    def tearDown(self):
++        self.temp.cleanup()
++
++    def captured(self, remote):
++        return json.loads(self.container.path(remote).read_text())
++
++    def test_teacher_fresh_and_resume_execute_large_file_arguments(self):
++        runner = get_hint_by_task.ContainerHintGenerator.__new__(get_hint_by_task.ContainerHintGenerator)
++        runner.container = self.container
++        runner.out_dir = self.root / "teacher-output"
++        runner.out_dir.mkdir()
++        runner.base_commit = "fixture-base"
++        runner.monitor_interval = 0
++        with patch.object(get_hint_by_task, "inject_file_to_container", self.container.inject), \
++                patch.object(get_hint_by_task, "copy_from_container", self.container.copy):
++            for session in (None, "original-sdk-session"):
++                with self.subTest(session=session):
++                    self.assertTrue(runner.run_hint_agent(None, user_prompt=self.payload.decode("utf-8"),
++                                                         resume_session_id=session))
++                    captured = self.captured("/tmp/hint_agent_out/captured.json")
++                    self.assertEqual(captured["problem_statement"], self.expected)
++                    self.assertEqual(captured["extra_message"], self.expected if session else None)
++                    self.assertEqual(captured["resume_session_id"], session)
++                    self.assertEqual(self.container.path("/tmp/ps.txt").read_bytes(), self.payload)
++
++    def test_student_fresh_and_resume_use_the_same_large_file_transport(self):
++        runner = run_multi_turn_loop.MultiTurnLoopRunner.__new__(run_multi_turn_loop.MultiTurnLoopRunner)
++        runner.container = self.container
++        runner.args = SimpleNamespace(experiment_session="", teacher_progress_url="", first_init=False)
++        runner.compact_hint_path = None
++        runner.base_commit = "fixture-base"
++        runner.session_id = "original-sdk-session"
++        runner.monitor_interval = 0
++        runner.execution_status = {}
++        self.container.inject(None, self.payload, "/tmp/ps.txt")
++        with patch.object(run_multi_turn_loop, "inject_file_to_container", self.container.inject):
++            self.assertTrue(runner.execute_turn(1, None))
++            self.assertEqual(self.captured("/tmp/turn_1/captured.json")["problem_statement"], self.expected)
++            self.assertTrue(runner.execute_turn(2, None, hint=self.payload.decode("utf-8")))
++        captured = self.captured("/tmp/turn_2/captured.json")
++        self.assertEqual(captured["extra_message"], self.expected)
++        self.assertEqual(captured["resume_session_id"], "original-sdk-session")
++        self.assertEqual(self.container.path("/tmp/hint_turn_2.txt").read_bytes(), self.payload)
++        self.assertEqual(self.container.path("/tmp/ps.txt").read_bytes(), self.payload)
++
++    def test_single_run_student_executes_large_file_argument(self):
++        runner = run_cc_trajs_swe_pro.DockerTaskRunner.__new__(run_cc_trajs_swe_pro.DockerTaskRunner)
++        runner._system_prompt_content = None
++        self.container.inject(None, self.payload, "/tmp/ps.txt")
++        status, _, exit_code, _ = runner._execute_task(self.container, "offline-task", "fixture-base", {})
++        self.assertEqual((status, exit_code), ("success", 0))
++        self.assertEqual(self.captured("/tmp/captured.json")["problem_statement"], self.expected)
++        self.assertEqual(self.container.path("/tmp/ps.txt").read_bytes(), self.payload)
++
++    def test_file_mode_matches_shell_lf_semantics_and_legacy_text_is_unchanged(self):
++        capture = self.container.path("/tmp/sdk_script.py")
++        for number, text in enumerate(("line\r\nlast\r\n\n", "line\nlast\n\n", "last\r", "last \t")):
++            with self.subTest(text=repr(text)):
++                prompt = self.root / f"short-{number}.txt"
++                prompt.write_bytes(text.encode("utf-8"))
++                previous = subprocess.run(["/bin/bash", "-c", 'printf %s "$(cat "$1")"', "fixture", str(prompt)],
++                                          capture_output=True, check=True).stdout
++                output = self.root / f"file-output-{number}"
++                result = subprocess.run([sys.executable, str(capture), "--cwd", str(self.root),
++                                         "--problem_statement_file", str(prompt), "--output_dir", str(output),
++                                         "--log_path", str(self.root / "offline.log")], capture_output=True)
++                self.assertEqual(result.returncode, 0, result.stderr.decode())
++                self.assertEqual(json.loads((output / "captured.json").read_text())["problem_statement"].encode("utf-8"), previous)
++                self.assertEqual(prompt.read_bytes(), text.encode("utf-8"))
++        direct = "legacy text with CRLF\r\n\n"
++        output = self.root / "legacy-output"
++        result = subprocess.run([sys.executable, str(capture), "--cwd", str(self.root),
++                                 "--problem_statement", direct, "--output_dir", str(output),
++                                 "--log_path", str(self.root / "offline.log")], capture_output=True)
++        self.assertEqual(result.returncode, 0, result.stderr.decode())
++        self.assertEqual(json.loads((output / "captured.json").read_text())["problem_statement"], direct)
++        result = subprocess.run([sys.executable, str(capture), "--cwd", str(self.root),
++                                 "--resume_session_id", "legacy-sdk-session", "--extra_message", direct,
++                                 "--output_dir", str(output), "--log_path", str(self.root / "offline.log")],
++                                capture_output=True)
++        self.assertEqual(result.returncode, 0, result.stderr.decode())
++        self.assertEqual(json.loads((output / "captured.json").read_text())["extra_message"], direct)
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- tests_parallel/test_report_codex_experiments.py
++++ tests_parallel_06/test_report_codex_experiments.py
+@@ -6,7 +6,7 @@
+ import unittest
+ from pathlib import Path
+ 
+-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "source_parallel"))
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "source_parallel_06"))
+ from report_codex_experiments import aggregate_experiment, write_reports  # noqa: E402
+ 
+ 
+@@ -376,5 +376,26 @@
+         self.assertEqual(groups["M"]["incomplete_attempts"],1)
+ 
+ 
++
++
++class SelectedTasksReportTests(unittest.TestCase):
++    def test_subset_report_names_deferred_tasks_and_preserves_full_usage_scope(self):
++        module = sys.modules["report_codex_experiments"]
++        metrics = {"stage":"formal", "status":"stopped", "model":"gpt-6.1-terra",
++            "reasoning_effort":"low", "dry_run":False, "selected_tasks":["new-task"],
++            "deferred_prior_tasks":["unfinished-old-task"], "outcomes":[],
++            "excluded_prior_attempts":[], "group_totals":{},
++            "totals":{"total_tokens":123,"request_seconds":1.0}, "continuation":None,
++            "included_experiment_states":["new-worker-state"], "parallelism":1,
++            "parallel_new_totals":{"total_tokens":0}, "parallel_workers":[],
++            "preflight_cli":None, "missing_token_fields":{}, "stop_reason":None}
++        text = module.render_report(metrics)
++        self.assertIn("本批结果主表仅统计所选新题：new-task", text)
++        self.assertIn("延后题：unfinished-old-task", text)
++        self.assertIn("旧批延后题仍未完成", text)
++        self.assertIn("123 Token", text)
++        self.assertNotIn("其余九题各执行一次", text)
++
++
+ if __name__=="__main__":
+     unittest.main()
+--- tests_parallel/test_task_partition.py
++++ tests_parallel_06/test_task_partition.py
+@@ -9,7 +9,7 @@
+ from types import SimpleNamespace
+ from unittest.mock import Mock, patch
+ 
+-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "source_parallel"))
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "source_parallel_06"))
+ import run_codex_experiments as paired  # noqa: E402
+ 
+ 
+--- tests_parallel/test_teacher_progress.py
++++ tests_parallel_06/test_teacher_progress.py
+@@ -12,7 +12,7 @@
+ 
+ import httpx
+ 
+-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "source_parallel"))
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "source_parallel_06"))
+ from teacher_progress import MODEL, TeacherProgress, create_app  # noqa: E402
+ 
+ 
+--- tests_parallel/test_tool_result_transport.py
++++ tests_parallel_06/test_tool_result_transport.py
+@@ -13,8 +13,8 @@
+ from litellm.llms.anthropic.experimental_pass_through.adapters.transformation import LiteLLMAnthropicMessagesAdapter
+ 
+ ROOT = Path(__file__).resolve().parents[1]
+-sys.path.insert(0, str(ROOT / "source_parallel"))
+-sys.path.insert(0, str(ROOT / "source_parallel" / "litellm_proxy"))
++sys.path.insert(0, str(ROOT / "source_parallel_06"))
++sys.path.insert(0, str(ROOT / "source_parallel_06" / "litellm_proxy"))
+ sys.path.insert(0, str(Path(__file__).resolve().parent))
+ import streaming_fix  # noqa: E402
+ from codex_cli_bridge import CodexBridge, MODEL  # noqa: E402

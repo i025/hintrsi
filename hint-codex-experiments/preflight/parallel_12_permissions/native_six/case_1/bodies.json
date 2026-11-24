@@ -1,0 +1,129 @@
+[
+  {
+    "model": "fixture-requested-model",
+    "messages": [
+      {
+        "role": "system",
+        "content": "CASE_1_STAGE_1 Original system instructions."
+      },
+      {
+        "role": "developer",
+        "content": "Follow the provided external tools."
+      },
+      {
+        "role": "user",
+        "content": "ORIGINAL_REQUEST_CASE_1"
+      }
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "Read",
+          "description": "Read fixture.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "file_path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "file_path"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "Bash",
+          "description": "Bash fixture.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "command": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "command"
+            ]
+          }
+        }
+      }
+    ],
+    "tool_choice": "auto"
+  },
+  {
+    "model": "fixture-requested-model",
+    "messages": [
+      {
+        "role": "system",
+        "content": "CASE_1_STAGE_2 Changed system instructions."
+      },
+      {
+        "role": "user",
+        "content": "COMPACTED_SUMMARY_CASE_1"
+      },
+      {
+        "role": "assistant",
+        "content": "Requested operations for case 1",
+        "tool_calls": [
+          {
+            "id": "call-62e6aceb2cbf4f6a89b00951f35d659d",
+            "type": "function",
+            "function": {
+              "name": "Read",
+              "arguments": "{\"file_path\": \"case_1.txt\"}"
+            }
+          },
+          {
+            "id": "call-c557863f8214445e9c22b0b9a9bbe44b",
+            "type": "function",
+            "function": {
+              "name": "Bash",
+              "arguments": "{\"command\": \"rg -n 'executeChat\\\\(|CLAUDE\\\\.md' /app # CASE_1\", \"nested\": {\"entries\": [{\"text\": \"\u03a9\\nquote \\\" value\", \"flag\": false}]}, \"nullable\": null}"
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call-62e6aceb2cbf4f6a89b00951f35d659d",
+        "content": "READ_SUCCESS_CASE_1"
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call-c557863f8214445e9c22b0b9a9bbe44b",
+        "is_error": true,
+        "content": "BASH_FAILURE_CASE_1: exit 7"
+      },
+      {
+        "role": "user",
+        "content": "HOOK_CASE_1: use actual observations."
+      }
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "Search",
+          "description": "Search fixture.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "pattern": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "pattern"
+            ]
+          }
+        }
+      }
+    ],
+    "tool_choice": "auto"
+  }
+]

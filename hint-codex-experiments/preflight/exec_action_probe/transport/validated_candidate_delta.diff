@@ -1,0 +1,23 @@
+--- validated_candidate.py
++++ current_codex_exec_bridge.py
+@@ -111,6 +111,8 @@
+             )
+             self.processes[request_id] = process
+             try:
++                if self.stopped:
++                    raise CodexBridgeError(self.stop_reason, "experiment_stopped")
+                 process.stdin.write(json.dumps(payload, ensure_ascii=False).encode())
+                 await process.stdin.drain()
+                 process.stdin.close()
+@@ -213,6 +215,11 @@
+                         "thread_id": thread_id, "elapsed_seconds": time.time() - started,
+                         "response": response})
+             return response
++        except asyncio.CancelledError:
++            self.record("model_errors.jsonl", {**attribution, "request_id": request_id,
++                        "elapsed_seconds": time.time() - started, "error": "Request cancelled",
++                        "code": "request_cancelled"})
++            raise
+         except (CodexBridgeError, ValueError, KeyError) as exc:
+             self.record("model_errors.jsonl", {**attribution, "request_id": request_id,
+                         "elapsed_seconds": time.time() - started, "error": str(exc)})

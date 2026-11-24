@@ -1,0 +1,682 @@
+--- /srv/lab-disks/disk2/users/xymo/hint-codex-experiments/source_parallel_07/run_codex_experiments.py
++++ /srv/lab-disks/disk2/users/xymo/hint-codex-experiments/source_parallel_08/run_codex_experiments.py
+@@ -78,6 +78,8 @@
+         self.state["skipped_groups"] = {}
+         if getattr(args, "continue_from", ""):
+             self.load_continuation(Path(args.continue_from))
++        if getattr(args, "recover_from", ""):
++            self.load_recovery(Path(args.recover_from))
+ 
+     def load_continuation(self, path):
+         """Import completed observations without resuming or rewriting the old run."""
+@@ -118,10 +120,52 @@
+             manifest_path=str(manifest),
+         )]
+ 
++    def load_recovery(self, path):
++        """Reuse completed preparation and recovered grades from an interrupted segment."""
++        if not self.shared_first_attempt or self.args.stage != "formal" or getattr(self.args, "continue_from", ""):
++            raise ValueError("Recovery requires a formal shared-first worker without legacy continuation")
++        path = (path / "experiment_state.json" if path.is_dir() else path).resolve()
++        source = json.loads(path.read_text())
++        if source["status"] != "stopped" or source.get("shared_first_attempts"):
++            raise ValueError("Recovery currently requires a stopped worker before its common-first grade")
++        if any(row["status"] in ("solved", "not_solved") for row in source["attempts"]):
++            raise ValueError("Use this recovery entry only for the interrupted first-attempt segment")
++        self.state["recovery"] = {"source_experiment": source["experiment"], "state_path": str(path),
++                                  "new_costs_since": self.state["started_at"]}
++        recovered = []
++        if getattr(self.args, "recovered_evaluations", ""):
++            value = json.loads(Path(self.args.recovered_evaluations).read_text())
++            recovered = value["attempts"] if isinstance(value, dict) else value
++        matched = {(row["task"], row["group"], row["round"]): row for row in recovered
++                   if row["origin_experiment"] == source["experiment"]}
++        self.state["excluded_prior_attempts"] = []
++        for row in source["attempts"]:
++            key = (row["task"], row["group"], row["round"])
++            if key in matched:
++                grade = matched[key]
++                if grade["status"] not in ("solved", "not_solved") or grade["group"] != "I":
++                    raise ValueError("Recovered evaluations must be completed I attempts")
++                self.state["attempts"].append({**row, **grade, "review": "pending"})
++            else:
++                self.state["excluded_prior_attempts"].append(dict(
++                    row, origin_experiment=source["experiment"], original_status=row["status"],
++                    status="interrupted", exclusion_reason="technical_interruption", formal_score=None))
++        for task, original in source.get("shared", {}).items():
++            copied = self.output / "recovered_teachers" / task / "teacher_state.json"
++            copied.parent.mkdir(parents=True, exist_ok=True)
++            shutil.copyfile(original["teacher_state"], copied)
++            shared = dict(original)
++            shared.update(teacher_state=str(copied),
++                          source_teacher_state=original["teacher_state"],
++                          teacher_codex_session=f"{source['experiment']}-{task}-shared")
++            self.state["shared"][task] = shared
++            self.kept_teachers.append(copied)
++
+     def continued_shared(self, task):
+         shared = self.loop(task, "shared")
+         source = self.state["shared"][task]
+         shared.args.teacher_state = source["teacher_state"]
++        shared.args.teacher_codex_session = source.get("teacher_codex_session", "")
+         shared.full_hint_path = Path(source["full_hint"])
+         shared.golden_diff_path = Path(source["golden_diff"])
+         shared.hint_gen_dir = Path(source["first_hint"]).parent
+@@ -163,7 +207,8 @@
+             argv += ["--teacher_state", str(teacher_state),
+                      "--teacher_session_mode", "resume" if group == "M" else "fresh"]
+             if group == "M":
+-                argv += ["--teacher_codex_session", f"{self.args.experiment_name}-{task}-shared"]
++                argv += ["--teacher_codex_session", self.state["shared"].get(task, {}).get(
++                    "teacher_codex_session", f"{self.args.experiment_name}-{task}-shared")]
+         if group == "I":
+             argv += ["--teacher_progress_url", self.args.container_progress_base + "/experiment/progress"]
+         if self.args.dry_run:
+@@ -394,6 +439,13 @@
+                             loops[group].summary["rounds"] = [dict(row) for row in imported]
+                             loops[group].summary["total_rounds"] = max(row["round"] for row in imported)
+                     return loops[group]
++
++                for entry in previous:
++                    if entry.get("review") == "pending":
++                        group = entry["group"]
++                        loop = get_loop(group)
++                        self.review_attempt(task, group, loop, entry["round"], reviews[group], entry,
++                                            trajs_override=Path(entry["trajs_path"]))
+ 
+                 for round_num in range(1, self.round_limit + 1):
+                     for group in order:
+@@ -442,9 +494,14 @@
+         import docker
+         client = docker.from_env()
+         if self.state["status"] == "stopped":
++            containers = {container.name: container for container in client.containers.list(
++                all=True, filters={"label": "hint.experiment_name=" + self.args.experiment_name})}
++            for path in self.kept_teachers:
++                name = json.loads(path.read_text())["container_name"]
++                if name not in containers:
++                    containers[name] = client.containers.get(name)
+             retained = []
+-            for container in client.containers.list(all=True, filters={
+-                    "label": "hint.experiment_name=" + self.args.experiment_name}):
++            for container in containers.values():
+                 container.stop(timeout=10)
+                 retained.append(container.name)
+             self.state["retained_containers"] = retained
+@@ -514,6 +571,8 @@
+     parser.add_argument("--dry_run", action="store_true")
+     parser.add_argument("--shared_first_attempt", action="store_true")
+     parser.add_argument("--continue_from", default="", help="Stopped source experiment state or directory")
++    parser.add_argument("--recover_from", default="", help="Interrupted worker state with retained teachers")
++    parser.add_argument("--recovered_evaluations", default="", help="Completed verifier-only recovered attempt records")
+     parser.add_argument("--task_ids", nargs="+", choices=TASKS,
+                         help="Fixed task subset for an independent worker; original task order is preserved")
+     args = parser.parse_args()
+--- /srv/lab-disks/disk2/users/xymo/hint-codex-experiments/source_parallel_07/run_parallel_experiments.py
++++ /srv/lab-disks/disk2/users/xymo/hint-codex-experiments/source_parallel_08/run_parallel_experiments.py
+@@ -36,6 +36,15 @@
+             self.prior_path /= "experiment_state.json"
+         self.prior = json.loads(self.prior_path.read_text())
+         self.check_prior()
++        self.recovery_path = None
++        self.recovery_prior = None
++        if getattr(args, "recover_from_parallel", ""):
++            self.recovery_path = Path(args.recover_from_parallel).resolve()
++            if self.recovery_path.is_dir():
++                self.recovery_path /= "experiment_state.json"
++            self.recovery_prior = json.loads(self.recovery_path.read_text())
++            if self.recovery_prior["status"] != "stopped" or self.subset:
++                raise ValueError("Parallel recovery requires all nine tasks from a stopped segment")
+         self.lanes = sorted(json.loads(Path(args.runtime_manifest).read_text())["lanes"],
+                             key=lambda lane: lane["lane"])
+         if [lane["lane"] for lane in self.lanes] != list(range(6)):
+@@ -59,6 +68,15 @@
+                 "log_path": str(self.output / "worker_logs" / (name + ".log")),
+                 "status": "not_started",
+             })
++        if self.recovery_prior:
++            sources = {row["lane"]: row for row in self.recovery_prior["workers"]}
++            for worker in self.workers:
++                source = sources[worker["lane"]]
++                if source["task_ids"] != worker["task_ids"]:
++                    raise ValueError("Recovery must retain the original fixed lane queues")
++                worker["recover_from"] = source["state_path"]
++                worker["retained_teacher_names"] = [json.loads(Path(value["teacher_state"]).read_text())["container_name"]
++                    for value in json.loads(Path(source["state_path"]).read_text()).get("shared", {}).values()]
+         self.state = {key: self.prior.get(key) for key in (
+             "model", "reasoning_effort", "max_rounds", "student_cpus", "student_memory",
+             "verifier_memory", "student_active_timeout_seconds", "initial_teacher_timeout_seconds",
+@@ -84,6 +102,11 @@
+             prior_task_segment="Anko v1 transition; completed observations adopted without reruns",
+             timing_note="Parallel batch wall time is distinct from per-attempt SDK/active/teacher-wait time; lanes share the host and account quota.",
+         )
++        if self.recovery_prior:
++            self.state["recovery"] = {"source_experiment": self.recovery_prior["experiment"],
++                                      "state_path": str(self.recovery_path),
++                                      "new_costs_since": self.state["started_at"]}
++            self.state["recovery_note"] = "Retained original teachers and initial Hints; recovered completed student evaluations; interrupted students restart with new sessions."
+         if self.subset:
+             observed = {row["task"] for row in self.prior.get("attempts", [])}
+             observed.update(self.prior.get("shared", {}))
+@@ -133,6 +156,10 @@
+                    "--container_progress_base", self.args.container_progress_base,
+                    "--container_http_proxy", self.args.container_http_proxy,
+                    "--task_ids", *worker["task_ids"]]
++        if worker.get("recover_from"):
++            command += ["--recover_from", worker["recover_from"]]
++            if getattr(self.args, "recovered_evaluations", ""):
++                command += ["--recovered_evaluations", self.args.recovered_evaluations]
+         if self.args.dry_run:
+             command.append("--dry_run")
+         return command
+@@ -158,12 +185,15 @@
+ 
+     def refresh(self):
+         self.state["attempts"] = []
++        self.state["excluded_prior_attempts"] = list(self.prior.get("excluded_prior_attempts", []))
+         for original in self.prior["attempts"]:
+             row = dict(original, origin_experiment=original.get("origin_experiment", self.prior["experiment"]))
+             if row["status"] == "running":
+                 row.update(original_status="running", status="interrupted")
+             self.state["attempts"].append(row)
+         self.state["shared"] = {task: dict(value) for task, value in self.prior.get("shared", {}).items()}
++        if self.recovery_prior:
++            self.state["shared"].update(self.recovery_prior.get("shared", {}))
+         self.state["shared_first_attempts"] = {task: dict(value) for task, value in
+                                               self.prior.get("shared_first_attempts", {}).items()}
+         for reference in self.state["shared_first_attempts"].values():
+@@ -180,6 +210,7 @@
+             worker["finished_at"] = state.get("finished_at")
+             self.state["attempts"].extend(dict(row, origin_experiment=row.get(
+                 "origin_experiment", state["experiment"])) for row in state.get("attempts", []))
++            self.state["excluded_prior_attempts"].extend(state.get("excluded_prior_attempts", []))
+             self.state["shared"].update(state.get("shared", {}))
+             self.state["shared_first_attempts"].update(state.get("shared_first_attempts", {}))
+         self.save()
+@@ -209,8 +240,16 @@
+                 continue
+             client = docker.DockerClient(base_url=worker["docker_host"])
+             try:
+-                for container in client.containers.list(all=True, filters={
+-                        "label": "hint.experiment_name=" + worker["experiment"]}):
++                containers = client.containers.list(all=True, filters={
++                    "label": "hint.experiment_name=" + worker["experiment"]})
++                owned = {container.name for container in containers}
++                for name in worker.get("retained_teacher_names", []):
++                    if name not in owned:
++                        try:
++                            containers.append(client.containers.get(name))
++                        except docker.errors.NotFound:
++                            pass
++                for container in containers:
+                     container.stop(timeout=10)
+             finally:
+                 client.close()
+@@ -265,6 +304,8 @@
+     parser.add_argument("--experiment_name", required=True)
+     parser.add_argument("--prior_state", required=True)
+     parser.add_argument("--runtime_manifest", required=True)
++    parser.add_argument("--recover_from_parallel", default="", help="Stopped parallel segment with retained teachers")
++    parser.add_argument("--recovered_evaluations", default="", help="Completed verifier-only recovered attempt records")
+     parser.add_argument("--output_base", default=str(ROOT / "runs"))
+     parser.add_argument("--api_base", default="http://127.0.0.1:8765")
+     parser.add_argument("--container_api_base", default="http://172.17.0.1:8765")
+--- /srv/lab-disks/disk2/users/xymo/hint-codex-experiments/source_parallel_07/report_codex_experiments.py
++++ /srv/lab-disks/disk2/users/xymo/hint-codex-experiments/source_parallel_08/report_codex_experiments.py
+@@ -56,50 +56,45 @@
+         target[name] += source.get(name, 0) or 0
+ 
+ 
++def source_paths(state):
++    paths = list(state.get("included_experiment_states", []))
++    for key in ("continuation", "recovery"):
++        if state.get(key):
++            paths.append(state[key]["state_path"])
++    return paths
++
++
+ def experiment_catalog(state_path, current):
+     catalog = {}
+     for path in Path(state_path).parent.parent.glob("*/experiment_state.json"):
+         item = read_json(path)
+         if item and item.get("experiment"):
+             catalog[item["experiment"]] = item
+-    catalog[current["experiment"]] = current
+-    if current.get("included_experiment_states"):
+-        visited = set()
+-        def include(item):
+-            if item["experiment"] in visited:
+-                return
+-            visited.add(item["experiment"])
+-            catalog[item["experiment"]] = item
+-            paths = list(item.get("included_experiment_states", []))
+-            if item.get("continuation"):
+-                paths.append(item["continuation"]["state_path"])
+-            for path in paths:
+-                child = read_json(path)
+-                if child:
+-                    include(child)
+-        include(current)
+-    elif current.get("continuation"):
+-        source = read_json(current["continuation"]["state_path"])
+-        catalog[source["experiment"]] = source
++    visited = set()
++    def include(item):
++        if item["experiment"] in visited:
++            return
++        visited.add(item["experiment"])
++        catalog[item["experiment"]] = item
++        for path in source_paths(item):
++            child = read_json(path)
++            if child:
++                include(child)
++    include(current)
+     return catalog
+ 
+ 
+ def experiment_origins(state, catalog):
+-    origins = {state["experiment"]}
+-    if not state.get("included_experiment_states"):
+-        if state.get("continuation"):
+-            origins.add(state["continuation"]["source_experiment"])
+-        return origins
++    origins = set()
+     def include(item):
+-        paths = list(item.get("included_experiment_states", []))
+-        if item.get("continuation"):
+-            paths.append(item["continuation"]["state_path"])
+-        for path in paths:
++        if item["experiment"] in origins:
++            return
++        origins.add(item["experiment"])
++        catalog.setdefault(item["experiment"], item)
++        for path in source_paths(item):
+             child = read_json(path)
+-            if child and child["experiment"] not in origins:
+-                origins.add(child["experiment"])
+-                catalog.setdefault(child["experiment"], child)
+-                include(catalog[child["experiment"]])
++            if child:
++                include(child)
+     include(state)
+     return origins
+ 
+@@ -325,8 +320,16 @@
+             overrides[(session, "teacher")] = {"group": "HM", "stage": "shared_success_review"}
+     for entry in state.get("excluded_prior_attempts", []):
+         overrides[(attempt_session(entry, state["experiment"]), "student")] = {
+-            "cost_status": "cancelled_prior"}
++            "cost_status": ("technical_interruption" if entry.get("exclusion_reason") == "technical_interruption"
++                            else "cancelled_prior")}
+     rows, missing_fields = {}, defaultdict(int)
++    segment = counters()
++    segment_start = (state.get("recovery") or {}).get("new_costs_since")
++    segment_end = state.get("finished_at") if state.get("status") in ("stopped", "complete") else None
++    def in_segment(record, row):
++        timestamp = record.get("timestamp", 0)
++        return (segment_start is not None and row["experiment"] in origins
++                and timestamp >= segment_start and (segment_end is None or timestamp <= segment_end))
+     def bucket(record):
+         info = attribution(record, catalog, overrides)
+         key = tuple(info[name] for name in DIMENSIONS)
+@@ -339,17 +342,25 @@
+         for field, native in TOKEN_FIELDS.items():
+             if native in delta:
+                 row[field] += delta[native]
++                if in_segment(record, row):
++                    segment[field] += delta[native]
+             elif row["experiment"] in origins:
+                 missing_fields[field] += 1
+         row["token_events"] += 1
++        if in_segment(record, row):
++            segment["token_events"] += 1
+     for filename, field in (("model_requests.jsonl", "request_count"),
+                             ("model_responses.jsonl", "response_count"),
+                             ("model_errors.jsonl", "error_count")):
+         for record in records(bridge_dir / filename):
+             row = bucket(record)
+             row[field] += 1
++            if in_segment(record, row):
++                segment[field] += 1
+             if field != "request_count":
+                 row["request_seconds"] += record.get("elapsed_seconds", 0) or 0
++                if in_segment(record, row):
++                    segment["request_seconds"] += record.get("elapsed_seconds", 0) or 0
+     for record in records(bridge_dir / "codex_events.jsonl"):
+         event = record.get("event") or {}
+         turn = (event.get("params") or {}).get("turn") or {}
+@@ -357,16 +368,20 @@
+             row = bucket(record)
+             row["codex_turn_count"] += 1
+             row["codex_turn_seconds"] += turn["durationMs"] / 1000
++            if in_segment(record, row):
++                segment["codex_turn_count"] += 1
++                segment["codex_turn_seconds"] += turn["durationMs"] / 1000
+     selected = [row for row in rows.values() if row["experiment"] in origins]
+     selected.sort(key=lambda row: tuple(str(row[name] or "") for name in DIMENSIONS))
+     total, shared, shared_first, cancelled = counters(), counters(), counters(), counters()
++    interrupted = counters()
+     group_totals, scope_totals, origin_totals = defaultdict(counters), defaultdict(counters), defaultdict(counters)
+     protocol_group_totals = defaultdict(lambda: defaultdict(counters))
+     for row in rows.values():
+         add_counters(scope_totals[row["scope"]], row)
+     for row in selected:
+         add_counters(total, row)
+-        group = "cancelled_prior" if row["cost_status"] == "cancelled_prior" else row["group"] or "unattributed"
++        group = row["cost_status"] if row["cost_status"] in ("cancelled_prior", "technical_interruption") else row["group"] or "unattributed"
+         add_counters(group_totals[group], row)
+         add_counters(origin_totals[row["experiment"]], row)
+         protocol = state.get("task_protocols", {}).get(row["task"], "independent_v1")
+@@ -377,6 +392,8 @@
+             add_counters(shared_first, row)
+         if row["cost_status"] == "cancelled_prior":
+             add_counters(cancelled, row)
++        if row["cost_status"] == "technical_interruption":
++            add_counters(interrupted, row)
+     progress_dir = Path(progress_dir) if progress_dir else bridge_dir.parent / "progress"
+     progress = [row for row in records(progress_dir / "progress.jsonl")
+                 if any((row.get("session") or "").startswith(origin + "-") for origin in origins)]
+@@ -415,12 +432,16 @@
+             included_names.add(child["experiment"])
+     for name in included_names:
+         add_counters(parallel_new, origin_totals[name])
++    if segment_start is not None:
++        parallel_new = segment
+     return {"experiment": state["experiment"], "stage": state.get("stage"),
+             "status": state.get("status"), "dry_run": state.get("dry_run", False),
+             "model": state.get("model"), "reasoning_effort": state.get("reasoning_effort"),
+             "stop_reason": state.get("stop_reason"), "state_source": str(state_path),
+             "bridge_source": str(bridge_dir), "totals": total, "shared_totals": shared,
+             "shared_first_totals": shared_first, "cancelled_prior_totals": cancelled,
++            "technical_interruption_totals": interrupted, "recovery": state.get("recovery"),
++            "segment_cost_start": segment_start, "segment_cost_end": segment_end,
+             "origin_totals": dict(origin_totals),
+             "current_experiment_totals": origin_totals[state["experiment"]],
+             "included_experiment_states": state.get("included_experiment_states", []),
+@@ -494,7 +515,9 @@
+         if transition:
+             lines += ["", "v1过渡题（" + "、".join(transition) + "）保留真实历史结果，排除在上述v2 H/M策略及条件分支统计之外；B/I仍按其真实尝试统计。"]
+     if metrics["excluded_prior_attempts"]:
+-        lines += ["", f"旧批用户取消的{len(metrics['excluded_prior_attempts'])}次尝试单列在 excluded_prior_attempt_metrics.csv，没有正式成绩，不计正常失败，也不充当共同首轮。"]
++        technical = sum(row.get("exclusion_reason") == "technical_interruption" for row in metrics["excluded_prior_attempts"])
++        cancelled = len(metrics["excluded_prior_attempts"]) - technical
++        lines += ["", f"旧批单列：用户取消{cancelled}次、技术中断{technical}次，详见 excluded_prior_attempt_metrics.csv；没有正式成绩，不计正常失败，也不充当共同首轮。"]
+     lines += ["",
+               "## 实际 Token 与模型请求耗时", "",
+               "缓存输入包含在输入内，推理输出包含在输出内；总量采用模型返回的 totalTokens，不重复相加。", "",
+@@ -503,7 +526,8 @@
+     for group, row in sorted(metrics["group_totals"].items()):
+         label = {"shared": "共享初始教师与首轮压缩（仅计一次）",
+                  "HM": "H/M共同首轮及共享成功审查（仅计一次）",
+-                 "cancelled_prior": "旧批用户取消尝试（仅计费用）"}.get(group, group)
++                 "cancelled_prior": "旧批用户取消尝试（仅计费用）",
++                 "technical_interruption": "旧批技术中断尝试（仅计费用）"}.get(group, group)
+         lines.append(f"| {label} | {row['input_tokens']} | {row['cached_input_tokens']} | {row['output_tokens']} | {row['reasoning_output_tokens']} | {row['total_tokens']} | {row['request_seconds']:.2f} | {row['error_count']} |")
+     total = metrics["totals"]
+     lines += ["", f"本次报告覆盖的实际总量：{total['total_tokens']} Token；模型请求耗时合计 {total['request_seconds']:.2f} 秒。",
+@@ -513,16 +537,18 @@
+               "## 阶段与数据边界", "",
+               "各任务、组别、角色、阶段的明细见 token_usage_by_stage.csv；每次教师决定见原始 progress.jsonl。",
+               "预检、联调和正式实验的 Token 分开列在 metrics.json.bridge_scope_totals；成绩仅使用当前状态中的真实尝试及明确引用的共同首轮。"]
+-    if metrics["continuation"]:
++    if metrics["continuation"] or metrics.get("recovery"):
+         lines += ["", "续接批次按原始 experiment/session 归集，源批与当前批各计一次；导入成绩保留 origin_experiment，轨迹与轮内检查按原会话读取。", "",
+                   "| 实际调用来源 | 总Token |", "|---|---:|"]
+         for origin, value in sorted(metrics["origin_totals"].items()):
+             lines.append(f"| {origin} | {value['total_tokens']} |")
+         lines.append(f"旧批用户取消尝试的 {metrics['cancelled_prior_totals']['total_tokens']} Token 已包含在上述实际总量内，不计入成绩。")
+         lines.append("v1/v2的费用归属另见 metrics.json.protocol_group_totals，避免将过渡题费用用于v2分支效果比较。")
++    if metrics.get("recovery"):
++        lines += ["", "恢复段沿用原始教师会话和已生成指导；已完成学生仅补正式评测与待完成复盘，技术中断学生从全新会话重新执行。新增用量按本段开始时间筛选实际账本，包含继续使用旧教师路由产生的新Token。"]
+     if metrics.get("included_experiment_states"):
+         lines += ["", "## 按题并行与来源", "",
+-                  f"本次按题固定分配{metrics['parallelism']}路，每路独立运行原有题内流程；实际学生与教师仍为8CPU/128GiB。" + ("本批只启动上述新选题，旧批观察只读保留，不续接旧教师、不跨路复用学生代码。" if metrics.get("selected_tasks") is not None else "Anko保留旧批已完成结果，其余九题各执行一次，不跨路复用学生代码。"),
++                  f"本次按题固定分配{metrics['parallelism']}路，每路独立运行原有题内流程；实际学生与教师仍为8CPU/128GiB。" + ("本批恢复九题固定队列，保留原教师和完成的学生结果。" if metrics.get("recovery") else ("本批只启动上述新选题，旧批观察只读保留，不续接旧教师、不跨路复用学生代码。" if metrics.get("selected_tasks") is not None else "Anko保留旧批已完成结果，其余九题各执行一次，不跨路复用学生代码。")),
+                   f"本并行段新增实际用量：{metrics['parallel_new_totals']['total_tokens']} Token。上文报告总量还覆盖明确承接的历史来源，不能再次与旧批总量相加。",
+                   "各路共用账户额度和宿主机；整批墙钟、每次SDK/有效时间、教师等待须分别解释，不能把并行墙钟当作纯模型提速。", "",
+                   "| 路 | 实验 | 固定题目 | 状态 |", "|---:|---|---|---|"]
+--- /dev/null
++++ /srv/lab-disks/disk2/users/xymo/hint-codex-experiments/tests_parallel_08/test_parallel_recovery.py
+@@ -0,0 +1,242 @@
++"""Exercise interrupted-segment recovery without model or Docker calls."""
++
++import json
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++from types import SimpleNamespace
++from unittest.mock import Mock, patch
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "source_parallel_08"))
++import run_codex_experiments as paired
++import run_parallel_experiments as parallel
++import report_codex_experiments as reporting
++from benchmark.deepswe.run_loop_by_hint import HintLoopOrchestrator
++
++
++class RecoveryTests(unittest.TestCase):
++    def setUp(self):
++        self.temporary = tempfile.TemporaryDirectory()
++        self.root = Path(self.temporary.name)
++        self.task = paired.TASKS[3]
++        self.old_name = "codex_parallel_07_lane2"
++        self.source_path = self.root / "old" / "experiment_state.json"
++        self.source_path.parent.mkdir()
++        hint = self.source_path.parent / "hint"
++        hint.mkdir()
++        for name, content in (("hint_output.md", "Full guidance\n"),
++                              ("hint_compact_r1.md", "Compact guidance\n"),
++                              ("golden_diff.diff", "Reference diff\n")):
++            (hint / name).write_text(content)
++        teacher = hint / "teacher_state.json"
++        teacher.write_text(json.dumps({"session_id": "retained-sdk", "container_name": "old-teacher",
++                                       "sdk_projects_archive": "old-backup.tar.gz"}))
++        self.source = {"experiment": self.old_name, "stage": "formal", "status": "stopped",
++            "tasks": [self.task], "shared_first_attempts": {}, "groups": list(paired.GROUPS),
++            "attempts": [{"task": self.task, "group": "I", "round": 1, "status": "running",
++                          "origin_experiment": self.old_name}],
++            "shared": {self.task: {"teacher_state": str(teacher),
++                "full_hint": str(hint / "hint_output.md"), "first_hint": str(hint / "hint_compact_r1.md"),
++                "golden_diff": str(hint / "golden_diff.diff"), "origin_experiment": self.old_name}}}
++        self.source_path.write_text(json.dumps(self.source))
++        self.args = SimpleNamespace(output_base=str(self.root / "runs"), experiment_name="codex_parallel_08_lane2",
++            stage="formal", shared_first_attempt=True, continue_from="", recover_from=str(self.source_path),
++            recovered_evaluations="", task_ids=[self.task], dry_run=False, api_base="http://bridge",
++            container_api_base="http://guest", progress_base="http://progress", container_progress_base="http://guest-progress")
++
++    def tearDown(self):
++        self.temporary.cleanup()
++
++    def recovered_grade(self, solved=False):
++        trajectory = self.root / "trajs.json"
++        trajectory.write_text(json.dumps({"metadata": {}}))
++        grade = dict(self.source["attempts"][0], status="solved" if solved else "not_solved", solved=solved,
++                     trajs_path=str(trajectory), eval_path=str(self.root / "eval.json"),
++                     eval={"reward": int(solved), "f2p_passed": 0, "f2p_total": 25}, review="pending")
++        path = self.root / "recovered.json"
++        path.write_text(json.dumps({"attempts": [grade]}))
++        self.args.recovered_evaluations = str(path)
++        return grade
++
++    def test_original_hint_and_teacher_state_are_reused_without_overwriting_source(self):
++        original = self.source_path.read_bytes()
++        state_path = Path(self.source["shared"][self.task]["teacher_state"])
++        teacher_bytes = state_path.read_bytes()
++        driver = paired.PairedExperiments(self.args)
++        shared = driver.continued_shared(self.task)
++        self.assertNotEqual(Path(shared.args.teacher_state), state_path)
++        self.assertEqual(Path(shared.args.teacher_state).read_bytes(), teacher_bytes)
++        for group in ("H", "M", "I"):
++            loop = driver.loop(self.task, group, shared.args.teacher_state)
++            driver.use_shared(loop, shared)
++            self.assertEqual(loop._hint_path_for_round(1).read_text(), "Compact guidance\n")
++            self.assertEqual(loop.full_hint_path.read_text(), "Full guidance\n")
++            if group == "M":
++                self.assertEqual(loop.args.teacher_codex_session, f"{self.old_name}-{self.task}-shared")
++        self.assertEqual(driver.state["attempts"], [])
++        self.assertEqual(driver.state["excluded_prior_attempts"][0]["exclusion_reason"], "technical_interruption")
++        self.assertEqual(self.source_path.read_bytes(), original)
++        self.assertEqual(state_path.read_bytes(), teacher_bytes)
++
++    def test_recovered_i1_is_reviewed_once_then_i2_uses_its_feedback(self):
++        self.recovered_grade()
++        driver = paired.PairedExperiments(self.args)
++        calls = []
++        compression = []
++        def solve(loop, number, no_hint=False):
++            calls.append(("solve", loop.summary["group"], number))
++            return {"solved": True, "exit_code": 0, "eval": {"reward": 1}}
++        def review(loop, number, **kwargs):
++            calls.append(("review", loop.summary["group"], number))
++            if loop.summary["group"] == "I" and number == 1:
++                self.assertEqual(kwargs["trajs_override"], self.root / "trajs.json")
++            output = loop._review_json_path(number)
++            output.parent.mkdir(parents=True, exist_ok=True)
++            output.write_text('{"corrective_hint":"Retained feedback"}')
++            return True
++        def compress(loop, number, reviews):
++            compression.append((loop.summary["group"], number, list(reviews)))
++            loop._hint_path_for_round(number).write_text("Updated guidance")
++            return True
++        with patch.object(driver, "check_running"), patch.object(driver, "register_online"), \
++                patch.object(driver, "close_teachers"), patch.object(driver, "prepare_shared") as prepare, \
++                patch.object(paired, "write_reports"), \
++                patch.object(HintLoopOrchestrator, "step_solve", solve), \
++                patch.object(HintLoopOrchestrator, "step_review", review), \
++                patch.object(HintLoopOrchestrator, "step_compress", compress):
++            self.assertEqual(driver.run(), 0)
++        prepare.assert_not_called()
++        self.assertEqual(calls[0], ("review", "I", 1))
++        self.assertNotIn(("solve", "I", 1), calls)
++        self.assertEqual(calls.count(("solve", "I", 2)), 1)
++        self.assertEqual(calls.count(("review", "I", 1)), 1)
++        self.assertEqual(compression[0][:2], ("I", 2))
++        self.assertEqual(len(compression[0][2]), 1)
++        self.assertIn("Retained feedback", compression[0][2][0].read_text())
++        self.assertEqual(driver.state["attempts"][0]["review"], "done")
++        self.assertEqual(driver.state["attempts"][0]["origin_experiment"], self.old_name)
++        self.assertEqual(driver.state["excluded_prior_attempts"], [])
++
++    def test_stopping_recovery_also_retains_borrowed_old_teacher(self):
++        driver = paired.PairedExperiments(self.args)
++        driver.state["status"] = "stopped"
++        client = Mock()
++        client.containers.list.return_value = []
++        teacher = Mock()
++        teacher.name = "old-teacher"
++        client.containers.get.return_value = teacher
++        with patch("docker.from_env", return_value=client):
++            driver.close_teachers()
++        client.containers.get.assert_called_once_with("old-teacher")
++        teacher.stop.assert_called_once_with(timeout=10)
++        teacher.remove.assert_not_called()
++        self.assertEqual(driver.state["retained_containers"], ["old-teacher"])
++
++    def test_current_segment_usage_includes_resumed_old_teacher_without_double_count(self):
++        self.recovered_grade()
++        driver = paired.PairedExperiments(self.args)
++        driver.state.update(started_at=100, finished_at=200, status="complete")
++        driver.state["recovery"]["new_costs_since"] = 100
++        driver.save()
++        bridge = self.root / "logs/bridge"
++        bridge.mkdir(parents=True)
++        teacher = f"{self.old_name}-{self.task}-shared"
++        student = f"{self.args.experiment_name}-{self.task}-I-r2"
++        records = [
++            {"timestamp": 90, "session": teacher, "role": "teacher", "phase": "generate", "delta": {"totalTokens": 100}},
++            {"timestamp": 110, "session": teacher, "role": "teacher", "phase": "review_r1", "delta": {"totalTokens": 20}},
++            {"timestamp": 120, "session": student, "role": "student", "phase": "solve_r2", "delta": {"totalTokens": 30}},
++            {"timestamp": 210, "session": teacher, "role": "teacher", "phase": "review_r2", "delta": {"totalTokens": 7}},
++        ]
++        (bridge / "token_usage.jsonl").write_text("".join(json.dumps(row) + "\n" for row in records))
++        metrics = reporting.aggregate_experiment(driver.summary_path, bridge)
++        self.assertEqual(metrics["totals"]["total_tokens"], 157)
++        self.assertEqual(metrics["parallel_new_totals"]["total_tokens"], 50)
++        self.assertEqual(metrics["origin_totals"][self.old_name]["total_tokens"], 127)
++        self.assertEqual(metrics["origin_totals"][self.args.experiment_name]["total_tokens"], 30)
++        self.assertEqual(metrics["included_experiments"], sorted([self.old_name, self.args.experiment_name]))
++
++    def test_interrupted_student_cost_is_distinct_from_user_cancellation(self):
++        driver = paired.PairedExperiments(self.args)
++        driver.save()
++        bridge = self.root / "bridge"
++        bridge.mkdir()
++        record = {"session": f"{self.old_name}-{self.task}-I-r1", "role": "student", "phase": "solve_r1",
++                  "delta": {"totalTokens": 70}}
++        (bridge / "token_usage.jsonl").write_text(json.dumps(record) + "\n")
++        metrics = reporting.aggregate_experiment(driver.summary_path, bridge)
++        self.assertEqual(metrics["technical_interruption_totals"]["total_tokens"], 70)
++        self.assertEqual(metrics["cancelled_prior_totals"]["total_tokens"], 0)
++        self.assertEqual(metrics["attempts"], [])
++
++    def test_coordinator_recovers_fixed_queues_and_counts_shared_sources_once(self):
++        self.recovered_grade()
++        prior3 = self.root / "prior3/experiment_state.json"
++        prior4 = self.root / "prior4/experiment_state.json"
++        prior3.parent.mkdir()
++        prior4.parent.mkdir()
++        prior3.write_text(json.dumps({"experiment": "codex_formal_03", "status": "stopped",
++                                     "stage": "formal", "tasks": list(paired.TASKS), "attempts": []}))
++        baseline = {"experiment": "codex_formal_04", "status": "stopped", "stage": "formal",
++            "groups": list(paired.GROUPS), "tasks": list(paired.TASKS), "max_rounds": 5,
++            "continuation": {"source_experiment": "codex_formal_03", "state_path": str(prior3)},
++            "attempts": [{"task": paired.TASKS[0], "group": group, "round": 1, "status": "solved"}
++                         for group in ("B", "H", "I")], "shared": {}}
++        prior4.write_text(json.dumps(baseline))
++        lanes = [{"lane": lane, "docker_host": f"unix:///lane{lane}"} for lane in range(6)]
++        manifest = self.root / "runtime.json"
++        manifest.write_text(json.dumps({"lanes": lanes}))
++        queues = parallel.task_queues(lanes)
++        workers = []
++        for lane in range(6):
++            path = self.root / f"lane{lane}/experiment_state.json"
++            path.parent.mkdir()
++            task = queues[lane][0]
++            source = json.loads(json.dumps(self.source))
++            source.update(experiment=f"codex_parallel_07_lane{lane}", tasks=queues[lane])
++            source["attempts"] = [{"task": task, "group": ("H", "H", "I", "B", "H", "H")[lane],
++                "round": 1, "status": "running", "origin_experiment": source["experiment"]}]
++            shared = dict(source["shared"][self.task], origin_experiment=source["experiment"])
++            source["shared"] = {task: shared} if lane != 3 else {}
++            path.write_text(json.dumps(source))
++            workers.append({"lane": lane, "state_path": str(path), "task_ids": queues[lane]})
++        old_master = self.root / "master07/experiment_state.json"
++        old_master.parent.mkdir()
++        old_master.write_text(json.dumps({"experiment": "codex_parallel_07", "status": "stopped",
++            "stage": "formal", "tasks": list(paired.TASKS), "attempts": [], "workers": workers,
++            "included_experiment_states": [row["state_path"] for row in workers],
++            "continuation": {"source_experiment": "codex_formal_04", "state_path": str(prior4)}}))
++        original = old_master.read_bytes()
++        args = parallel.build_parser().parse_args([
++            "--experiment_name", "codex_parallel_08", "--prior_state", str(prior4),
++            "--runtime_manifest", str(manifest), "--output_base", str(self.root / "runs"),
++            "--recover_from_parallel", str(old_master), "--recovered_evaluations", self.args.recovered_evaluations,
++            "--bridge_dir", str(self.root / "bridge"), "--progress_dir", str(self.root / "progress")])
++        driver = parallel.ParallelExperiments(args)
++        for worker in driver.workers:
++            command = driver.worker_command(worker)
++            self.assertEqual(command[command.index("--recover_from") + 1], workers[worker["lane"]]["state_path"])
++            self.assertEqual(worker["task_ids"], queues[worker["lane"]])
++            worker_args = SimpleNamespace(**vars(self.args))
++            worker_args.experiment_name = worker["experiment"]
++            worker_args.output_base = str(driver.output / "lanes")
++            worker_args.task_ids = worker["task_ids"]
++            worker_args.recover_from = worker["recover_from"]
++            child = paired.PairedExperiments(worker_args)
++            child.save()
++        driver.refresh()
++        self.assertEqual(len(driver.state["excluded_prior_attempts"]), 5)
++        ink = [row for row in driver.state["attempts"] if row["task"] == self.task]
++        self.assertEqual(len(ink), 1)
++        self.assertEqual(ink[0]["review"], "pending")
++        catalog = reporting.experiment_catalog(driver.state_path, driver.state)
++        origins = reporting.experiment_origins(driver.state, catalog)
++        self.assertEqual(len(origins), 16)  # 03, 04, 07 + six lanes, 08 + six lanes.
++        self.assertIn("codex_parallel_07_lane2", origins)
++        self.assertIn("codex_formal_03", origins)
++        self.assertEqual(old_master.read_bytes(), original)
++
++
++if __name__ == "__main__":
++    unittest.main()

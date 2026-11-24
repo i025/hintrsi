@@ -1,0 +1,47 @@
+{
+  "real_model_calls": 0,
+  "formal_config_changed": false,
+  "checks": {
+    "case_a": {
+      "exited_successfully": true,
+      "stdin_preserved_verbatim": true,
+      "no_foreign_history": true,
+      "schema_passed_strictly": true,
+      "one_provider_request": true,
+      "final_matches_agent_event": true,
+      "usage_available": true
+    },
+    "case_b": {
+      "exited_successfully": true,
+      "stdin_preserved_verbatim": true,
+      "no_foreign_history": true,
+      "schema_passed_strictly": true,
+      "one_provider_request": true,
+      "final_matches_agent_event": true,
+      "usage_available": true
+    }
+  },
+  "parallel": {
+    "unique_threads": true,
+    "overlapping_process_intervals": true
+  },
+  "passed": true,
+  "native_top_level_tools": [
+    "exec",
+    "wait",
+    "request_user_input"
+  ],
+  "native_nested_tools": [
+    "list_mcp_resource_templates",
+    "list_mcp_resources",
+    "read_mcp_resource"
+  ],
+  "limitations": [
+    "The fake Responses provider uses fallback model metadata. Code mode was explicitly forced; production Terra metadata and extra tools are not verified here.",
+    "Native task tools were absent from the actual request, but exec/wait/request_user_input and empty-server MCP resource helpers remain; no claim of a fully tool-free CLI.",
+    "Full SDK messages are serialized into a single user prompt. This preserves text, not API role/channel semantics.",
+    "One provider request occurred in each controlled case; output schema does not prevent native tools or additional model requests if generated.",
+    "Synthetic provider usage is reported by exec; real model adherence and real billing are outside this zero-model test."
+  ],
+  "cleanup": "Both exec children exited with code 0; local provider shutdown and socket close completed."
+}

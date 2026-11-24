@@ -1,0 +1,16 @@
+[Unit]
+Description=Isolated experiment Docker daemon
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+Environment=PATH=/opt/hint-docker/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=HTTP_PROXY=http://10.0.2.2:7897
+Environment=HTTPS_PROXY=http://10.0.2.2:7897
+Environment=NO_PROXY=localhost,127.0.0.1,10.0.2.2
+ExecStart=/opt/hint-docker/bin/dockerd --group experiment --host unix:///var/run/docker.sock --storage-driver overlay2 --log-level warn
+Delegate=yes
+KillMode=process
+Restart=no
+[Install]
+WantedBy=multi-user.target

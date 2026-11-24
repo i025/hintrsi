@@ -1,0 +1,128 @@
+--- source_parallel_10/codex_cli_bridge.py
++++ source_parallel_12/codex_cli_bridge.py
+@@ -36,23 +36,41 @@
+     ))
+ 
+ 
+-INSTRUCTIONS = """Produce the next assistant response for the conversation supplied as JSON.
++INSTRUCTIONS = """You are the response generator for an agent running in a separate SDK container.
++Your only task in this local process is to return the next assistant message as JSON.
++The sdk_execution_context describes that external executor and its container access.
++The input messages and tools belong to that external SDK agent. Paths mentioned in
++those messages and tool arguments refer to the SDK container, not this local host.
++
++There are two distinct permission scopes:
++- Local CLI: read-only; no native operations are allowed. This process only emits JSON.
++  The CLI permissions instructions and local environment context describe this scope.
++- External SDK: the supplied tools are executed by the original SDK in its own container.
++  A JSON request for Edit, Write, Bash, or another supplied tool is data returned to that
++  executor; emitting it does not write to the local filesystem. Local read-only mode
++  does not deny those external requests and does not require local write approval.
++  Follow all restrictions in the SDK conversation and actual external tool results.
++  A teacher or read-only subagent must remain read-only. Never bypass a tool denial.
++Do not ask for local write access to perform an external SDK task. If the conversation
++permits code changes, request the appropriate external tools and use their observations.
++If it forbids changes, preserve that restriction. Do not infer external permissions from
++this process's sandbox, working directory, network access, or available native tools.
++
+ The messages array is the complete current conversation maintained by the original SDK.
+-Follow its system and developer instructions and the chronological user, assistant, and
+-external tool observations. Do not invent or omit prior observations. Tool definitions
+-in the tools array describe operations available through that SDK, not native Codex tools.
+-The local Codex process and the external SDK workspace are separate environments.
+-The read-only sandbox applies to this local process, which only returns JSON.
+-Requests in tool_calls are executed by the SDK under the supplied conversation's permissions.
+-Preserve explicit SDK restrictions and tool denials; do not infer that the SDK workspace
+-is read-only from the local sandbox mode.
++Follow its system and developer instructions and chronological user, assistant, and tool
++observations. Do not invent or omit prior observations. The tools array contains the
++external operations available on this request, including their exact parameter schemas.
+ Return only the structured response required by the output schema. To request operations,
+-put their exact names and JSON-encoded argument objects in tool_calls. The original SDK
+-will execute them and supply their actual results in a subsequent request. Do not execute
+-commands, inspect host files, browse, delegate, or call any native tool yourself. You may
+-request multiple independent operations in one response. Use an empty tool_calls array
+-for a final text answer. The supplied conversation determines the role and task; do not
+-add new task guidance, claim an operation was executed, or guess its result.
++put their exact names in tool_calls. Represent each arguments object as
++{"entries": [{"key": "parameter_name", "value": parameter_value}, ...]}.
++Use ordinary JSON strings, numbers, booleans, nulls and arrays for values. Represent
++nested object values with the same entries form recursively. Omit unused optional keys.
++Do not JSON-encode argument objects or values into strings. The bridge serializes them
++for the SDK, which executes the operations and supplies actual results in the next request.
++Do not execute commands, inspect host files, browse, delegate, or call native tools here.
++You may request multiple independent external operations in one response. Use an empty
++tool_calls array for a final text answer. The supplied conversation determines the role
++and task; do not add task guidance, claim an operation ran, or guess its result.
+ """
+ 
+ 
+@@ -63,14 +81,35 @@
+         name["enum"] = names
+     calls = {"type": "array", "items": {
+         "type": "object", "properties": {
+-            "name": name, "arguments": {"type": "string"},
++            "name": name, "arguments": {"$ref": "#/$defs/argument_object"},
+         }, "required": ["name", "arguments"], "additionalProperties": False,
+     }}
+     if not names:
+         calls["maxItems"] = 0
+     return {"type": "object", "properties": {
+         "content": {"type": "string"}, "tool_calls": calls,
+-    }, "required": ["content", "tool_calls"], "additionalProperties": False}
++    }, "required": ["content", "tool_calls"], "additionalProperties": False,
++        "$defs": {
++            "argument_object": {"type": "object", "properties": {
++                "entries": {"type": "array", "items": {"type": "object", "properties": {
++                    "key": {"type": "string"}, "value": {"$ref": "#/$defs/argument_value"},
++                }, "required": ["key", "value"], "additionalProperties": False}},
++            }, "required": ["entries"], "additionalProperties": False},
++            "argument_value": {"anyOf": [
++                {"type": "string"}, {"type": "number"}, {"type": "boolean"}, {"type": "null"},
++                {"type": "array", "items": {"$ref": "#/$defs/argument_value"}},
++                {"$ref": "#/$defs/argument_object"},
++            ]},
++        }}
++
++
++def argument_value(value):
++    """Convert structured key/value entries into the original SDK JSON values."""
++    if isinstance(value, dict):
++        return {entry["key"]: argument_value(entry["value"]) for entry in value["entries"]}
++    if isinstance(value, list):
++        return [argument_value(item) for item in value]
++    return value
+ 
+ 
+ def context_error_message(event):
+@@ -136,6 +175,16 @@
+         command = self.command + ["-c", "model_instructions_file=" + json.dumps(str(self.instructions)),
+                                   "--output-schema", str(schema), "--output-last-message", str(output), "-"]
+         payload = {"messages": body["messages"], "tools": body.get("tools") or []}
++        if payload["tools"]:
++            payload = {"sdk_execution_context": {
++                "executor": "Original Claude Agent SDK in a separate task container",
++                "permission_mode": "bypassPermissions",
++                "container_repository": "/app",
++                "container_repository_access": "read-only" if attribution["role"] == "teacher" else "read-write",
++                "scope": ("Container access describes the external executor only. "
++                          "Agent-specific restrictions in messages and actual tool denials still apply, "
++                          "including read-only subagents. Local CLI filesystem rules do not describe this container."),
++            }, **payload}
+         for name in ("tool_choice", "parallel_tool_calls"):
+             if name in body:
+                 payload[name] = body[name]
+@@ -227,10 +276,11 @@
+             for tool in action["tool_calls"]:
+                 if tool["name"] not in allowed:
+                     raise CodexBridgeError("Unavailable SDK tool: " + tool["name"], "invalid_action", 422)
+-                arguments = json.loads(tool["arguments"])
++                arguments = argument_value(tool["arguments"])
+                 if not isinstance(arguments, dict):
+                     raise CodexBridgeError("SDK tool arguments must be an object", "invalid_action", 422)
+-                calls.append({"id": "call-" + uuid.uuid4().hex, "type": "function", "function": tool})
++                function = {"name": tool["name"], "arguments": json.dumps(arguments, ensure_ascii=False)}
++                calls.append({"id": "call-" + uuid.uuid4().hex, "type": "function", "function": function})
+             choice = body.get("tool_choice", "auto")
+             if ((choice == "none" and calls) or (choice == "required" and not calls)
+                     or (isinstance(choice, dict) and (not calls or any(

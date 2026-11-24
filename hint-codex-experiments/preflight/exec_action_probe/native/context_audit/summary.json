@@ -1,0 +1,61 @@
+{
+  "real_model_calls": 0,
+  "formal_configuration_changed": false,
+  "candidate_changed_only_under": "preflight/exec_action_probe/native/context_audit/candidate",
+  "mapping_regression_tests": {
+    "passed": 6,
+    "scope": "exact provider context codes and codexErrorInfo map to 400; other errors retain 503"
+  },
+  "actual_cli_observations": {
+    "fresh_stdin_characters": 176138,
+    "test_auto_compact_limit": 1000,
+    "first_input_compacted": false,
+    "original_context_400_mapped_to_503": true,
+    "failed_after_partial_generation_usage_missing": true
+  },
+  "sdk_full_proxy_gate": {
+    "passed": true,
+    "request_phases": [
+      "initial",
+      "context_error",
+      "compact",
+      "after_compact"
+    ],
+    "statuses": [
+      200,
+      400,
+      200,
+      200
+    ],
+    "compact_trigger": "auto",
+    "same_sdk_session": true,
+    "result_is_error": false,
+    "request_count": 4,
+    "usage_events": 3,
+    "reported_synthetic_tokens": 10260,
+    "reported_usage_unknown": [
+      {
+        "request_id": "76149997ded744eabc891991cb87a32b",
+        "session": "offline-audit",
+        "role": "student",
+        "phase": "solve",
+        "usage_status": "reported_usage_unknown"
+      }
+    ],
+    "host_elapsed_seconds": 168.84189043659717,
+    "container_removed": true
+  },
+  "model_window_evidence": {
+    "local_terra_cache_context_window": 500000,
+    "local_terra_cache_effective_context_window_percent": 95,
+    "sdk_unknown_model_assumption": 1000000,
+    "fakeprovider_uses_fallback_metadata": true
+  },
+  "limitations": [
+    "The gate proves automatic SDK compaction after the mapped error, not that genuine oversized history and its summary request fit the native model window.",
+    "The tiny fixture grew from pre_tokens=2416 to post_tokens=2487; no real long-context reduction was tested.",
+    "All fake response usage is synthetic and excluded from formal experiments.",
+    "Failed exec requests without token events must be reported as usage unknown, not zero.",
+    "CLI native compaction and internal samples may have usage that the exec JSON interface does not report."
+  ]
+}

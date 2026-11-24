@@ -1,0 +1,1 @@
+Consider how records exactly on each boundary of the requested time window should be treated. Compare that expectation with the selection logic, and think about how a boundary record would affect all of the summary fields.

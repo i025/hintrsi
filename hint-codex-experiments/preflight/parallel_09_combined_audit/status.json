@@ -1,0 +1,83 @@
+{
+  "status": "not_equivalent_to_original_api",
+  "formal_experiment_started": false,
+  "launch_eligible": false,
+  "updated_at_unix": 1795337870.3415253,
+  "real_model_calls": 0,
+  "original_source": "/srv/lab-disks/disk2/users/xymo/hint-experiment-handoff/source",
+  "frozen_candidate": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/source_parallel_09",
+  "checked_candidate": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/source_parallel_09_checked",
+  "candidate_deployed": false,
+  "sdk_auto_compact_disabled": false,
+  "regressions": {
+    "passed": true,
+    "count": 143,
+    "elapsed_seconds": 8.434483280871063,
+    "evidence": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/preflight/parallel_09_combined_audit/continuation/all_tests.json"
+  },
+  "native_six_session_probe": {
+    "passed": true,
+    "threads": 6,
+    "turns": 12,
+    "sdk_tool_calls": 36,
+    "evidence": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/preflight/parallel_09_combined_audit/native_bridge/result.json",
+    "scope": "Actual native process with local fake provider; direct dynamic-tool mode. Separate lifecycle tests explicitly force Code Mode."
+  },
+  "full_proxy_sdk_probe": {
+    "passed": true,
+    "tool_calls": 9,
+    "evidence": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/preflight/parallel_09_transport_audit/result.json",
+    "scope": "Original09 SSE candidate, real LiteLLM CLI and SDK, fake bridge RPC; not a full combined-candidate multi-SDK gate."
+  },
+  "strict_api_contract": {
+    "messages": "Original API receives the current full SDK messages each request. Native bridge only appends new user inputs and tool outputs; later system/assistant changes and compaction are not faithfully synchronized.",
+    "sampling": "temperature, top_p and max_tokens are present in SDK/direct requests but are not mapped to native generation. Fixed model/low effort does not preserve these parameters.",
+    "tools": "The original SDK executes external operations. Native Code Mode adds internal exec/wait sampling and pending-queue batching; the API response/tool batch boundary is different.",
+    "cancellation": "Late-output recovery prevents observation loss but may append an extra native turn after a premature final. It is a compatibility repair, not exact original API lifecycle behavior.",
+    "instructions": "Initial system/developer messages are combined into native base instructions, and the bridge adds external-tool instructions. Native environment context and orchestration instructions remain. Disabling bundled host skills removes only an unintended subset.",
+    "compaction": "Default SDK automatic compaction was reproduced with a local prompt-too-long response. Current bridge creates a new native state or stops a persistent teacher. Disabling SDK compaction changes original behavior and was not adopted.",
+    "token_accounting": "Normal native cumulative deltas are consistent. A native compaction fixture did not include the compaction response usage in cumulative token events; do not claim complete billing-equivalent usage.",
+    "historical_runtime": "The handoff dependency list does not lock the historical SDK/model version; original code behavior and current retained runtime tests do not prove exact historical runtime identity."
+  },
+  "parallel08_actual_request_fields": {
+    "temperature": {
+      "1.0": 759,
+      "0.3": 18
+    },
+    "top_p": {
+      "0.95": 759,
+      "\"ABSENT\"": 18
+    },
+    "max_tokens": {
+      "65536": 714,
+      "16384": 8,
+      "2048": 6,
+      "1024": 4,
+      "32000": 45
+    }
+  },
+  "api_compaction_evidence": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/preflight/parallel_09_compaction_audit/audit.json",
+  "native_compaction_evidence": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/preflight/parallel_09_native_compaction_audit/result.json",
+  "already_authorized_experiment_changes": [
+    "Terra model and English prompts",
+    "B up to five independent attempts",
+    "M/I directions",
+    "H/M shared first attempt",
+    "six parallel runtimes",
+    "static SDK tool presentation"
+  ],
+  "not_validated": [
+    "Exact original API input/sampling/compaction equivalence",
+    "Full combined-candidate two-SDK parallel gate",
+    "Any real-model run of the checked candidate"
+  ],
+  "decision": "Retain checked repairs and evidence; do not launch09 under a claim of original API equivalence. No new automatic retries or hash verification framework added.",
+  "audit_completed_at_unix": 1795337971.2188933,
+  "historical_native_compaction_scan": {
+    "evidence": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/preflight/parallel_09_native_compaction_audit/historical_compactions.json",
+    "lines": 107221,
+    "completed_events": 0,
+    "scope": "Only retained logs/bridge/codex_events.jsonl. No observed native compaction in this file, including08; not proof of all billing usage."
+  },
+  "final_state_check": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/preflight/parallel_09_combined_audit/final_state.json"
+}

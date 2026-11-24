@@ -1,0 +1,11 @@
+# Actual exec bridge zero-model gate
+
+This fixture imports `CodexExecBridge` and `default_command` from the candidate at `preflight/exec_action_probe/codex_exec_bridge.py`. It calls `bridge.chat`, which launches the real Codex CLI. Only the configured loopback Responses provider answers model requests. No native app-server substitute or mocked bridge execution is used.
+
+Six cases run concurrently through the same bridge object. Each makes two sequential requests. Stage 1 supplies system/developer/user history plus Read and Bash definitions and receives two external tool requests. Stage 2 supplies the exact resulting assistant calls, successful and failed observations, a hook message, a replaced earlier history resembling SDK compaction, and changed Search definitions. The fake provider returns a final JSON action. No SDK operation or real model is invoked by this fixture.
+
+Result: all 78 per-case checks pass; all 12 native thread IDs are unique; peak concurrent provider requests is 6. Every current `{messages, tools, tool_choice}` payload is preserved exactly. Updated history and schemas replace the earlier request content. All 12 usage events are recorded and sum to 2010 synthetic tokens. Total wall time is 15.00 seconds. Bridge child process count is zero after completion; bridge close and local provider shutdown completed.
+
+Files: `result.json` contains assertions and thread IDs; `requests.json` contains actual provider requests; `runtime/` contains the candidate's unchanged request, response, token, and event ledgers plus per-request final/schema files; `case_*/` contains the two API bodies and returned API responses. `instruction_checks.json` separately verifies that the English decision instructions reach every provider request.
+
+Limits: this tests plumbing and isolation, not real model obedience, real billing, or SDK execution. The fake provider uses fallback model metadata, with code mode explicitly forced. Native exec/wait/request_user_input remain advertised; task tools are not executed. The serialized SDK history is received inside a user-text payload, so exact text preservation is not native API role-channel equivalence. All fixture tokens are synthetic and excluded from formal experiment accounting.

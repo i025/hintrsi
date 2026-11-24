@@ -1,0 +1,69 @@
+--- source_parallel_10/codex_cli_bridge.py
++++ source_parallel_11/codex_cli_bridge.py
+@@ -47,8 +47,12 @@
+ Preserve explicit SDK restrictions and tool denials; do not infer that the SDK workspace
+ is read-only from the local sandbox mode.
+ Return only the structured response required by the output schema. To request operations,
+-put their exact names and JSON-encoded argument objects in tool_calls. The original SDK
+-will execute them and supply their actual results in a subsequent request. Do not execute
++put their exact names in tool_calls. Represent each arguments object as
++{"entries": [{"key": "parameter_name", "value": parameter_value}, ...]}.
++Use ordinary JSON strings, numbers, booleans, nulls and arrays for values. Represent
++nested object values with the same entries form recursively. Omit unused optional keys.
++Do not JSON-encode argument objects or values into strings. The bridge serializes them
++for the SDK, which executes the operations and supplies actual results in the next request. Do not execute
+ commands, inspect host files, browse, delegate, or call any native tool yourself. You may
+ request multiple independent operations in one response. Use an empty tool_calls array
+ for a final text answer. The supplied conversation determines the role and task; do not
+@@ -63,14 +67,35 @@
+         name["enum"] = names
+     calls = {"type": "array", "items": {
+         "type": "object", "properties": {
+-            "name": name, "arguments": {"type": "string"},
++            "name": name, "arguments": {"$ref": "#/$defs/argument_object"},
+         }, "required": ["name", "arguments"], "additionalProperties": False,
+     }}
+     if not names:
+         calls["maxItems"] = 0
+     return {"type": "object", "properties": {
+         "content": {"type": "string"}, "tool_calls": calls,
+-    }, "required": ["content", "tool_calls"], "additionalProperties": False}
++    }, "required": ["content", "tool_calls"], "additionalProperties": False,
++        "$defs": {
++            "argument_object": {"type": "object", "properties": {
++                "entries": {"type": "array", "items": {"type": "object", "properties": {
++                    "key": {"type": "string"}, "value": {"$ref": "#/$defs/argument_value"},
++                }, "required": ["key", "value"], "additionalProperties": False}},
++            }, "required": ["entries"], "additionalProperties": False},
++            "argument_value": {"anyOf": [
++                {"type": "string"}, {"type": "number"}, {"type": "boolean"}, {"type": "null"},
++                {"type": "array", "items": {"$ref": "#/$defs/argument_value"}},
++                {"$ref": "#/$defs/argument_object"},
++            ]},
++        }}
++
++
++def argument_value(value):
++    """Convert structured key/value entries into the original SDK JSON values."""
++    if isinstance(value, dict):
++        return {entry["key"]: argument_value(entry["value"]) for entry in value["entries"]}
++    if isinstance(value, list):
++        return [argument_value(item) for item in value]
++    return value
+ 
+ 
+ def context_error_message(event):
+@@ -227,10 +252,11 @@
+             for tool in action["tool_calls"]:
+                 if tool["name"] not in allowed:
+                     raise CodexBridgeError("Unavailable SDK tool: " + tool["name"], "invalid_action", 422)
+-                arguments = json.loads(tool["arguments"])
++                arguments = argument_value(tool["arguments"])
+                 if not isinstance(arguments, dict):
+                     raise CodexBridgeError("SDK tool arguments must be an object", "invalid_action", 422)
+-                calls.append({"id": "call-" + uuid.uuid4().hex, "type": "function", "function": tool})
++                function = {"name": tool["name"], "arguments": json.dumps(arguments, ensure_ascii=False)}
++                calls.append({"id": "call-" + uuid.uuid4().hex, "type": "function", "function": function})
+             choice = body.get("tool_choice", "auto")
+             if ((choice == "none" and calls) or (choice == "required" and not calls)
+                     or (isinstance(choice, dict) and (not calls or any(

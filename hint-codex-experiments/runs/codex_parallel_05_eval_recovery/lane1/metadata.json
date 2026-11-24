@@ -1,0 +1,50 @@
+{
+  "lane": 1,
+  "task": "igel-persist-feature-schema",
+  "group": "I",
+  "round": 1,
+  "origin_experiment": "codex_parallel_05_lane1",
+  "started_at_utc": "2026-11-22T04:53:56.973534+00:00",
+  "source_patch": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane1/codex_parallel_05_lane1_I_r1/infer_logs/igel-persist-feature-schema/patch.diff",
+  "source_patch_bytes": 11895,
+  "source_patch_copy": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05_eval_recovery/lane1/original_patch.diff",
+  "source_trajectory": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane1/codex_parallel_05_lane1_I_r1/infer_logs/igel-persist-feature-schema/trajs.json",
+  "original_formal_result_existed": false,
+  "parameters": {
+    "task_dir": "/srv/lab-disks/disk2/users/xymo/hint-baseline-run/data/tasks/igel-persist-feature-schema",
+    "task_id": "igel-persist-feature-schema",
+    "patches_dir": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05/lanes/codex_parallel_05_lane1/codex_parallel_05_lane1_I_r1/infer_logs",
+    "output_dir": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_05_eval_recovery/lane1/eval_output",
+    "delete_image": true
+  },
+  "docker_host": "unix:///srv/lab-disks/disk2/users/xymo/hint-codex-experiments/vm-lane1/docker.sock",
+  "label": "codex_parallel_05_eval_recovery_lane1",
+  "verifier_memory": "8g",
+  "network_mode": "none",
+  "guest_vcpus": 8,
+  "real_model_calls": 0,
+  "student_rerun": false,
+  "prior_attempt_status": "student_completed_grading_interrupted",
+  "status": "completed",
+  "result": {
+    "instance_id": "igel-persist-feature-schema",
+    "reward": {
+      "reward": 0,
+      "f2p_total": 24,
+      "f2p_passed": 23,
+      "p2p_total": 2,
+      "p2p_passed": 2,
+      "f2p": 0.9583333333333334,
+      "p2p": 1.0,
+      "partial": 0.9615384615384616
+    },
+    "exit_code": 0,
+    "stdout_tail": "[verifier] model.patch applied (11895 bytes)\n[verifier] Resetting files touched by test.patch\n[verifier] Applying test.patch\n..                                                                       [100%]\n2 passed in 47.74s\n...............F........                                                 [100%]\n=================================== FAILURES ===================================\n________________ test_fit_rejects_when_all_features_are_removed ________________\n\nchallenge_paths = {'description_file': PosixPath('/tmp/pytest-of-root/pytest-0/test_fit_rejects_when_all_feat0/model_results/description...model_file': PosixPath('/tmp/pytest-of-root/pytest-0/test_fit_rejects_when_all_feat0/model_results/model.joblib'), ...}\n\n    def test_fit_rejects_when_all_features_are_removed(challenge_paths):\n        feature_props = {\n            \"include\": [\"const\"],\n            \"exclude\": None,\n            \"drop_constant\": True,\n            \"drop_duplicate\": False,\n        }\n    \n        with pytest.raises(Exception) as exc_info:\n            _fit_with_feature_props(challenge_paths, feature_props)\n    \n        message = str(exc_info.value).lower()\n        assert \"feature\" in message\n>       assert any(token in message for token in (\"remove\", \"left\", \"remain\"))\nE       assert False\nE        +  where False = any(<generator object test_fit_rejects_when_all_features_are_removed.<locals>.<genexpr> at 0x7342062d7c60>)\n\ntests/test_igel/test_feature_schema_persistence.py:808: AssertionError\n------------------------------ Captured log call -------------------------------\nERROR    igel.igel:igel.py:438 error occured while preparing the data: features.exclude must contain non-empty column names\nTraceback (most recent call last):\n  File \"/app/igel/igel.py\", line 340, in _process_data\n    self.feature_schema = fit_feature_schema(dataset, self.dataset_props.get(\"features\"), targets)\n                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/igel/preprocessing.py\", line 154, in fit_feature_schema\n    include, exclude = names(\"include\"), names(\"exclude\")\n                                         ^^^^^^^^^^^^^^^^\n  File \"/app/igel/preprocessing.py\", line 143, in names\n    raise ValueError(f\"features.{key} must contain non-empty column names\")\nValueError: features.exclude must contain non-empty column names\n=========================== short test summary info ============================\nFAILED tests/test_igel/test_feature_schema_persistence.py::test_fit_rejects_when_all_features_are_removed\n1 failed, 23 passed in 46.06s\n===== grade =====\n[verifier] ===== FAILURES (1) =====\n[verifier] \u2717 [f2p] tests.test_igel.test_feature_schema_persistence.test_fit_rejects_when_all_features_are_removed\n    assert False\n     +  where False = any(<generator object test_fit_rejects_when_all_features_are_removed.<locals>.<genexpr> at 0x7342062d7c60>)\n    challenge_paths = {'description_file': PosixPath('/tmp/pytest-of-root/pytest-0/test_fit_rejects_when_all_feat0/model_results/description...model_file': PosixPath('/tmp/pytest-of-root/pytest-0/test_fit_rejects_when_all_feat0/model_results/model.joblib'), ...}\n    \n        def test_fit_rejects_when_all_features_are_removed(challenge_paths):\n            feature_props = {\n                \"include\": [\"const\"],\n                \"exclude\": None,\n                \"drop_constant\": True,\n                \"drop_duplicate\": False,\n            }\n        \n            with pytest.raises(Exception) as exc_info:\n                _fit_with_feature_props(challenge_paths, feature_props)\n        \n            message = str(exc_info.value).lower()\n            assert \"feature\" in message\n    >       assert any(token in message for token in (\"remove\", \"left\", \"remain\"))\n    E       assert False\n    E        +  where False = any(<generator object test_fit_rejects_when_all_features_are_removed.<locals>.<genexpr> at 0x7342062d7c60>)\n    \n    tests/test_igel/test_feature_schema_persistence.py:808: AssertionError\nP2P 2/2 pass 0 fail; F2P 23/24 pass 1 fail; PARTIAL 0.9615384615384616; BINARY 0\n[verifier] reward.json={\"reward\": 0, \"f2p_total\": 24, \"f2p_passed\": 23, \"p2p_total\": 2, \"p2p_passed\": 2, \"f2p\": 0.9583333333333334, \"p2p\": 1.0, \"partial\": 0.9615384615384616}\n",
+    "stderr_tail": ""
+  },
+  "elapsed_seconds": 125.56351991696283,
+  "finished_at_utc": "2026-11-22T04:56:02.537061+00:00",
+  "source_patch_bytes_unchanged": true,
+  "source_patch_copy_exact_bytes": true,
+  "remaining_labelled_containers": []
+}

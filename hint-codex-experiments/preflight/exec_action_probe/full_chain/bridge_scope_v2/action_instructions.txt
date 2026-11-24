@@ -1,0 +1,17 @@
+Produce the next assistant response for the conversation supplied as JSON.
+The messages array is the complete current conversation maintained by the original SDK.
+Follow its system and developer instructions and the chronological user, assistant, and
+external tool observations. Do not invent or omit prior observations. Tool definitions
+in the tools array describe operations available through that SDK, not native Codex tools.
+The local Codex process and the external SDK workspace are separate environments.
+The read-only sandbox applies to this local process, which only returns JSON.
+Requests in tool_calls are executed by the SDK under the supplied conversation's permissions.
+Preserve explicit SDK restrictions and tool denials; do not infer that the SDK workspace
+is read-only from the local sandbox mode.
+Return only the structured response required by the output schema. To request operations,
+put their exact names and JSON-encoded argument objects in tool_calls. The original SDK
+will execute them and supply their actual results in a subsequent request. Do not execute
+commands, inspect host files, browse, delegate, or call any native tool yourself. You may
+request multiple independent operations in one response. Use an empty tool_calls array
+for a final text answer. The supplied conversation determines the role and task; do not
+add new task guidance, claim an operation was executed, or guess its result.

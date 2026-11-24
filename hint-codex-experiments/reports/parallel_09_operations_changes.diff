@@ -1,0 +1,76 @@
+--- preflight/launch_parallel_08.py
++++ preflight/launch_parallel_09.py
+@@ -14,9 +14,9 @@
+ 
+ ROOT = Path('/srv/lab-disks/disk2/users/xymo/hint-codex-experiments')
+ PYTHON = ROOT.parent / 'hint-baseline-run/env/bin/python'
+-SOURCE = ROOT / 'source_parallel_08_static'
+-NAME = 'codex_parallel_08'
+-OUT = ROOT / 'preflight/parallel_08_launch'
++SOURCE = ROOT / 'source_parallel_09'
++NAME = 'codex_parallel_09'
++OUT = ROOT / 'preflight/parallel_09_launch'
+ OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+ 
+ 
+@@ -44,7 +44,7 @@
+             '-o', 'IdentitiesOnly=yes', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15',
+             '-o', 'UserKnownHostsFile='+str(directory/'known_hosts'),
+             '-o', 'StrictHostKeyChecking=yes', 'experiment@127.0.0.1']
+-    program = "import json,urllib.request; print(json.dumps([json.load(urllib.request.urlopen('http://172.17.0.1:8765/status',timeout=10)),json.load(urllib.request.urlopen('http://172.17.0.1:8766/experiment/status?session=prelaunch08',timeout=10))]))"
++    program = "import json,urllib.request; print(json.dumps([json.load(urllib.request.urlopen('http://172.17.0.1:8765/status',timeout=10)),json.load(urllib.request.urlopen('http://172.17.0.1:8766/experiment/status?session=prelaunch09',timeout=10))]))"
+     result = subprocess.run(args + ['python3 -c ' + shlex.quote(program)], check=True,
+                             capture_output=True, text=True, timeout=40)
+     gateway = json.loads(result.stdout)
+@@ -58,13 +58,15 @@
+     OUT.mkdir(exist_ok=True)
+     assert json.loads((ROOT/'preflight/parallel_08_sdk_candidate_tools/host_result.json').read_text())['passed']
+     assert json.loads((ROOT/'preflight/parallel_08_sdk_candidate_tools/result.json').read_text())['tools_stable']
+-    dry = json.loads((ROOT/'preflight/dryruns/codex_parallel_08_dryrun/experiment_state.json').read_text())
++    assert json.loads((ROOT/'preflight/parallel_09_sdk_multitool_gate/host_result.json').read_text())['passed']
++    assert json.loads((ROOT/'preflight/parallel_09_sdk_multitool_gate/result.json').read_text())['passed']
++    dry = json.loads((ROOT/'preflight/dryruns/codex_parallel_09_dryrun/experiment_state.json').read_text())
+     assert dry['status']=='complete' and dry['parallelism']==6
+     assert not (ROOT/'runs'/NAME).exists()
+-    quota = json.loads((ROOT/'preflight/parallel_08_quota.json').read_text())
++    quota = json.loads((ROOT/'preflight/parallel_09_quota.json').read_text())
+     assert quota['ordinaryUsageAllowed'] and not quota['rateLimits']['spendControlReached']
+     if '--services_ready' not in sys.argv:
+-        shutdown = ROOT / 'preflight/parallel_08_service_shutdown'
++        shutdown = ROOT / 'preflight/parallel_09_service_shutdown'
+         for name in ('services.json', 'bridge_status.json', 'bridge_state.json',
+                      'bridge_recovery.json', 'result.json'):
+             shutil.copy2(shutdown/name, OUT/('previous_'+name))
+@@ -79,7 +81,7 @@
+                                          stdout=stream,stderr=subprocess.STDOUT,start_new_session=True)
+             services.append({'name':name,'pid':process.pid,'command':command})
+         save(ROOT/'logs/services.json',{'started_at':time.time(),'services':services,
+-              'reason':'User-authorized fresh nine-task cohort with static SDK tools after interrupted parallel07',
++              'reason':'User-authorized fresh nine-task cohort with corrected multi-tool SSE transport after saved parallel08',
+               'previous_services_record':str(OUT/'previous_services.json')})
+     else:
+         services = json.loads((ROOT/'logs/services.json').read_text())['services']
+@@ -89,7 +91,7 @@
+     for attempt in range(30):
+         try:
+             status=read_api('http://127.0.0.1:8765/status')
+-            progress=read_api('http://127.0.0.1:8766/experiment/status?session=prelaunch08')
++            progress=read_api('http://127.0.0.1:8766/experiment/status?session=prelaunch09')
+             if not status['stopped'] and not progress['stopped']:break
+         except OSError:pass
+         time.sleep(1)
+@@ -106,10 +108,10 @@
+         process=subprocess.Popen(command,cwd=SOURCE,env=env,stdin=subprocess.DEVNULL,
+                                  stdout=stream,stderr=subprocess.STDOUT,start_new_session=True)
+     record={'pid':process.pid,'started_at_unix':time.time(),'command':command,'cwd':str(SOURCE),
+-            'configuration':str(ROOT/'reports/parallel_08_config.json'),
+-            'source_snapshot':str(ROOT/'reports/parallel_08_snapshot.json'),
+-            'separate_interrupted_batch':str(ROOT/'runs/codex_parallel_07/experiment_state.json'),
+-            'reason':'User accepted static SDK tool presentation and restarting all nine tasks. Anko is retained without rerun; parallel07 observations and recovered Ink I1 remain separate.',
++            'configuration':str(ROOT/'reports/parallel_09_config.json'),
++            'source_snapshot':str(ROOT/'reports/parallel_09_snapshot.json'),
++            'separate_interrupted_batch':str(ROOT/'runs/codex_parallel_08/experiment_state.json'),
++            'reason':'User accepted saving and stopping parallel08, correcting multi-tool SSE transport, and restarting all nine tasks. Anko is retained without rerun; parallel07 and parallel08 observations and costs remain separate.',
+             'log':str(ROOT/'logs'/(NAME+'.log'))}
+     save(ROOT/'logs'/(NAME+'_process.json'),record)
+     print(json.dumps(record),flush=True)

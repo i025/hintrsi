@@ -1,0 +1,1 @@
+Consider how the time window treats observations exactly at its boundaries. Compare that behavior with the intended meaning of the requested window, and think about how a boundary observation would affect every summary field.

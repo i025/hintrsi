@@ -1,0 +1,180 @@
+--- source_parallel_09/codex_cli_bridge.py
++++ source_parallel_09_checked/codex_cli_bridge.py
+@@ -3,6 +3,7 @@
+ 
+ import argparse
+ import asyncio
++import copy
+ import inspect
+ import json
+ import logging
+@@ -52,7 +53,7 @@
+     for name in DISABLED_FEATURES:
+         command += ["-c", f"features.{name}=false"]
+     command += ["-c", 'web_search="disabled"', "-c", "project_doc_max_bytes=0",
+-                "-c", "mcp_servers={}"]
++                "-c", "mcp_servers={}", "-c", "skills.bundled.enabled=false"]
+     return command
+ 
+ 
+@@ -173,6 +174,8 @@
+     arguments: Any
+     served: bool = False
+     completed: bool = False
++    cancelled: bool = False
++    result: Optional[Dict] = None
+ 
+ 
+ @dataclass
+@@ -194,7 +197,10 @@
+     text: deque = field(default_factory=deque)
+     usage_total: Optional[Dict] = None
+     reported_usage: Dict[str, int] = field(default_factory=dict)
++    last_request: Optional[Dict] = None
++    last_response: Optional[Dict] = None
+     error: Optional[str] = None
++    recovered_tool_results: bool = False
+     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+     changed: asyncio.Event = field(default_factory=asyncio.Event)
+ 
+@@ -300,7 +306,8 @@
+             if state.role != "teacher":
+                 continue
+             values = {name: value for name, value in vars(state).items()
+-                      if name not in ("lock", "changed", "pending", "ready", "text")}
++                      if name not in ("lock", "changed", "pending", "ready", "text",
++                                      "last_request", "last_response")}
+             values.update(pending=[vars(tool) for tool in state.pending.values()],
+                           ready=list(state.ready), text=list(state.text))
+             recovery.append({"key": list(key), "state": values})
+@@ -377,6 +384,15 @@
+                 state.ready.append(call_id)
+                 self.by_call[call_id] = state
+             state.changed.set()
++        elif method == "item/completed" and item.get("type") == "dynamicToolCall":
++            tool = state.pending.get(item.get("id"))
++            # Code Mode cancellation closes the RPC without an external result.
++            if tool and item.get("status") == "failed" and item.get("contentItems") == []:
++                tool.cancelled = True
++                tool.completed = False
++                state.changed.set()
++            elif tool:
++                tool.result = None
+         elif method == "item/completed" and item.get("type") == "agentMessage":
+             state.text.append(item.get("text", ""))
+             state.changed.set()
+@@ -404,9 +420,11 @@
+             state.changed.set()
+             self.checkpoint()
+         elif method == "error":
+-            state.error = json.dumps(params)
+-            if _quota_error(params):
+-                self.stop(state.error)
++            quota_error = _quota_error(params)
++            if not params.get("willRetry") or quota_error:
++                state.error = json.dumps(params)
++                if quota_error:
++                    self.stop(state.error)
+             state.changed.set()
+ 
+     async def start(self):
+@@ -570,6 +588,16 @@
+                     self.stop("SDK tool definitions changed inside an existing Codex thread")
+                 if self.stopped:
+                     raise CodexBridgeError(self.stop_reason, "experiment_stopped")
++                request_key = {"messages": body["messages"], "phase": state.phase}
++                if state.last_request == request_key and state.last_response is not None:
++                    response = copy.deepcopy(state.last_response)
++                    self.record("model_responses.jsonl", {
++                        "session": state.session_id, "role": state.role, "phase": state.phase,
++                        "thread_id": state.thread_id, "turn_id": state.turn_id,
++                        "started_at": start_time, "elapsed_seconds": time.time() - start_time,
++                        "replayed_response": True, "response": response,
++                    })
++                    return response
+                 new_inputs = self._new_inputs(state, body["messages"])
+                 if new_inputs:
+                     if state.active:
+@@ -589,12 +617,52 @@
+                         continue
+                     tool = state.pending.get(message.get("tool_call_id"))
+                     if tool and tool.served and not tool.completed:
+-                        await self.rpc.respond(tool.rpc_id, {
+-                            "success": not message.get("is_error", False),
+-                            "contentItems": [{"type": "inputText", "text": _text(message.get("content"))}],
+-                        })
+-                        tool.completed = True
++                        tool.result = {
++                            "tool_call_id": tool.call_id, "arguments": tool.arguments,
++                            "is_error": message.get("is_error", False),
++                            "output": _text(message.get("content")),
++                        }
++                        if not tool.cancelled:
++                            tool.completed = True
++                            await self.rpc.respond(tool.rpc_id, {
++                                "success": not tool.result["is_error"],
++                                "contentItems": [{"type": "inputText", "text": tool.result["output"]}],
++                            })
++                seen_calls = {call["id"] for message in body["messages"]
++                              if message["role"] == "assistant"
++                              for call in message.get("tool_calls") or []}
++                # Older undelivered calls precede newly arrived tools.
++                for call_id, tool in reversed(state.pending.items()):
++                    if tool.served and not tool.completed and call_id not in seen_calls:
++                        state.ready.appendleft(call_id)
+                 while True:
++                    if self.stopped or state.error:
++                        raise CodexBridgeError(state.error or self.stop_reason, "experiment_stopped")
++                    for tool in list(state.pending.values()):
++                        if tool.cancelled and tool.result is not None and not tool.completed:
++                            if self.stopped or state.error:
++                                raise CodexBridgeError(state.error or self.stop_reason, "experiment_stopped")
++                            # The SDK operation continued after its Code Mode cell ended.
++                            # Retain the actual observation in the same native thread.
++                            state.text.clear()
++                            state.recovered_tool_results = True
++                            state.active = True
++                            tool.completed = True
++                            resumed = await self.rpc.request("turn/start", {
++                                "threadId": state.thread_id, "model": MODEL,
++                                "effort": EFFORT, "input": [], "environments": [],
++                                "toolOutput": {"name": tool.name,
++                                               "output": json.dumps(tool.result, ensure_ascii=False),
++                                               "retain": True},
++                            })
++                            state.turn_id = resumed["turn"]["id"]
++                            self.record("tool_result_recoveries.jsonl", {
++                                "session": state.session_id, "role": state.role, "phase": state.phase,
++                                "thread_id": state.thread_id, "turn_id": state.turn_id,
++                                "tool_call_id": tool.call_id, "tool": tool.name,
++                                "is_error": tool.result["is_error"],
++                            })
++                            tool.result = None
+                     if self.stopped or state.error:
+                         raise CodexBridgeError(state.error or self.stop_reason, "experiment_stopped")
+                     if state.ready or not state.active:
+@@ -602,7 +670,14 @@
+                     # Commentary is buffered until a real tool call or final completion.
+                     state.changed.clear()
+                     await state.changed.wait()
+-                text = "\n".join(state.text)
++                if state.recovered_tool_results:
++                    # An active native turn can emit its old final before consuming
++                    # the late observation. Only the last answer follows that result.
++                    text = state.text[-1] if state.text and not state.ready else ""
++                    if not state.ready:
++                        state.recovered_tool_results = False
++                else:
++                    text = "\n".join(state.text)
+                 state.text.clear()
+                 calls = []
+                 while state.ready:
+@@ -635,6 +710,8 @@
+                     "started_at": start_time, "elapsed_seconds": time.time() - start_time,
+                     "response": response,
+                 })
++                state.last_request = copy.deepcopy(request_key)
++                state.last_response = copy.deepcopy(response)
+                 self.checkpoint()
+                 return response
+             except CodexBridgeError as exc:

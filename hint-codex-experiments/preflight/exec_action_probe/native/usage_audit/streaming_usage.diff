@@ -1,0 +1,72 @@
+--- source_parallel_09_checked/litellm_proxy/streaming_fix.py
++++ candidate/streaming_fix.py
+@@ -459,34 +459,6 @@
+                 if chunk == "None" or chunk is None:
+                     raise Exception
+ 
+-                self._accumulate_reasoning(chunk)
+-
+-                should_start_new_block = self._should_start_new_content_block(chunk)
+-
+-                # --- FIX: skip late-arriving chunks ---
+-                if getattr(chunk, "_drop_late", False):
+-                    logger.debug(
+-                        "streaming_fix: dropping late chunk (current_block_type=%s, "
+-                        "current_index=%d)",
+-                        self.current_content_block_type,
+-                        self.current_content_block_index,
+-                    )
+-                    continue
+-
+-                if should_start_new_block:
+-                    self._increment_content_block_index()
+-
+-                processed_chunk = (
+-                    LiteLLMAnthropicMessagesAdapter()
+-                    .translate_streaming_openai_response_to_anthropic(
+-                        response=chunk,
+-                        current_content_block_index=self.current_content_block_index,
+-                    )
+-                )
+-
+-                if self._strip_tool_section_from_thinking(processed_chunk):
+-                    continue
+-
+                 if (
+                     self.holding_stop_reason_chunk is not None
+                     and getattr(chunk, "usage", None) is not None
+@@ -507,6 +479,34 @@
+                     self.queued_usage_chunk = True
+                     self.holding_stop_reason_chunk = None
+                     return self.chunk_queue.popleft()
++
++                self._accumulate_reasoning(chunk)
++
++                should_start_new_block = self._should_start_new_content_block(chunk)
++
++                # --- FIX: skip late-arriving chunks ---
++                if getattr(chunk, "_drop_late", False):
++                    logger.debug(
++                        "streaming_fix: dropping late chunk (current_block_type=%s, "
++                        "current_index=%d)",
++                        self.current_content_block_type,
++                        self.current_content_block_index,
++                    )
++                    continue
++
++                if should_start_new_block:
++                    self._increment_content_block_index()
++
++                processed_chunk = (
++                    LiteLLMAnthropicMessagesAdapter()
++                    .translate_streaming_openai_response_to_anthropic(
++                        response=chunk,
++                        current_content_block_index=self.current_content_block_index,
++                    )
++                )
++
++                if self._strip_tool_section_from_thinking(processed_chunk):
++                    continue
+ 
+                 if not self.queued_usage_chunk:
+                     if should_start_new_block:

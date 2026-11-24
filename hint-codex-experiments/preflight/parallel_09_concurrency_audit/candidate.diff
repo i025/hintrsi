@@ -1,0 +1,84 @@
+--- source_parallel_09/codex_cli_bridge.py
++++ candidate/codex_cli_bridge.py
+@@ -3,6 +3,7 @@
+ 
+ import argparse
+ import asyncio
++import copy
+ import inspect
+ import json
+ import logging
+@@ -194,6 +195,8 @@
+     text: deque = field(default_factory=deque)
+     usage_total: Optional[Dict] = None
+     reported_usage: Dict[str, int] = field(default_factory=dict)
++    last_request: Optional[Dict] = None
++    last_response: Optional[Dict] = None
+     error: Optional[str] = None
+     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+     changed: asyncio.Event = field(default_factory=asyncio.Event)
+@@ -300,7 +303,8 @@
+             if state.role != "teacher":
+                 continue
+             values = {name: value for name, value in vars(state).items()
+-                      if name not in ("lock", "changed", "pending", "ready", "text")}
++                      if name not in ("lock", "changed", "pending", "ready", "text",
++                                      "last_request", "last_response")}
+             values.update(pending=[vars(tool) for tool in state.pending.values()],
+                           ready=list(state.ready), text=list(state.text))
+             recovery.append({"key": list(key), "state": values})
+@@ -404,9 +408,11 @@
+             state.changed.set()
+             self.checkpoint()
+         elif method == "error":
+-            state.error = json.dumps(params)
+-            if _quota_error(params):
+-                self.stop(state.error)
++            quota_error = _quota_error(params)
++            if not params.get("willRetry") or quota_error:
++                state.error = json.dumps(params)
++                if quota_error:
++                    self.stop(state.error)
+             state.changed.set()
+ 
+     async def start(self):
+@@ -570,6 +576,16 @@
+                     self.stop("SDK tool definitions changed inside an existing Codex thread")
+                 if self.stopped:
+                     raise CodexBridgeError(self.stop_reason, "experiment_stopped")
++                request_key = {"messages": body["messages"], "phase": state.phase}
++                if state.last_request == request_key and state.last_response is not None:
++                    response = copy.deepcopy(state.last_response)
++                    self.record("model_responses.jsonl", {
++                        "session": state.session_id, "role": state.role, "phase": state.phase,
++                        "thread_id": state.thread_id, "turn_id": state.turn_id,
++                        "started_at": start_time, "elapsed_seconds": time.time() - start_time,
++                        "replayed_response": True, "response": response,
++                    })
++                    return response
+                 new_inputs = self._new_inputs(state, body["messages"])
+                 if new_inputs:
+                     if state.active:
+@@ -594,6 +610,13 @@
+                             "contentItems": [{"type": "inputText", "text": _text(message.get("content"))}],
+                         })
+                         tool.completed = True
++                seen_calls = {call["id"] for message in body["messages"]
++                              if message["role"] == "assistant"
++                              for call in message.get("tool_calls") or []}
++                # Older undelivered calls precede newly arrived tools.
++                for call_id, tool in reversed(state.pending.items()):
++                    if tool.served and not tool.completed and call_id not in seen_calls:
++                        state.ready.appendleft(call_id)
+                 while True:
+                     if self.stopped or state.error:
+                         raise CodexBridgeError(state.error or self.stop_reason, "experiment_stopped")
+@@ -635,6 +658,8 @@
+                     "started_at": start_time, "elapsed_seconds": time.time() - start_time,
+                     "response": response,
+                 })
++                state.last_request = copy.deepcopy(request_key)
++                state.last_response = copy.deepcopy(response)
+                 self.checkpoint()
+                 return response
+             except CodexBridgeError as exc:

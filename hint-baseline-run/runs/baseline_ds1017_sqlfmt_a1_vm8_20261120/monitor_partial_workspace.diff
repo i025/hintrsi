@@ -1,0 +1,163 @@
+diff --git a/src/sqlfmt/api.py b/src/sqlfmt/api.py
+index b009e30..1184d1d 100755
+--- a/src/sqlfmt/api.py
++++ b/src/sqlfmt/api.py
+@@ -24,11 +24,13 @@ from tqdm import tqdm
+ 
+ from sqlfmt.analyzer import Analyzer
+ from sqlfmt.cache import Cache, check_cache, clear_cache, load_cache, write_cache
++from sqlfmt.ddl import is_ddl_header_token
+ from sqlfmt.exception import SqlfmtEquivalenceError, SqlfmtError, SqlfmtUnicodeError
+ from sqlfmt.mode import Mode as Mode
+ from sqlfmt.query import Query
+ from sqlfmt.query_formatter import QueryFormatter
+ from sqlfmt.report import STDIN_PATH, Report, SqlFormatResult
++from sqlfmt.tokens import TokenType
+ 
+ T = TypeVar("T")
+ R = TypeVar("R")
+@@ -337,13 +339,29 @@ def _perform_safety_check(analyzer: Analyzer, raw_query: Query, result: str) ->
+     the original.
+     """
+     result_query = analyzer.parse_query(source_string=result)
++    raw_tokens = raw_query.tokens
++    result_tokens = result_query.tokens
++    # CREATE TABLE statements are formatted structurally: for example, a
++    # trailing comma after the final column is removed, and commas may be
++    # moved from the start of a line to the end of a line. These are not
++    # semantic changes, but they do remove commas from the token stream, so
++    # we don't compare commas when formatting DDL.
++    formatting_ddl = any([is_ddl_header_token(token) for token in raw_tokens]) and any(
++        [is_ddl_header_token(token) for token in result_tokens]
++    )
++    if formatting_ddl:
++        raw_tokens = [
++            token for token in raw_tokens if token.type is not TokenType.COMMA
++        ]
++        result_tokens = [
++            token for token in result_tokens if token.type is not TokenType.COMMA
++        ]
++
+     filtered_raw_tokens = [
+-        token.type for token in raw_query.tokens if token.type.is_equivalent_in_output
++        token.type for token in raw_tokens if token.type.is_equivalent_in_output
+     ]
+     filtered_result_tokens = [
+-        token.type
+-        for token in result_query.tokens
+-        if token.type.is_equivalent_in_output
++        token.type for token in result_tokens if token.type.is_equivalent_in_output
+     ]
+ 
+     try:
+diff --git a/src/sqlfmt/query_formatter.py b/src/sqlfmt/query_formatter.py
+index 443b6ec..57afa63 100644
+--- a/src/sqlfmt/query_formatter.py
++++ b/src/sqlfmt/query_formatter.py
+@@ -1,6 +1,7 @@
+ from dataclasses import dataclass
+ from typing import List, Optional
+ 
++from sqlfmt.ddl import format_ddl_lines
+ from sqlfmt.jinjafmt import JinjaFormatter
+ from sqlfmt.line import Line
+ from sqlfmt.merger import LineMerger
+@@ -75,6 +76,15 @@ class QueryFormatter:
+ 
+         return lines
+ 
++    def _format_ddl(self, lines: List[Line]) -> List[Line]:
++        """
++        Re-formats CREATE TABLE statements, which have a very different
++        structure than queries (one line per column, no trailing comma,
++        nested types on a single line, etc.)
++        """
++        node_manager = NodeManager(self.mode.dialect.case_sensitive_names)
++        return format_ddl_lines(lines, node_manager)
++
+     def _remove_extra_blank_lines(self, lines: List[Line]) -> List[Line]:
+         """
+         A query can have at most 2 consecutive blank lines at depth (0,0)
+@@ -113,6 +123,7 @@ class QueryFormatter:
+             self._dedent_jinja_blocks,
+             self._merge_lines,
+             self._remove_extra_blank_lines,
++            self._format_ddl,
+         ]
+ 
+         for transform in pipeline:
+diff --git a/src/sqlfmt/rules/__init__.py b/src/sqlfmt/rules/__init__.py
+index a5c9ac1..7f6b6b8 100644
+--- a/src/sqlfmt/rules/__init__.py
++++ b/src/sqlfmt/rules/__init__.py
+@@ -8,11 +8,14 @@ from sqlfmt.rules.common import (
+     ALTER_WAREHOUSE,
+     CREATE_CLONABLE,
+     CREATE_FUNCTION,
++    CREATE_TABLE,
+     CREATE_WAREHOUSE,
+     PRAGMA_SET_CALL,
++    TABLE_NAME,
+     group,
+ )
+ from sqlfmt.rules.core import CORE as CORE
++from sqlfmt.rules.ddl import DDL as DDL
+ from sqlfmt.rules.function import FUNCTION as FUNCTION
+ from sqlfmt.rules.grant import GRANT as GRANT
+ from sqlfmt.rules.jinja import JINJA as JINJA  # noqa
+@@ -325,6 +328,28 @@ MAIN = [
+             ),
+         ),
+     ),
++    Rule(
++        # create table statements that define a table body (i.e., with
++        # an opening paren after the table name) are formatted by the
++        # ddl ruleset. create table statements that use other syntax
++        # (e.g., create table as select, or create table like) are
++        # handled by the unsupported_ddl rule below and pass through
++        # unchanged.
++        name="create_table",
++        priority=2040,
++        pattern=group(CREATE_TABLE)
++        # only treat this as DDL if a table body (a paren after the table
++        # name) follows. A bare `create table` keyword also matches, so
++        # that this rule can be tested/lexed on its own.
++        + r"(?:(?=\s+" + TABLE_NAME + r"\s*\()|$)" + group(r"\W", r"$"),
++        action=partial(
++            actions.handle_nonreserved_top_level_keyword,
++            action=partial(
++                actions.lex_ruleset,
++                new_ruleset=DDL,
++            ),
++        ),
++    ),
+     Rule(
+         name="unsupported_ddl",
+         priority=2999,
+diff --git a/src/sqlfmt/rules/common.py b/src/sqlfmt/rules/common.py
+index 52072ae..14f7120 100644
+--- a/src/sqlfmt/rules/common.py
++++ b/src/sqlfmt/rules/common.py
+@@ -54,4 +54,22 @@ CREATE_CLONABLE = (
+     + r"(\s+if\s+not\s+exists)?"
+ )
+ 
++# A CREATE TABLE statement that defines a table body, e.g.,
++# `create table if not exists my_table (...)`. Statements like
++# `create table foo as select ...` or `create table foo like bar`
++# are not matched, since they don't have a body.
++CREATE_TABLE = (
++    r"create(\s+or\s+replace)?(\s+temp(orary)?)?(\s+transient)?(\s+secure)?"
++    r"(\s+external)?\s+table(\s+if\s+not\s+exists)?"
++)
++
++# A possibly-qualified or quoted table name, used to look ahead for
++# the opening paren of a CREATE TABLE body
++TABLE_NAME_PART = group(
++    r"\"([^\"]|\"\")*\"",
++    r"`([^`]|``)*`",
++    r"[\w$@#-]+",
++)
++TABLE_NAME = TABLE_NAME_PART + r"(\s*\.\s*" + TABLE_NAME_PART + r")*"
++
+ PRAGMA_SET_CALL = group(r"pragma", r"set", r"call")

@@ -1,0 +1,113 @@
+{
+  "event": "rootless_native_preflight_blocked",
+  "at": "2026-11-20T21:19:23.881459+00:00",
+  "purpose": "free_isolated_environment_validation_only",
+  "uid": 1005,
+  "gid": 1005,
+  "kernel": {
+    "args": [
+      "uname",
+      "-r"
+    ],
+    "exit_code": 0,
+    "output": "5.15.0-139-generic"
+  },
+  "uid_map": "0          0 4294967295",
+  "unprivileged_userns_clone": "1",
+  "max_user_namespaces": "4109081",
+  "unshare_user_namespace_probe": {
+    "args": [
+      "unshare",
+      "-Ur",
+      "id"
+    ],
+    "exit_code": 0,
+    "output": "uid=0(root) gid=0(root) groups=0(root)"
+  },
+  "subuid": [
+    "xymo:427680:65536"
+  ],
+  "subgid": [
+    "xymo:427680:65536"
+  ],
+  "mapping_helper_paths": {
+    "/usr/bin/newuidmap": {
+      "exists": false,
+      "executable": false
+    },
+    "/usr/bin/newgidmap": {
+      "exists": false,
+      "executable": false
+    },
+    "/bin/newuidmap": {
+      "exists": false,
+      "executable": false
+    },
+    "/bin/newgidmap": {
+      "exists": false,
+      "executable": false
+    },
+    "/usr/local/bin/newuidmap": {
+      "exists": false,
+      "executable": false
+    },
+    "/usr/local/bin/newgidmap": {
+      "exists": false,
+      "executable": false
+    }
+  },
+  "mapping_helpers_on_path": {
+    "newuidmap": null,
+    "newgidmap": null
+  },
+  "fuse": {
+    "exists": true,
+    "readable": true,
+    "writable": true,
+    "mode": "0o666"
+  },
+  "process_cgroup": "13:cpuset:/\n12:perf_event:/\n11:net_cls,net_prio:/\n10:misc:/\n9:rdma:/\n8:hugetlb:/\n7:devices:/user.slice\n6:freezer:/\n5:pids:/user.slice/user-1005.slice/session-109847.scope\n4:memory:/user.slice/user-1005.slice/session-109847.scope\n3:cpu,cpuacct:/user.slice\n2:blkio:/user.slice\n1:name=systemd:/user.slice/user-1005.slice/session-109847.scope\n0::/user.slice/user-1005.slice/session-109847.scope",
+  "cgroup_mounts": {
+    "args": [
+      "findmnt",
+      "-t",
+      "cgroup,cgroup2"
+    ],
+    "exit_code": 0,
+    "output": "TARGET                          SOURCE  FSTYPE  OPTIONS\n/sys/fs/cgroup/unified          cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n/sys/fs/cgroup/systemd          cgroup  cgroup  rw,nosuid,nodev,noexec,relatime,xattr,name=systemd\n/sys/fs/cgroup/blkio            cgroup  cgroup  rw,nosuid,nodev,noexec,relatime,blkio\n/sys/fs/cgroup/cpu,cpuacct      cgroup  cgroup  rw,nosuid,nodev,noexec,relatime,cpu,cpuacct\n/sys/fs/cgroup/memory           cgroup  cgroup  rw,nosuid,nodev,noexec,relatime,memory\n/sys/fs/cgroup/pids             cgroup  cgroup  rw,nosuid,nodev,noexec,relatime,pids\n/sys/fs/cgroup/freezer          cgroup  cgroup  rw,nosuid,nodev,noexec,relatime,freezer\n/sys/fs/cgroup/devices          cgroup  cgroup  rw,nosuid,nodev,noexec,relatime,devices\n/sys/fs/cgroup/hugetlb          cgroup  cgroup  rw,nosuid,nodev,noexec,relatime,hugetlb\n/sys/fs/cgroup/rdma             cgroup  cgroup  rw,nosuid,nodev,noexec,relatime,rdma\n/sys/fs/cgroup/misc             cgroup  cgroup  rw,nosuid,nodev,noexec,relatime,misc\n/sys/fs/cgroup/net_cls,net_prio cgroup  cgroup  rw,nosuid,nodev,noexec,relatime,net_cls,net_prio\n/sys/fs/cgroup/perf_event       cgroup  cgroup  rw,nosuid,nodev,noexec,relatime,perf_event\n/sys/fs/cgroup/cpuset           cgroup  cgroup  rw,nosuid,nodev,noexec,relatime,cpuset"
+  },
+  "v2_controllers": "",
+  "v2_subtree_control": "",
+  "v2_user_path_writable": false,
+  "static_dockerd": {
+    "args": [
+      "/srv/lab-disks/disk2/users/xymo/hint-baseline-run/bin/dockerd",
+      "--version"
+    ],
+    "exit_code": 0,
+    "output": "Docker version 29.10.0, build 06db173"
+  },
+  "docker_sdk_version": "7.2.0",
+  "result": "BLOCKED_AT_PREREQUISITES",
+  "blockers": [
+    "newuidmap and newgidmap are absent; official RootlessKit requires these host mapping helpers for subordinate UID/GID ranges",
+    "memory controller remains cgroup v1; hybrid v2 cgroup.controllers is empty; no delegated memory controller for rootless enforcement"
+  ],
+  "daemon_started": false,
+  "official_packages_downloaded": false,
+  "docker_api_negotiation_tested": false,
+  "privileged_128g_container_tested": false,
+  "actual_128g_memory_cap_tested": false,
+  "memory_limit_assessment": "NOT_TESTED_RUNTIME; expected unsupported/ignored by Docker official rootless cgroup-v1 limitations, never counted as a proven 128GiB cap",
+  "model_requests": 0,
+  "paid_requests": 0,
+  "global_system_changes": false,
+  "existing_environment_modified": false,
+  "vm_or_existing_containers_touched": false,
+  "official_sources": [
+    "https://docs.docker.com/engine/security/rootless/#prerequisites",
+    "https://github.com/rootless-containers/rootlesskit#requirements",
+    "https://docs.docker.com/engine/security/rootless/tips/#limiting-resources"
+  ],
+  "decision": "Stop at the confirmed prerequisite failure; do not install privileged helpers, change host cgroups, start a daemon, pull images, or switch experiments."
+}

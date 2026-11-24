@@ -1,0 +1,23 @@
+--- source_parallel_08_static/codex_cli_bridge.py
++++ source_parallel_09/codex_cli_bridge.py
+@@ -658,14 +658,15 @@
+     delta = {"role": "assistant"}
+     if message.get("content"):
+         delta["content"] = message["content"]
+-    if message.get("tool_calls"):
+-        delta["tool_calls"] = [{"index": index, **tool}
+-                               for index, tool in enumerate(message["tool_calls"])]
+     chunks = [
+         {**base, "choices": [{"index": 0, "delta": delta, "finish_reason": None}]},
+-        {**base, "choices": [{"index": 0, "delta": {}, "finish_reason": choice["finish_reason"]}],
+-         "usage": response["usage"]},
+     ]
++    for index, tool in enumerate(message.get("tool_calls") or []):
++        chunks.append({**base, "choices": [{"index": 0, "delta": {
++            "tool_calls": [{"index": index, **tool}]}, "finish_reason": None}]})
++    chunks.append({**base, "choices": [
++        {"index": 0, "delta": {}, "finish_reason": choice["finish_reason"]}],
++        "usage": response["usage"]})
+     for chunk in chunks:
+         yield "data: " + json.dumps(chunk) + "\n\n"
+     yield "data: [DONE]\n\n"

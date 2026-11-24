@@ -1,0 +1,11 @@
+--- source_parallel_09/run_codex_experiments.py
++++ candidate/run_codex_experiments.py
+@@ -519,6 +519,8 @@
+     args = parser.parse_args()
+     os.environ.setdefault("DOCKER_HOST", "unix://" + str(ROOT / "vm/docker.sock"))
+     os.environ["HINT_CODEX_RUNTIME"] = "/opt/hint-codex-runtime/python"
++    # Native Codex owns context compaction for every experiment group.
++    os.environ["DISABLE_AUTO_COMPACT"] = "1"
+     os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+     os.environ["HINT_EXPERIMENT_NAME"] = args.experiment_name
+     os.environ.pop("ALL_PROXY", None)

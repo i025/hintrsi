@@ -1,0 +1,130 @@
+--- source_parallel_06/benchmark/deepswe/get_hint_by_task.py
++++ source_parallel_07/benchmark/deepswe/get_hint_by_task.py
+@@ -24,6 +24,7 @@
+ """
+ 
+ import argparse
++import gzip
+ import io
+ import json
+ import logging
+@@ -653,6 +654,20 @@
+             "truncate -s 0 /tmp/proxy.log",
+         ])
+ 
++    def save_sdk_session(self):
++        """Export SDK conversation files before releasing a teacher container."""
++        target = self.out_dir / "teacher_sdk_projects.tar.gz"
++        temporary = target.with_suffix(".tmp")
++        try:
++            chunks, _ = self.container.get_archive("/root/.claude/projects")
++        except docker.errors.NotFound:
++            return None
++        with gzip.open(temporary, "wb") as stream:
++            for chunk in chunks:
++                stream.write(chunk)
++        temporary.replace(target)
++        return str(target)
++
+     def save_teacher_state(self, state_path, trajs_path=None):
+         trajs_path = Path(trajs_path or self.out_dir / "trajs.json")
+         metadata = json.loads(trajs_path.read_text(encoding="utf-8"))["metadata"]
+@@ -668,7 +683,11 @@
+         arguments["config"] = str(config_path)
+         arguments["keep_teacher"] = False
+         arguments["teacher_output_dir"] = None
++        archive = self.save_sdk_session()
++        if archive is None:
++            raise RuntimeError("The completed teacher SDK session could not be exported")
+         state = {
++            "sdk_projects_archive": archive,
+             "container_name": self.container.name,
+             "session_id": session_id,
+             "base_commit": self.base_commit,
+@@ -824,7 +843,10 @@
+         finally:
+             # 8. 清理容器
+             log.info("清理容器 ...")
+-            if not (self.args.keep_teacher and completed):
++            if not completed:
++                self.save_sdk_session()
++                self.container.stop(timeout=10)
++            elif not self.args.keep_teacher:
+                 self.stop_and_remove_container()
+ 
+ 
+@@ -850,6 +872,7 @@
+         generator.refresh_proxy(task_config)
+     else:
+         generator.start_container()
++    completed = False
+     try:
+         if not resume:
+             generator.inject_files(task_config)
+@@ -877,9 +900,13 @@
+         if resume:
+             generator.save_teacher_state(state_path)
+         generator.clear_stage_files()
++        completed = True
+         return review
+     finally:
+-        if not resume:
++        if not completed:
++            generator.save_sdk_session()
++            generator.container.stop(timeout=10)
++        elif not resume:
+             generator.stop_and_remove_container()
+ 
+ 
+--- source_parallel_06/codex_cli_bridge.py
++++ source_parallel_07/codex_cli_bridge.py
+@@ -295,6 +295,19 @@
+     def checkpoint(self):
+         (self.run_dir / "bridge_state.json").write_text(
+             json.dumps(self.status(), ensure_ascii=False, indent=2), encoding="utf-8")
++        recovery = []
++        for key, state in self.sessions.items():
++            if state.role != "teacher":
++                continue
++            values = {name: value for name, value in vars(state).items()
++                      if name not in ("lock", "changed", "pending", "ready", "text")}
++            values.update(pending=[vars(tool) for tool in state.pending.values()],
++                          ready=list(state.ready), text=list(state.text))
++            recovery.append({"key": list(key), "state": values})
++        target = self.run_dir / "bridge_recovery.json"
++        temporary = target.with_suffix(".tmp")
++        temporary.write_text(json.dumps(recovery, ensure_ascii=False), encoding="utf-8")
++        temporary.replace(target)
+ 
+     def stop(self, reason):
+         if self.stopped:
+--- source_parallel_06/run_codex_experiments.py
++++ source_parallel_07/run_codex_experiments.py
+@@ -441,6 +441,16 @@
+             return
+         import docker
+         client = docker.from_env()
++        if self.state["status"] == "stopped":
++            retained = []
++            for container in client.containers.list(all=True, filters={
++                    "label": "hint.experiment_name=" + self.args.experiment_name}):
++                container.stop(timeout=10)
++                retained.append(container.name)
++            self.state["retained_containers"] = retained
++            self.kept_teachers.clear()
++            client.close()
++            return
+         for path in self.kept_teachers:
+             if path.exists():
+                 name = json.loads(path.read_text())["container_name"]
+--- source_parallel_06/run_parallel_experiments.py
++++ source_parallel_07/run_parallel_experiments.py
+@@ -211,7 +211,7 @@
+             try:
+                 for container in client.containers.list(all=True, filters={
+                         "label": "hint.experiment_name=" + worker["experiment"]}):
+-                    container.remove(force=True)
++                    container.stop(timeout=10)
+             finally:
+                 client.close()
+ 

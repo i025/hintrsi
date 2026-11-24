@@ -1,0 +1,243 @@
+#!/usr/bin/env python3
+"""Return one structured decision from Codex exec; the original SDK runs tools."""
+
+import argparse
+import asyncio
+import json
+import logging
+import sys
+import time
+import uuid
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "source_parallel_09_checked"))
+from codex_cli_bridge import (  # noqa: E402
+    CodexBridgeError, DISABLED_FEATURES, EFFORT, MODEL, _quota_error, create_app,
+)
+
+INSTRUCTIONS = """Produce the next assistant response for the conversation supplied as JSON.
+The messages array is the complete current conversation maintained by the original SDK.
+Follow its system and developer instructions and the chronological user, assistant, and
+external tool observations. Do not invent or omit prior observations. Tool definitions
+in the tools array describe operations available through that SDK, not native Codex tools.
+Return only the structured response required by the output schema. To request operations,
+put their exact names and JSON-encoded argument objects in tool_calls. The original SDK
+will execute them and supply their actual results in a subsequent request. Do not execute
+commands, inspect host files, browse, delegate, or call any native tool yourself. You may
+request multiple independent operations in one response. Use an empty tool_calls array
+for a final text answer. The supplied conversation determines the role and task; do not
+add new task guidance, claim an operation was executed, or guess its result.
+"""
+
+
+def action_schema(tools):
+    names = [tool["function"]["name"] for tool in tools]
+    name = {"type": "string"}
+    if names:
+        name["enum"] = names
+    calls = {"type": "array", "items": {
+        "type": "object", "properties": {
+            "name": name, "arguments": {"type": "string"},
+        }, "required": ["name", "arguments"], "additionalProperties": False,
+    }}
+    if not names:
+        calls["maxItems"] = 0
+    return {"type": "object", "properties": {
+        "content": {"type": "string"}, "tool_calls": calls,
+    }, "required": ["content", "tool_calls"], "additionalProperties": False}
+
+
+def default_command():
+    command = ["codex", "exec", "--ephemeral", "--json", "--skip-git-repo-check",
+               "--ignore-user-config", "--ignore-rules", "--sandbox", "read-only",
+               "--model", MODEL, "-c", "model_reasoning_effort=" + json.dumps(EFFORT)]
+    for name in DISABLED_FEATURES:
+        command += ["-c", "features." + name + "=false"]
+    command += ["-c", 'web_search="disabled"', "-c", "project_doc_max_bytes=0",
+                "-c", "mcp_servers={}", "-c", "skills.bundled.enabled=false"]
+    return command
+
+
+class CodexExecBridge:
+    def __init__(self, run_dir, command=None):
+        self.run_dir = Path(run_dir).resolve()
+        self.run_dir.mkdir(parents=True, exist_ok=True)
+        self.instructions = self.run_dir / "action_instructions.txt"
+        self.instructions.write_text(INSTRUCTIONS, encoding="utf-8")
+        self.command = command or default_command()
+        self.processes = {}
+        self.stopped = False
+        self.stop_reason = None
+
+    def record(self, filename, value):
+        with (self.run_dir / filename).open("a", encoding="utf-8") as output:
+            output.write(json.dumps({"timestamp": time.time(), **value}, ensure_ascii=False) + "\n")
+
+    def status(self):
+        return {"stopped": self.stopped, "stop_reason": self.stop_reason,
+                "backend": "stateless_exec_action", "sessions": [],
+                "active_requests": list(self.processes)}
+
+    def stop(self, reason):
+        self.stopped = True
+        self.stop_reason = reason
+        for process in self.processes.values():
+            if process.returncode is None:
+                process.terminate()
+
+    async def close(self):
+        self.stop("Exec action bridge closed")
+        await asyncio.gather(*(process.wait() for process in list(self.processes.values())))
+
+    async def execute(self, request_id, body, directory, attribution):
+        schema = directory / "schema.json"
+        schema.write_text(json.dumps(action_schema(body.get("tools") or [])), encoding="utf-8")
+        output = directory / "final.json"
+        command = self.command + ["-c", "model_instructions_file=" + json.dumps(str(self.instructions)),
+                                  "--output-schema", str(schema), "--output-last-message", str(output), "-"]
+        payload = {"messages": body["messages"], "tools": body.get("tools") or []}
+        for name in ("tool_choice", "parallel_tool_calls"):
+            if name in body:
+                payload[name] = body[name]
+        thread_id = None
+        usage = None
+        error = None
+        failed = False
+        with (directory / "stderr.log").open("wb") as stderr:
+            process = await asyncio.create_subprocess_exec(
+                *command, cwd=directory, stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE, stderr=stderr, limit=16 * 1024 * 1024,
+            )
+            self.processes[request_id] = process
+            try:
+                process.stdin.write(json.dumps(payload, ensure_ascii=False).encode())
+                await process.stdin.drain()
+                process.stdin.close()
+                async for line in process.stdout:
+                    event = json.loads(line)
+                    self.record("codex_events.jsonl", {**attribution, "request_id": request_id, "event": event})
+                    kind = event["type"]
+                    if kind == "thread.started":
+                        thread_id = event["thread_id"]
+                    elif kind == "turn.completed":
+                        usage = event.get("usage")
+                        if usage is not None:
+                            delta = {"inputTokens": usage["input_tokens"],
+                                     "outputTokens": usage["output_tokens"],
+                                     "totalTokens": usage["input_tokens"] + usage["output_tokens"]}
+                            for source, target in (("cached_input_tokens", "cachedInputTokens"),
+                                                   ("reasoning_output_tokens", "reasoningOutputTokens")):
+                                if source in usage:
+                                    delta[target] = usage[source]
+                            self.record("token_usage.jsonl", {**attribution, "request_id": request_id,
+                                        "thread_id": thread_id, "usage": usage, "delta": delta})
+                    elif kind in ("error", "turn.failed"):
+                        error = json.dumps(event)
+                        failed = failed or kind == "turn.failed"
+                        if _quota_error(event):
+                            self.stop(error)
+                    item = event.get("item") or {}
+                    if item.get("type") in ("command_execution", "file_change", "mcp_tool_call", "web_search"):
+                        error = "Unexpected native operation: " + item["type"]
+                        self.stop(error)
+                code = await process.wait()
+                if self.stopped or failed or code != 0:
+                    raise CodexBridgeError(error or self.stop_reason or "Codex exec exited " + str(code),
+                                           "exec_failed")
+                return json.loads(output.read_text(encoding="utf-8")), usage, thread_id
+            finally:
+                if process.returncode is None:
+                    process.terminate()
+                    await process.wait()
+                self.processes.pop(request_id, None)
+
+    async def chat(self, body, headers=None, route=None):
+        if self.stopped:
+            raise CodexBridgeError(self.stop_reason, "experiment_stopped")
+        headers = headers or {}
+        metadata = body.get("metadata") or {}
+        route = route or {}
+        attribution = {
+            "session": route.get("session") or headers.get("x-experiment-session") or metadata.get("experiment_session") or "unlabelled",
+            "role": route.get("role") or headers.get("x-experiment-role") or "student",
+            "phase": route.get("phase") or headers.get("x-experiment-phase") or "solve",
+        }
+        request_id = uuid.uuid4().hex
+        directory = self.run_dir / request_id
+        directory.mkdir()
+        started = time.time()
+        self.record("model_requests.jsonl", {**attribution, "request_id": request_id,
+                    "requested_model": body.get("model"), "actual_model": MODEL,
+                    "reasoning_effort": EFFORT, "request": body,
+                    "backend": "stateless_exec_action"})
+        try:
+            action, usage, thread_id = await self.execute(request_id, body, directory, attribution)
+            allowed = {tool["function"]["name"] for tool in body.get("tools") or []}
+            calls = []
+            for tool in action["tool_calls"]:
+                if tool["name"] not in allowed:
+                    raise CodexBridgeError("Unavailable SDK tool: " + tool["name"], "invalid_action", 422)
+                arguments = json.loads(tool["arguments"])
+                if not isinstance(arguments, dict):
+                    raise CodexBridgeError("SDK tool arguments must be an object", "invalid_action", 422)
+                calls.append({"id": "call-" + uuid.uuid4().hex, "type": "function", "function": tool})
+            choice = body.get("tool_choice", "auto")
+            if ((choice == "none" and calls) or (choice == "required" and not calls)
+                    or (isinstance(choice, dict) and (not calls or any(
+                        call["function"]["name"] != choice["function"]["name"] for call in calls)))):
+                raise CodexBridgeError("Decision does not satisfy tool_choice", "invalid_action", 422)
+            if body.get("parallel_tool_calls") is False and len(calls) > 1:
+                raise CodexBridgeError("Parallel SDK tool calls are disabled", "invalid_action", 422)
+            content = action["content"]
+            if not content.strip() and not calls:
+                raise CodexBridgeError("Codex returned an empty decision", "empty_action", 422)
+            mapped_usage = None
+            if usage is not None:
+                mapped_usage = {"prompt_tokens": usage["input_tokens"],
+                                "completion_tokens": usage["output_tokens"],
+                                "total_tokens": usage["input_tokens"] + usage["output_tokens"]}
+                if "cached_input_tokens" in usage:
+                    mapped_usage["prompt_tokens_details"] = {"cached_tokens": usage["cached_input_tokens"]}
+                if "reasoning_output_tokens" in usage:
+                    mapped_usage["completion_tokens_details"] = {"reasoning_tokens": usage["reasoning_output_tokens"]}
+            message = {"role": "assistant", "content": content or None}
+            if calls:
+                message["tool_calls"] = calls
+            response = {"id": "chatcmpl-" + request_id, "object": "chat.completion",
+                        "created": int(time.time()), "model": MODEL,
+                        "choices": [{"index": 0, "message": message,
+                                     "finish_reason": "tool_calls" if calls else "stop"}],
+                        "usage": mapped_usage}
+            self.record("model_responses.jsonl", {**attribution, "request_id": request_id,
+                        "thread_id": thread_id, "elapsed_seconds": time.time() - started,
+                        "response": response})
+            return response
+        except (CodexBridgeError, ValueError, KeyError) as exc:
+            self.record("model_errors.jsonl", {**attribution, "request_id": request_id,
+                        "elapsed_seconds": time.time() - started, "error": str(exc)})
+            if isinstance(exc, CodexBridgeError):
+                raise
+            raise CodexBridgeError(str(exc), "invalid_action", 422) from exc
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8775)
+    parser.add_argument("--run_dir", required=True)
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO)
+    import uvicorn
+    bridge = CodexExecBridge(args.run_dir)
+    app = create_app(bridge)
+
+    @app.on_event("shutdown")
+    async def shutdown():
+        await bridge.close()
+
+    uvicorn.run(app, host=args.host, port=args.port)
+
+
+if __name__ == "__main__":
+    main()

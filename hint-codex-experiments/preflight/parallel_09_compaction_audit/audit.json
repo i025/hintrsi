@@ -1,0 +1,117 @@
+{
+  "formal_experiment_started": false,
+  "production_source_modified": false,
+  "real_model_calls": 0,
+  "context_owner_candidate_status": "Not adopted: the user requires comparison with the original API framework; disabling SDK compaction changes that behavior.",
+  "scope": "Current installed SDK 0.2.186 / bundled Claude Code 2.1.329; original handoff source is read-only; historical SDK version and historical model are not established.",
+  "probes": [
+    {
+      "path": "attempt_01",
+      "trigger": "Synthetic 980000 input-token usage, otherwise normal Read round trip",
+      "automatic_compaction_observed": false,
+      "sdk_completed": true
+    },
+    {
+      "path": "attempt_02",
+      "trigger": "Explicit local /context then /compact then continuation",
+      "compaction_trigger": "manual",
+      "same_sdk_session": true,
+      "compacted_history_replaces_original_prefix": true,
+      "sdk_completed": true
+    },
+    {
+      "path": "attempt_03",
+      "trigger": "One synthetic standard HTTP 400 prompt-too-long after Read; original compact settings",
+      "compaction_trigger": "auto",
+      "pre_tokens": 980029,
+      "post_tokens": 2554,
+      "same_sdk_session": true,
+      "sdk_completed": true
+    },
+    {
+      "path": "attempt_04",
+      "trigger": "Same fixture with DISABLE_AUTO_COMPACT=1",
+      "automatic_compaction_observed": false,
+      "api_requests": 1,
+      "sdk_is_error": true,
+      "sdk_result": "Prompt is too long",
+      "interpretation": "The switch works but changes behavior; capture completion is not a successful solving gate."
+    }
+  ],
+  "all_test_containers_removed": true,
+  "bridge_compacted_history_replay": "bridge_replay.json",
+  "native_model_cache_safe_fields": {
+    "model": "gpt-6.1-terra",
+    "context_window": 500000,
+    "max_context_window": 872000,
+    "effective_context_window_percent": 95,
+    "tool_mode": "code_mode_only"
+  },
+  "native_documentation": "https://learn.chatgpt.com/docs/config-file/config-reference",
+  "native_documentation_fact": "Unset model_auto_compact_token_limit uses model defaults; no current effective numeric threshold was established by this audit.",
+  "observed_08_requests": 777,
+  "observed_08_compaction_markers": 0,
+  "observed_08_sampling": {
+    "temperature": {
+      "1.0": 759,
+      "0.3": 18
+    },
+    "top_p": {
+      "0.95": 759,
+      "absent": 18
+    },
+    "max_tokens": {
+      "65536": 714,
+      "16384": 8,
+      "2048": 6,
+      "1024": 4,
+      "32000": 45
+    }
+  },
+  "comparison": [
+    {
+      "topic": "Conversation inputs",
+      "original": "SDK provides full current message history on each model call, including SDK changes and compacted history.",
+      "cli_bridge": "Persistent native thread receives only new user input and tool replies; assistant/tool history revisions are not reapplied.",
+      "evidence": "Original source/run_cc_sdk.py:400-416; source_parallel_09/codex_cli_bridge.py:529-596"
+    },
+    {
+      "topic": "Compaction",
+      "original": "Default SDK behavior, with inherited optional environment override only.",
+      "cli_bridge": "Independent native compaction plus SDK compaction; captured compacted requests create a second state or stop a teacher when the phase changes.",
+      "evidence": "Original source/runtime_config.py:275-301; bridge_replay.json; attempts 02/03"
+    },
+    {
+      "topic": "Sampling",
+      "original": "Proxy requests temperature/top_p/max_tokens, with request-level overrides.",
+      "cli_bridge": "Thread/turn calls specify fixed model and low effort, not these three request values.",
+      "evidence": "Original source/constant_zhy.py:95-97,116-118; source_parallel_09/codex_cli_bridge.py:502-507,582-584; actual 08 request counts"
+    },
+    {
+      "topic": "Tool execution",
+      "original": "Claude SDK executes tools in task containers.",
+      "cli_bridge": "Same SDK executor; corrected transport preserves tested calls/results, while native Terra requires code mode.",
+      "evidence": "preflight/parallel_09_transport_audit/result.json; 9 tool results, 2 SDK phases, 0 true model calls"
+    },
+    {
+      "topic": "Tool visibility",
+      "original": "No ENABLE_TOOL_SEARCH=false override in original create_agent_options.",
+      "cli_bridge": "Static 18 tools are exposed by the added override; original lazy loading is not preserved.",
+      "evidence": "Original source/run_cc_sdk.py:309-321; source_parallel_09/run_cc_sdk.py:419"
+    },
+    {
+      "topic": "Instruction roles",
+      "original": "Original SDK preset or explicit teacher system prompt is sent via API.",
+      "cli_bridge": "System/developer messages are combined at thread start and an extra external-tool developer instruction is added. Later revisions are not reapplied.",
+      "evidence": "source_parallel_09/codex_cli_bridge.py:488-507"
+    },
+    {
+      "topic": "Historical reproducibility",
+      "original": "Handoff requirements explicitly say not a historical lockfile and specify claude-agent-sdk>=0.1.60.",
+      "cli_bridge": "Current tests use SDK0.2.186/CLI2.1.329 and Terra; historical model/version equality is unconfirmed.",
+      "evidence": "Original requirements.txt:1-4; actual test SystemMessage/metadata"
+    }
+  ],
+  "conclusion": "Tool execution compatibility was demonstrated for tested cases. Exact original API input, sampling, context-management, and model-harness equivalence is not established and the current persistent bridge demonstrably differs. No small verified compatibility patch removes all differences.",
+  "unadopted_alternative": "Reconstruct native context from each SDK request and replay exact structured history. This remains unverified, especially no-extra-user-message turn start, code-mode cell lifecycle, and request-level sampling support; do not deploy or describe as equivalent."
+}

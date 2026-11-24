@@ -1,0 +1,292 @@
+[
+  {
+    "label": "readonly_student",
+    "role": "student",
+    "response": {
+      "id": "chatcmpl-d2f54d72f9904718af956986f2f4b311",
+      "object": "chat.completion",
+      "created": 1795423340,
+      "model": "gpt-6.1-terra",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "I\u2019m a read-only Explore subagent, so I can\u2019t modify `/app/answer.py`. No changes were made."
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 16282,
+        "completion_tokens": 42,
+        "total_tokens": 16324,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    "elapsed_seconds": 14.62595515884459
+  },
+  {
+    "label": "readonly_teacher",
+    "role": "teacher",
+    "response": {
+      "id": "chatcmpl-1ab162deb502498abde9f4e69ed850dc",
+      "object": "chat.completion",
+      "created": 1795423341,
+      "model": "gpt-6.1-terra",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "I can\u2019t edit `/app/answer.py` because my role is read-only and prohibits changing the repository."
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 16280,
+        "completion_tokens": 39,
+        "total_tokens": 16319,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    "elapsed_seconds": 15.622206971980631
+  },
+  {
+    "label": "sqlfmt_baseline_incomplete",
+    "saved_request_id": "1992fc7f5c044b63b4eac60ebf3d4b55",
+    "role": "student",
+    "response": {
+      "id": "chatcmpl-910fbbbba8ba43a5a9bcb788bf876193",
+      "object": "chat.completion",
+      "created": 1795423341,
+      "model": "gpt-6.1-terra",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "I reproduced the issue: `CREATE TABLE` is currently treated as unsupported and passed through unchanged. I created the `ddl-formatting` branch from `main`, but did not implement or commit the fix. No source or test files were changed."
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 62787,
+        "completion_tokens": 66,
+        "total_tokens": 62853,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    "elapsed_seconds": 15.834223637357354
+  },
+  {
+    "label": "sqlfmt_reproduction_only",
+    "saved_request_id": "41e0c0080d5e45d2aff11be7fd164ac6",
+    "role": "student",
+    "response": {
+      "id": "chatcmpl-09fee2c0f61644bda782f98badf61556",
+      "object": "chat.completion",
+      "created": 1795423342,
+      "model": "gpt-6.1-terra",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "id": "call-820821c75c4841a7ae6ac4a6f8253dc9",
+                "type": "function",
+                "function": {
+                  "name": "Read",
+                  "arguments": "{\"file_path\": \"/app/src/sqlfmt/rule.py\"}"
+                }
+              },
+              {
+                "id": "call-3f0a4075da24496ab2bf2b8b79460889",
+                "type": "function",
+                "function": {
+                  "name": "Read",
+                  "arguments": "{\"file_path\": \"/app/src/sqlfmt/mode.py\"}"
+                }
+              },
+              {
+                "id": "call-a26d6679060c4a9a8a34ef280833ce0f",
+                "type": "function",
+                "function": {
+                  "name": "Read",
+                  "arguments": "{\"file_path\": \"/app/src/sqlfmt/rules/common.py\"}"
+                }
+              }
+            ]
+          },
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 66811,
+        "completion_tokens": 100,
+        "total_tokens": 66911,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    "elapsed_seconds": 17.017763061914593
+  },
+  {
+    "label": "student_readonly_refusal",
+    "saved_request_id": "2228af32b3a74f71b12c5a8568bc9e42",
+    "role": "student",
+    "response": {
+      "id": "chatcmpl-180d14b7b0e0485bb8d9fa8192289207",
+      "object": "chat.completion",
+      "created": 1795423343,
+      "model": "gpt-6.1-terra",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "id": "call-25f646cf7c1140c09437d720d21eb636",
+                "type": "function",
+                "function": {
+                  "name": "Bash",
+                  "arguments": "{\"command\": \"git switch -c fix/recursive-agent-delegation main\", \"description\": \"Create a branch from main\"}"
+                }
+              },
+              {
+                "id": "call-0e522e8578af4c5a9b45c8410f1f373f",
+                "type": "function",
+                "function": {
+                  "name": "Read",
+                  "arguments": "{\"file_path\": \"/app/backend/handlers/multiAgentChat.ts\"}"
+                }
+              },
+              {
+                "id": "call-cb5933624c4747c4ad15e2a16a51cd8a",
+                "type": "function",
+                "function": {
+                  "name": "Read",
+                  "arguments": "{\"file_path\": \"/app/backend/providers/types.ts\"}"
+                }
+              },
+              {
+                "id": "call-3cf1bd01860345868355130e638c16df",
+                "type": "function",
+                "function": {
+                  "name": "Read",
+                  "arguments": "{\"file_path\": \"/app/backend/providers/anthropic.ts\"}"
+                }
+              },
+              {
+                "id": "call-f10c048df8e54493b34f29db22007083",
+                "type": "function",
+                "function": {
+                  "name": "Read",
+                  "arguments": "{\"file_path\": \"/app/backend/providers/registry.ts\"}"
+                }
+              },
+              {
+                "id": "call-5b1416fa2d8243bfa1cb558c0622d2a9",
+                "type": "function",
+                "function": {
+                  "name": "Read",
+                  "arguments": "{\"file_path\": \"/app/backend/package.json\"}"
+                }
+              },
+              {
+                "id": "call-dd36037051124c1e87fbdc8550503f9e",
+                "type": "function",
+                "function": {
+                  "name": "Read",
+                  "arguments": "{\"file_path\": \"/app/backend/tests/handlers/multiAgentChat.test.ts\"}"
+                }
+              }
+            ]
+          },
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 26043,
+        "completion_tokens": 223,
+        "total_tokens": 26266,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    "elapsed_seconds": 18.533845034893602
+  },
+  {
+    "label": "native_mcp_teacher_review",
+    "saved_request_id": "6f0af270c3564a2688a3f3f5ae090f8f",
+    "role": "teacher",
+    "response": {
+      "id": "chatcmpl-8efdb748e4bc4bfdbfe79f007c1ea333",
+      "object": "chat.completion",
+      "created": 1795423356,
+      "model": "gpt-6.1-terra",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "id": "call-84186186b6334be39a54f372e363b169",
+                "type": "function",
+                "function": {
+                  "name": "Read",
+                  "arguments": "{\"file_path\": \"/tmp/review_output.md\"}"
+                }
+              }
+            ]
+          },
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 185572,
+        "completion_tokens": 89,
+        "total_tokens": 185661,
+        "prompt_tokens_details": {
+          "cached_tokens": 92672
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 27
+        }
+      }
+    },
+    "elapsed_seconds": 31.3567801178433
+  }
+]

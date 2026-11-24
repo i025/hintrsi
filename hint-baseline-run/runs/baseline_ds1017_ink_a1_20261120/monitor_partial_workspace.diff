@@ -1,0 +1,173 @@
+diff --git a/src/components/Text.tsx b/src/components/Text.tsx
+index 13a5d5d..0fe2aaf 100644
+--- a/src/components/Text.tsx
++++ b/src/components/Text.tsx
+@@ -62,6 +62,16 @@ export type Props = {
+ 	*/
+ 	readonly wrap?: Styles['textWrap'];
+ 
++	/**
++	Places the text in a column when its parent uses `display="grid"`.
++	*/
++	readonly gridColumn?: Styles['gridColumn'];
++
++	/**
++	Places the text in a row when its parent uses `display="grid"`.
++	*/
++	readonly gridRow?: Styles['gridRow'];
++
+ 	readonly children?: ReactNode;
+ };
+ 
+@@ -78,6 +88,8 @@ export default function Text({
+ 	strikethrough = false,
+ 	inverse = false,
+ 	wrap = 'wrap',
++	gridColumn,
++	gridRow,
+ 	children,
+ 	'aria-label': ariaLabel,
+ 	'aria-hidden': ariaHidden = false,
+@@ -136,7 +148,14 @@ export default function Text({
+ 
+ 	return (
+ 		<ink-text
+-			style={{flexGrow: 0, flexShrink: 1, flexDirection: 'row', textWrap: wrap}}
++			style={{
++				flexGrow: 0,
++				flexShrink: 1,
++				flexDirection: 'row',
++				textWrap: wrap,
++				gridColumn,
++				gridRow,
++			}}
+ 			internal_transform={transform}
+ 		>
+ 			{isScreenReaderEnabled && ariaLabel ? ariaLabel : children}
+diff --git a/src/dom.ts b/src/dom.ts
+index 2a40651..a72bb26 100644
+--- a/src/dom.ts
++++ b/src/dom.ts
+@@ -70,6 +70,8 @@ export type DOMElement = {
+ 	onRender?: () => void;
+ 	onImmediateRender?: () => void;
+ 	internal_layoutListeners?: Set<LayoutListener>;
++	internal_gridContainer?: boolean;
++	internal_gridItem?: boolean;
+ } & InkNode;
+ 
+ export type TextNode = {
+diff --git a/src/ink.tsx b/src/ink.tsx
+index dae0a88..f0bb834 100644
+--- a/src/ink.tsx
++++ b/src/ink.tsx
+@@ -9,13 +9,13 @@ import signalExit from 'signal-exit';
+ import patchConsole from 'patch-console';
+ import {LegacyRoot, ConcurrentRoot} from 'react-reconciler/constants.js';
+ import {type FiberRoot} from 'react-reconciler';
+-import Yoga from 'yoga-layout';
+ import wrapAnsi from 'wrap-ansi';
+ import {getWindowSize} from './utils.js';
+ import reconciler from './reconciler.js';
+ import render from './renderer.js';
+ import * as dom from './dom.js';
+ import {hideCursorEscape, showCursorEscape} from './cursor-helpers.js';
++import {calculateLayout as calculateTreeLayout} from './grid.js';
+ import logUpdate, {type LogUpdate, type CursorPosition} from './log-update.js';
+ import {bsu, esu, shouldSynchronize} from './write-synchronized.js';
+ import instances from './instances.js';
+@@ -503,13 +503,7 @@ export default class Ink {
+ 	calculateLayout = () => {
+ 		const terminalWidth = getWindowSize(this.options.stdout).columns;
+ 
+-		this.rootNode.yogaNode!.setWidth(terminalWidth);
+-
+-		this.rootNode.yogaNode!.calculateLayout(
+-			undefined,
+-			undefined,
+-			Yoga.DIRECTION_LTR,
+-		);
++		calculateTreeLayout(this.rootNode, terminalWidth);
+ 	};
+ 
+ 	onRender: () => void = () => {
+diff --git a/src/render-to-string.ts b/src/render-to-string.ts
+index 4e8db94..b334243 100644
+--- a/src/render-to-string.ts
++++ b/src/render-to-string.ts
+@@ -1,9 +1,9 @@
+ import type {ReactNode} from 'react';
+-import Yoga from 'yoga-layout';
+ import {LegacyRoot} from 'react-reconciler/constants.js';
+ import reconciler from './reconciler.js';
+ import renderer from './renderer.js';
+ import {createNode, type DOMElement} from './dom.js';
++import {calculateLayout} from './grid.js';
+ 
+ export type RenderToStringOptions = {
+ 	/**
+@@ -59,12 +59,7 @@ const renderToString = (
+ 	let capturedStaticOutput = '';
+ 
+ 	rootNode.onComputeLayout = () => {
+-		rootNode.yogaNode!.setWidth(columns);
+-		rootNode.yogaNode!.calculateLayout(
+-			undefined,
+-			undefined,
+-			Yoga.DIRECTION_LTR,
+-		);
++		calculateLayout(rootNode, columns);
+ 	};
+ 
+ 	rootNode.onImmediateRender = () => {
+diff --git a/src/styles.ts b/src/styles.ts
+index d604475..88162b1 100644
+--- a/src/styles.ts
++++ b/src/styles.ts
+@@ -244,9 +244,35 @@ export type Styles = {
+ 	readonly aspectRatio?: number;
+ 
+ 	/**
+-	Set this property to `none` to hide the element.
++	Set this property to `none` to hide the element, or to `grid` to lay out its children using CSS Grid.
+ 	*/
+-	readonly display?: 'flex' | 'none';
++	readonly display?: 'flex' | 'grid' | 'none';
++
++	/**
++	Defines the columns of a grid container as a space-separated list of track sizes.
++
++	Each track can be a fixed number of columns, a fractional unit (`1fr`), `auto`, or `minmax(min, max)`.
++	*/
++	readonly gridTemplateColumns?: string;
++
++	/**
++	Defines the rows of a grid container as a space-separated list of track sizes.
++
++	Each track can be a fixed number of rows, a fractional unit (`1fr`), `auto`, or `minmax(min, max)`.
++
++	When omitted, rows are created automatically as needed.
++	*/
++	readonly gridTemplateRows?: string;
++
++	/**
++	Places a grid item in a column. Accepts a 1-based column index or a `"start / end"` string.
++	*/
++	readonly gridColumn?: number | string;
++
++	/**
++	Places a grid item in a row. Accepts a 1-based row index or a `"start / end"` string.
++	*/
++	readonly gridRow?: number | string;
+ 
+ 	/**
+ 	Add a border with a specified style. If `borderStyle` is `undefined` (the default), no border will be added.
+@@ -687,7 +713,7 @@ const applyDimensionStyles = (node: YogaNode, style: Styles): void => {
+ const applyDisplayStyles = (node: YogaNode, style: Styles): void => {
+ 	if ('display' in style) {
+ 		node.setDisplay(
+-			style.display === 'flex' ? Yoga.DISPLAY_FLEX : Yoga.DISPLAY_NONE,
++			style.display === 'none' ? Yoga.DISPLAY_NONE : Yoga.DISPLAY_FLEX,
+ 		);
+ 	}
+ };

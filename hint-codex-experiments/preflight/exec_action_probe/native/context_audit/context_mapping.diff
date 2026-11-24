@@ -1,0 +1,49 @@
+--- preflight/exec_action_probe/codex_exec_bridge.py
++++ preflight/exec_action_probe/native/context_audit/candidate/codex_exec_bridge.py
+@@ -48,6 +48,20 @@
+     }, "required": ["content", "tool_calls"], "additionalProperties": False}
+ 
+ 
++def context_error_message(event):
++    error = event.get("error") or {}
++    message = error.get("message", "")
++    if error.get("codexErrorInfo") == "contextWindowExceeded":
++        return message
++    try:
++        provider = json.loads(message).get("error", {})
++    except (ValueError, AttributeError):
++        return None
++    if provider.get("code") in ("context_length_exceeded", "context_window_exceeded"):
++        return message
++    return None
++
++
+ def default_command():
+     command = ["codex", "exec", "--ephemeral", "--json", "--skip-git-repo-check",
+                "--ignore-user-config", "--ignore-rules", "--sandbox", "read-only",
+@@ -104,6 +118,7 @@
+         usage = None
+         error = None
+         failed = False
++        context_error = None
+         with (directory / "stderr.log").open("wb") as stderr:
+             process = await asyncio.create_subprocess_exec(
+                 *command, cwd=directory, stdin=asyncio.subprocess.PIPE,
+@@ -136,6 +151,7 @@
+                                         "thread_id": thread_id, "usage": usage, "delta": delta})
+                     elif kind in ("error", "turn.failed"):
+                         error = json.dumps(event)
++                        context_error = context_error_message(event) or context_error
+                         failed = failed or kind == "turn.failed"
+                         if _quota_error(event):
+                             self.stop(error)
+@@ -144,6 +160,9 @@
+                         error = "Unexpected native operation: " + item["type"]
+                         self.stop(error)
+                 code = await process.wait()
++                if (failed or code != 0) and context_error is not None and not self.stopped:
++                    raise CodexBridgeError("prompt is too long: " + context_error,
++                                           "context_length_exceeded", 400)
+                 if self.stopped or failed or code != 0:
+                     raise CodexBridgeError(error or self.stop_reason or "Codex exec exited " + str(code),
+                                            "exec_failed")

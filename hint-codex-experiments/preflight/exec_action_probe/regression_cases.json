@@ -1,0 +1,100 @@
+{
+  "status": "candidate_checked_with_fake_process",
+  "real_model_calls": 0,
+  "cases": [
+    {
+      "id": "full_history",
+      "priority": "required",
+      "input": "System, developer, two users, assistant text, assistant tool calls and tool results, preserving arrays and Unicode.",
+      "expect": "Each request contains all current messages, roles, IDs, blocks and tools in original order; no summary or user-only delta."
+    },
+    {
+      "id": "system_and_hook_update",
+      "priority": "required",
+      "input": "Second request changes system text and appends a teacher hook to a user or tool result message.",
+      "expect": "The next exec receives the updated current content exactly; stale system text is absent unless retained by the SDK itself."
+    },
+    {
+      "id": "compacted_replacement",
+      "priority": "required",
+      "input": "Second request replaces a long prior conversation with the SDK's compacted summary and recent tool results.",
+      "expect": "The replacement request succeeds without history-prefix errors; removed messages are not restored from bridge memory."
+    },
+    {
+      "id": "assistant_replacement",
+      "priority": "required",
+      "input": "Second request contains edited/compacted assistant history.",
+      "expect": "The next exec sees the current SDK version; no hidden native history survives from the earlier process."
+    },
+    {
+      "id": "three_tools_and_text",
+      "priority": "required",
+      "input": "Structured output includes prose plus three different tools with JSON escapes, newlines and Unicode.",
+      "expect": "Three unique original-order call IDs, exact names/arguments, finish_reason=tool_calls; actual LiteLLM receives three separate tool_use blocks."
+    },
+    {
+      "id": "tool_results_next_request",
+      "priority": "required",
+      "input": "SDK executes those three tools, one fails, and returns actual results in its chosen order.",
+      "expect": "The next full history contains matching IDs, exact outputs and failure representation; the bridge never fabricates success or executes tools itself."
+    },
+    {
+      "id": "final_and_empty",
+      "priority": "required",
+      "input": "One valid final, one whitespace-only content with no tools, one tool response with empty content.",
+      "expect": "Valid final returns stop; empty final is a technical response error; empty content with real tool calls remains valid."
+    },
+    {
+      "id": "invalid_action",
+      "priority": "required",
+      "input": "Malformed action JSON, malformed arguments JSON, unknown tool name, nonzero CLI exit, interrupted output.",
+      "expect": "No SDK operation is dispatched from an invalid response; explicit technical failure with retained usage/evidence, not an evaluated unsolved answer."
+    },
+    {
+      "id": "six_interleaved_requests",
+      "priority": "required",
+      "input": "Six routes with identical prompts and different GT/hook markers, reverse completion order and distinct output files.",
+      "expect": "Responses, usage, timings and tool IDs remain attached to each request; no --last/resume/fork and no shared response file."
+    },
+    {
+      "id": "sdk_shared_context",
+      "priority": "required",
+      "input": "M teacher sends full continued SDK history; H teacher and fresh student send their independent histories.",
+      "expect": "Model context follows the supplied histories only; reuse of route text alone does not add hidden memory."
+    },
+    {
+      "id": "usage_and_cancel",
+      "priority": "required",
+      "input": "JSONL usage including cached input, retry notifications, successful final, then a separate canceled request after reported usage.",
+      "expect": "Count observed CLI usage once per real exec; map API usage consistently, preserve known canceled usage and label unknown usage rather than zero."
+    },
+    {
+      "id": "dynamic_request_tools",
+      "priority": "required",
+      "input": "A later stateless request has one additional SDK tool definition.",
+      "expect": "Use the current list without the prior persistent-thread tool-schema failure; no unregistered host tool is substituted."
+    },
+    {
+      "id": "sse_roundtrip",
+      "priority": "required",
+      "input": "Non-stream and stream responses with identical text, tool calls and usage through actual LiteLLM/streaming_fix.",
+      "expect": "Equivalent SDK content, call order, exact escaped arguments and finish reason; one SSE chunk per tool and one final usage chunk."
+    },
+    {
+      "id": "retry_accounting",
+      "priority": "required",
+      "input": "Repeat an HTTP request after simulated delivery loss.",
+      "expect": "Document whether it starts another exec or replays a response; whichever occurs, no hidden model spend, incorrect tool attribution or accidental cross-lane replay."
+    },
+    {
+      "id": "cli_parameter_scope",
+      "priority": "required",
+      "input": "Incoming temperature, max_tokens, model alias and other generation settings.",
+      "expect": "Record which CLI parameters are actually effective; retaining them in serialized input alone must not be reported as API parameter parity."
+    }
+  ],
+  "contract_test_result": "action_contract_tests.json",
+  "contract_tests_passed": 17,
+  "real_codex_processes": 0,
+  "scope_note": "Actual candidate executes a Python fixture. Real CLI/provider and actual SDK gates are separate."
+}
