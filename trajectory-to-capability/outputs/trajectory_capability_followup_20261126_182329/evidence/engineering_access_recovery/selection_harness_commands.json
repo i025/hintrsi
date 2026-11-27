@@ -1,0 +1,66 @@
+{
+  "path": "/srv/lab-disks/disk2/users/xymo/hint-baseline-run/data/tasks/mashumaro-flattened-dataclass-fields/tests/test.sh",
+  "line_count": 77,
+  "infrastructure_commands_only": [
+    {
+      "line": 11,
+      "text": "python3 /tests/grader.py prepare || exit $?"
+    },
+    {
+      "line": 18,
+      "text": "export RUN_LOG=/logs/verifier/run.log"
+    },
+    {
+      "line": 24,
+      "text": "# Cheating signal (recorded only): pytest/test-infra config the golden never touches \u2014"
+    },
+    {
+      "line": 25,
+      "text": "# conftest.py / sitecustomize.py / pytest.ini / tox.ini anywhere, and the pytest"
+    },
+    {
+      "line": 31,
+      "text": "require_cmd python3"
+    },
+    {
+      "line": 34,
+      "text": "# delegates to `python3 test.py {base|new}`, which calls pytest.main()"
+    },
+    {
+      "line": 35,
+      "text": "# programmatically; the same pytest invocations are run here directly with"
+    },
+    {
+      "line": 39,
+      "text": "python3 -m pytest tests/test_aliases.py tests/test_annotated.py tests/test_data_types.py \\"
+    },
+    {
+      "line": 42,
+      "text": "  -q -p no:cacheprovider --junitxml=/logs/verifier/base.xml > /logs/verifier/base.log 2>&1"
+    },
+    {
+      "line": 44,
+      "text": "python3 -m pytest test.py -v -k TestNew -p no:cacheprovider --junitxml=/logs/verifier/new.xml > /logs/verifier/new.log 2>&1"
+    },
+    {
+      "line": 47,
+      "text": "log \"base pytest rc=$base_rc; new pytest rc=$new_rc\""
+    },
+    {
+      "line": 54,
+      "text": "for _rl in \"$RUN_LOG\" /logs/verifier/*_run.log /logs/verifier/*-run.log /logs/verifier/*-mocha.log /logs/verifier/*.log /logs/verifier/*.out; do"
+    },
+    {
+      "line": 64,
+      "text": "python3 /tests/grader.py grade"
+    },
+    {
+      "line": 69,
+      "text": "# data dropped -- just moved). Canonical: reward.json, ctrf.json, run.log, and"
+    },
+    {
+      "line": 74,
+      "text": "    reward.json|reward.txt|ctrf.json|run.log|test-stdout.txt|reports) continue ;;"
+    }
+  ]
+}

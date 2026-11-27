@@ -1,0 +1,1 @@
+The reproduction injects a tool-use event directly. Could you also check whether a real provider can discover and emit the delegation tool, and whether its continuation has enough context to act on the result? A mocked provider-API exchange could help check the round trip.

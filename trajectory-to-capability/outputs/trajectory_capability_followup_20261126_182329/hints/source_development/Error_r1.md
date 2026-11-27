@@ -1,0 +1,1 @@
+Your reproduction injects a tool-use event directly. Could you also trace whether the Anthropic provider can request and emit a delegation event in a real conversation? Compare its outgoing request and stream parsing with what the handler expects.

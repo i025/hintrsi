@@ -1,0 +1,43 @@
+# V2 capability update — K1
+
+## Chronological development evidence
+
+### cattrs-partial-structuring-recovery
+
+The main_agent created the requested branch, inspected converter interfaces and confirmed that the new public API was absent. A more specific pre-implementation check also stopped at the missing API, so it did not yet establish behavior for its later assertions (main_agent events 1–6, 15–26). The agent then added the implementation and public exports (events 37–48). This sequence is consistent with V1’s reproduction and boundary-tracing guidance; the record does not establish that the guidance caused the choices.
+
+After implementation, the focused script passed its nested refinement, collection-failure and TypedDict assertions. A separate probe showed recovery after a nested object could not initially be constructed; another checked selected attrs, validation-mode and extra-key cases (events 51–52, 62–64, 70–72). These are examples, not exhaustive verification. A later custom-hook probe printed a result different from the hook’s registered return and exposed behavior the agent labelled “stale nested”; the semantic significance of the hook difference depends on the intended hook contract. The agent edited nested-state handling, but the record does not show the same probe rerun after that edit (events 74–77).
+
+A separate observable defect was repaired: runtime annotation inspection raised a NameError, an import was added, and the same inspection then succeeded (events 77–79, 82–89). The converter regression file passed 61 tests. Full-suite collection was blocked by missing dependencies, Ruff was unavailable, and the filtered broader run was still in progress at the last observation; progress output is not a completed pass (events 52–56, 59, 63, 67, 71, 73–75, 80, 86, 88–90, 94). The agent committed the change (events 91–95). The supplied formal development evaluation reported success, 69/69 change-focused and 7/7 preservation checks; that result does not retroactively turn the unfinished local run into a full pass.
+
+### aiomonitor-task-snapshots-diff
+
+The main_agent created a branch, inspected monitor, terminal and web interfaces, and confirmed the requested monitor method was absent (main_agent events 1–25). It then changed the monitor, command group and web interface, and added a page (events 26–35). This is another observable instance of investigating multiple boundaries, not proof of causal transfer from V1.
+
+The local suite produced one console failure; an isolated rerun also failed. The final report attributes the observed failure to a disconnected transport but explicitly notes that no baseline comparison was made, leaving its cause unconfirmed (events 36–37, 39, 41, 56). Focused checks passed for selected capture, stack-header, removal, eviction and CLI-list/completion behaviors. Selected web calls returned the expected statuses and response shapes, including missing-delete cases; printed task and diff responses were clipped, and the probe did not cover every endpoint or every task lifecycle (events 38–40, 52–53). Ruff fixed an import-order issue and formatted files; the agent committed the changes (events 42–46, 54–56).
+
+The supplied formal development evaluation was partial: 52/53 change-focused and 8/8 preservation checks, with formal success zero. The failing formal case is not identified, so it cannot be equated with the local console failure. One visible implementation limitation worth checking in analogous work is that the diff reads only the running lists, although snapshots also contain terminated items; whether this explains the formal failure is unknown (final patch, main_agent events 49–50).
+
+## Persistent capabilities
+
+### 1. Trace behavior across boundaries and time
+- **Apply when:** A feature spans interfaces, lifecycle stages, persisted data or multiple consumers.
+- **Method:** Treat supplied guidance as a hypothesis. Map inputs, execution, outputs, identity and downstream use. For stateful features, inspect transitions and retained state as well as initial capture; distinguish stored raw schema from preprocessing. Check public entry points and error paths at a scale appropriate to the change.
+- **Verification and limits:** Exercise representative round trips and inspect actual artifacts or downstream inputs. A successful local boundary check does not prove all lifecycle paths. Sources: D02 events 24–33, 59–61; D05 events 84–85; D06 events 31–38, 68–77; D07 teacher guidance; aiomonitor-task-snapshots-diff main_agent events 38–40, 49–53.
+
+### 2. Reproduce, probe and retest the repair
+- **Apply when:** A safe public-interface reproduction or focused test is feasible.
+- **Method:** Observe a failure before editing, then check meaningful values and errors, not merely calls. Probe missing and invalid inputs, defaults, nested or repeated operations, and identity where relevant. Separate a missing API from a demonstrated algorithmic failure. If a probe motivates a repair, rerun that probe and add a durable regression check when feasible.
+- **Verification and limits:** The annotation failure and rerun demonstrate a visible repair; the nested-state edit lacks a visible same-probe rerun. Selected examples cannot establish all combinations or hook semantics. Sources: D02 events 24–33, 59–61; D05 events 27–28, 49–57, 84–85, 95–98; cattrs-partial-structuring-recovery main_agent events 24–26, 51–52, 74–79, 82–89.
+
+### 3. Verify transformation properties independently
+- **Apply when:** A transformation is expected to preserve meaning, support repetition, or retain successful work through refinement.
+- **Method:** Test the actual contract separately for semantic preservation, repeated application and mixed or boundary inputs; where state is retained, inspect both the new result and preservation of prior successful information. Use focused checks alongside relevant regression suites.
+- **Limits:** Do not infer broad correctness from a good-looking example, idempotence alone, or suite size. This constraint is not applicable where the contract intentionally changes meaning or does not require repetition. Sources: D08 events 52–63, 68–69, 78–82; cattrs-partial-structuring-recovery main_agent events 51–52, 62–64, 70–72.
+
+### 4. Interpret and report verification precisely
+- **Apply when:** Tests fail, setup is incomplete, outputs are clipped, or instructions require a stop or clarification.
+- **Method:** Separate implementation failures from missing dependencies, unavailable tools, unfinished runs, empty patches and instruction-driven stops. Compare a failure against an appropriate baseline when feasible; otherwise leave its cause open. Report the precise scope of passing checks, formal outcomes and unrun work. Investigate ambiguous repository instructions and disclose a justified choice or seek clarification as circumstances require.
+- **Limits:** Formal results describe the supplied evaluation, not general reliability; clipped output and background progress do not establish completion. Sources: D01 event 29; D02 events 54–62; D03 event 7; D05 events 64–71, 92–93, 101–112; D06 events 3–7, 55–63; D07 events 2–18; D08 events 78–82; cattrs-partial-structuring-recovery main_agent events 52–56, 73–75, 88–90, 94; aiomonitor-task-snapshots-diff main_agent events 36–41, 52–53, 56.
+
+The earlier development analysis remains historical evidence rather than newly reread raw trajectories. The new attempts used the loaded V1 library, but observed consistency is not proof of teacher-prior causation. The arms generated their own on-policy trajectories; this update neither assumes identical raw evidence nor isolates state alignment as a cause. No Selection/Test feedback was supplied.

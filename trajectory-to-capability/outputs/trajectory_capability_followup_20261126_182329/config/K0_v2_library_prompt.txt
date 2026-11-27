@@ -1,0 +1,87 @@
+Convert only the supplied Development analysis into a persistent capability library in English. You may add, revise, delete or merge previous units if the analysis supports doing so. No Selection/Test data or files are available. Return only <persistent_capabilities> ... </persistent_capabilities> containing exactly four Markdown sections headed "## 1. ..." through "## 4. ...". Each unit must include: capability name in heading; Applicable problems; Transferable knowledge/behavior constraint; Candidate methods; Verification steps; When not applicable; Evidence sources. Write 450-650 words total, absolute upper bound 700. Prefer implemention-independent constraints and evidence-bounded verification. Do not include complete task solutions, Golden Patches, task-specific code, hidden tests or concrete benchmark answers. Teacher-only condition must cite Development descriptions and general knowledge rather than invented observations. Distinguish observed behavior from hypotheses, and do not claim causal learning or universal correctness. No introduction or closing prose outside the tags.
+DEVELOPMENT ANALYSIS:
+# Reusable capabilities: teacher prior knowledge
+
+These proposals are **teacher prior knowledge** derived only from the five Development descriptions and general programming knowledge. They are not learned evidence about student behavior, implemented solutions, or empirical outcomes. The descriptions specify desired behavior; they do not establish what any existing repository currently does.
+
+## 1. Translate cross-interface requirements into explicit contracts
+
+**Applicability:** Changes that expose one capability through library methods, a CLI, HTTP endpoints, or persisted metadata.
+
+**Behavior constraints:** Enumerate inputs, outputs, error types, state transitions, and compatibility requirements for each interface. Keep shared semantics consistent while honoring interface-specific representations, such as exceptions in a library versus status codes and JSON in an API. Avoid assuming that a similarly named existing interface has identical behavior without inspecting it.
+
+**Candidate methods:** Build a contract matrix mapping operations to their entry points, result shapes, validation rules, and failure modes. Identify shared domain operations and keep transport-specific parsing and rendering at boundaries.
+
+**Verification:** Use contract-focused checks for successful and invalid inputs at each boundary; compare equivalent operations across interfaces and check exact error and output shapes where specified.
+
+**Limits:** A matrix cannot resolve unspecified behavior on its own. Repository conventions and applicable specifications must be inspected before implementation.
+
+**Sources:** `aiomonitor-task-snapshots-diff`, `igel-persist-feature-schema`, `claude-code-by-agents-recursive-delegation`.
+
+## 2. Model lifecycle, identity, and recovery invariants
+
+**Applicability:** Stateful features involving captured records, iterative recovery, or nested execution.
+
+**Behavior constraints:** Distinguish stable identity from display names and mutable state. Specify creation, lookup, retention, deletion, and failure transitions. Preserve already accepted information during recovery; distinguish complete success, partial success, and inability to produce a value. For recursive work, track the active delegation path and distinguish a cycle from an ordinary sub-operation failure.
+
+**Candidate methods:** Write a small state-transition model and invariants before choosing data structures. Represent outcomes explicitly rather than conflating missing, failed, and successful values. For recursive execution, propagate correlation identifiers and accumulate only the output the contract calls for.
+
+**Verification:** Exercise sequences, not only isolated calls: creation followed by eviction or deletion; partial recovery followed by refinement; nested delegation followed by continuation. Check missing identifiers, repeated operations, cycles, and failure propagation.
+
+**Limits:** Snapshot isolation, retention behavior when every record is protected, and similar edge cases require clarification if not specified; they should not be silently invented.
+
+**Sources:** `aiomonitor-task-snapshots-diff`, `cattrs-partial-structuring-recovery`, `claude-code-by-agents-recursive-delegation`.
+
+## 3. Preserve semantic boundaries in recursive data handling
+
+**Applicability:** Conversion or validation of nested structured objects with field-level diagnostics.
+
+**Behavior constraints:** Treat absent fields separately from successfully converted fields and fallback values. Respect the specified boundary between recursively recoverable structured fields and atomic collections. Preserve detailed errors and configuration-dependent behavior; do not mark a partially recovered nested field as fully successful merely because it has a usable value.
+
+**Candidate methods:** Classify fields by schema and initialization status, then track conversion outcome, fallback availability, and error separately. Implement refinement as a new result that retains successful fields and attempts only eligible failures. Keep validation policy explicit for extra keys and error detail.
+
+**Verification:** Cover required and defaulted fields, absent versus invalid input, nested partial values, collection element failures, excluded initialization fields, extra keys, and refinement without mutation of the original result.
+
+**Limits:** Framework-specific hooks and constructor semantics may constrain a general algorithm; they require inspection. Arbitrary recursive types and custom converters need particular care.
+
+**Source:** `cattrs-partial-structuring-recovery`.
+
+## 4. Carry training-time schema invariants across serving boundaries
+
+**Applicability:** Pipelines where feature selection or normalization during fitting must be reproduced during evaluation, prediction, and export.
+
+**Behavior constraints:** Persist the selected raw-feature order and provenance needed for later inputs. Ignore permitted extras, reject missing required inputs, and verify agreement when multiple sources claim to represent the same canonical feature. Validate configuration before model invocation and translate validation errors appropriately at the HTTP boundary.
+
+**Candidate methods:** Define a versionable schema artifact and a single schema-application routine shared by downstream paths. Separate raw-column selection and alias resolution from model execution; derive metadata consistently from the persisted schema.
+
+**Verification:** Check reordered and extra columns, missing columns, aliases alone and in combination, row-wise conflicts, invalid selection configuration, and consistency across supported model categories and interfaces. Confirm validation happens before a model call.
+
+**Limits:** Storage compatibility, type coercion, and equality semantics for missing or unusual values must follow the actual project contract; they should not be assumed from feature names alone.
+
+**Source:** `igel-persist-feature-schema`.
+
+## 5. Separate syntactic structure from faithful source reconstruction
+
+**Applicability:** Formatters and parsers that must both normalize output and expose a structured public representation.
+
+**Behavior constraints:** Recognize nesting and distinguish top-level items from commas or constraint keywords inside nested expressions. Preserve source spacing where the public model requires faithful reconstruction, while applying specified normalization to appropriate tokens. Respect explicit pass-through cases and line-length exceptions rather than applying a universal rewrite.
+
+**Candidate methods:** Traverse parsed tokens or lines with nesting awareness; represent columns and table constraints separately. Keep source spans or token spacing when extracting expressions instead of reconstructing them by blindly joining tokens. Separate recognition, public-model extraction, and formatting decisions.
+
+**Verification:** Use varied valid parsed representations, nested parentheses, inline and table constraints, named constraints, quoted or complex expressions, pass-through statements, and length-boundary cases. Check public-field equality and formatting idempotence where appropriate.
+
+**Limits:** Parsing valid syntax depends on the host parser's actual token model. An idempotence check alone does not prove semantic preservation or conformance.
+
+**Source:** `sqlfmt-create-table-ddl-formatting`.
+
+## 6. Verify integration without overstating evidence
+
+**Applicability:** All five descriptions, especially work that spans existing conventions or multiple layers.
+
+**Behavior constraints:** Inspect existing interfaces and tests before assuming architecture. Trace each stated requirement to a targeted verification; report what was and was not checked. Treat branch and commit requests as workflow instructions for an implementation task, not evidence that work was performed.
+
+**Candidate methods:** Combine focused unit checks for invariants with integration checks at interface boundaries, followed by relevant regression checks. Include negative cases and exact observable contracts, not just happy paths.
+
+**Verification:** Maintain a requirement-to-check list and record actual commands and results if implementation is undertaken.
+
+**Limits:** No repository, student trajectory, patch, ground truth, Selection, Test information, or execution result was provided here. Accordingly, these are proposals, not findings about outcomes or existing code.

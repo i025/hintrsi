@@ -1,0 +1,292 @@
+Historical evidence synthesis, English at most 1800 words. All source files in this group were supplied completely across explicit model-reviewed chunks; this input contains their audit reports and inventory, not raw source again. Cite original source IDs, paths and exact event/line IDs already supported in the reports; do not fabricate a missing detail. Compare actual successful, failed, partial and interrupted attempts; distinguish empty patches, permission/branch/CLI stops and algorithmic behavior. For teacher roles and Scene, distinguish advice availability, actual receipt, diagnosis, executed update, validation/acceptance and independently observed quality. Identify transferable constraints, task-specific facts and unverified hypotheses, with evidence for adoption or absence, and counterexamples to overgeneralization. File counts include copies, not independent trials. Missing formal scores are unknown; old model cost cannot be recovered from absence. Do not generate new solutions, skills, Test feedback or causal superiority claims. This report remains audit-only and never enters capability generation. Include an evidence matrix and coverage statement for this group/batch.
+{"project": "scene", "group": "scene_rsi_v2_2__r1", "batch": 1, "batches": 1, "group_files": 12}
+{"source_id": "S0013", "original_file": "/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/H0/fixed_version_test/commons_104864364/trajectory.jsonl", "kind": "student_trajectory", "original_bytes": 135944, "units": 13, "inventory": null}
+
+FULL-OBSERVATION AUDIT REPORT /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/scene/S0013_chunk001.md
+## Historical audit
+
+**Source:** S0013, original file `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/H0/fixed_version_test/commons_104864364/trajectory.jsonl`. Citations below refer to JSONL lines in that file; all observations are complete lines, not split observations.
+
+**Goal versus interpretation.** The stated goal was a separate-mesh reconstruction of an indoor photograph, including matching camera, framing, colors and materials, without using the reference as an image texture. The student interpreted the scene as a school classroom; that label and its object names are not independent evidence of the photograph’s contents (line 1, model_request; line 3, student model_response).
+
+| Evidence | Observed operation or result |
+|---|---|
+| Lines 3–4, student response and execute step 1 | The program specified a room shell, repeated desks and benches, stage, windows, bags, books and fans. It grouped desk and bag parts into assets, used colored primitives and proposed procedural floor tiles. Coordinates and fan rotations specify placement and pose, but do not verify connections or visual fidelity. It specified a camera, four area lights and render settings. |
+| Line 5, execution_result step 1; line 6, subsequent model_request | The build failed before a render: a backpack pocket fillet exceeded half its smallest dimension. The traceback was actually supplied to the student; `image` was null. |
+| Lines 8–10, student response, execute and execution_result step 2 | The revised program reduced the pocket radius from `.055*scale` to `.035*scale` and was executed. It progressed past that error but failed at `sc.world.use_nodes` because the world was `None`; again, no image was returned. This is evidence of a successful local error correction, not a successful build. |
+| Lines 11–13, model_request and student response | The second traceback was supplied with zero executions remaining. The final program added conditional world creation and background-node handling, but no subsequent execution or validation is recorded. |
+| Lines 2, 7, 12, student codex_session events | Each session reports zero tool calls. The visible autonomous exploration consists of program generation and revision using runner feedback, not independent tool-based scene inspection. |
+
+**Teacher input and outcome.** No teacher detection, diagnosis, proposed update, or teacher-to-student adoption is visible. The error feedback was runner input, not evidence of a teacher. Both permitted executions failed, so there was no successful build or rendered comparison in the visible record. The final nonempty revision is untested; the submission outcome is unknown. This is a technical build failure, not evidence that the scene-matching algorithm was visually evaluated.
+
+**Uncertainty and lessons.** The trace specifies multiple objects, materials, poses, part assemblies, camera and lights, but neither the reference image nor a successful render is visible to this audit. Thus object correspondence, texture appearance, actual part contact, framing, illumination and any render artifacts remain unresolved. A transferable lesson is to validate primitive constraints and environment initialization before relying on a costly render cycle. The pocket dimensions, classroom layout and missing-world condition are specific to this attempt; whether the final world fix would produce a runnable or accurate scene remains a hypothesis.
+
+{"source_id": "S0014", "original_file": "/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/H0/fixed_version_test/commons_31294395/trajectory.jsonl", "kind": "student_trajectory", "original_bytes": 261698, "units": 14, "inventory": null}
+
+FULL-OBSERVATION AUDIT REPORT /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/scene/S0014_chunk001.md
+**Source:** S0014, student trajectory, original file `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/H0/fixed_version_test/commons_31294395/trajectory.jsonl`. All citations below refer to JSONL lines in that file; supplied observations are complete line ranges, not split excerpts.
+
+| Stage | Evidence and distinction |
+|---|---|
+| Goal | The instruction requested a separate-mesh reconstruction of a single indoor photograph, including camera, framing, materials and occlusions, without using the reference as a background or texture (student request, line 1). The student’s “Victorian bedroom” is its interpretation, not independent evidence of the unseen photograph (student response, line 3). |
+| First build | The program specified multiple objects: room, windows, bed, chair, screen, table and rugs. It positioned separate bed rails, posts and pillows, rotated pillows, and specified a camera, emitters and procedural materials (student response and execute, lines 3–4). These operations do not verify part connections, pose or visual match. Step 1 failed at `world.use_nodes` because the world was `None`; no image was returned (execution result, line 5). |
+| Repair and validation | The student received the traceback in the next request (line 6), then added a conditional world creation and made smaller portrait and miniature changes (student response, line 8; execute, line 9). Step 2 reported success, saved a render and blend file, and was selected (execution result, line 10; select, line 11). The log reports 16 render samples despite the program requesting 48. A successful render is technical validation, not visual or geometric verification. |
+| Review and unexecuted revision | Reference and step-2 render were supplied to the student for comparison, with zero executions remaining (student request and session, lines 12–13). The student then returned another complete program: it rotated the bed and chair, changed the room and door, camera lens, lighting and material-selection logic, and added a triangular cloth mesh (student response, line 14). No execution or selection of that revision is recorded. |
+
+**Teacher input and exploration.** No teacher detection, diagnosis, proposed update or receipt is present in this student trace. The traceback was runner feedback, not teacher advice; the subsequent world fix is visibly consistent with that feedback. The student independently authored and revised programs; the three recorded sessions report no tool calls (lines 2, 7, 13). No separate exploration beyond these responses and runner executions is visible.
+
+**Outcome and uncertainty.** Step 1 was a technical failure; step 2 was a successful build/render and selection. Overall reconstruction correctness is **unknown**, not formal visual success or proven algorithm failure. The final response was a nonempty but unexecuted revision, not an empty patch. Neither image is visible in the supplied observations: object presence in the reference, actual texture appearance, connectedness, pose, framing, illumination and render defects cannot be independently assessed. The code’s name-based material assignment may or may not have affected intended meshes; the later dimension-based approach is only an untested hypothesis.
+
+**Lessons.** Transferably, runtime errors and image fidelity require separate checks: fixing the world initialization enabled rendering but did not establish a match. Task-specific camera, orientation and material revisions remain hypotheses because the execution budget was exhausted (lines 10–14).
+
+{"source_id": "S0015", "original_file": "/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/H0/fixed_version_test/commons_49800017/trajectory.jsonl", "kind": "student_trajectory", "original_bytes": 14980, "units": 4, "inventory": null}
+
+FULL-OBSERVATION AUDIT REPORT /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/scene/S0015_chunk001.md
+## Historical audit
+
+**Source:** S0015, `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/H0/fixed_version_test/commons_49800017/trajectory.jsonl`. Citations below refer to this file; offsets are half-open character ranges within each JSONL observation.
+
+| Evidence | Observation |
+|---|---|
+| Student `model_request`, line 1 [0,5630) | The stated goal was to reconstruct an indoor scene from one RGB photograph using separate meshes, matching geometry, materials, camera and framing. The reference image itself is not visible in this audit. |
+| Student `codex_session`, line 2 [0,3959) | The first session failed after approximately 300 seconds with `TimeoutExpired`; it recorded zero tool calls and no usage events. The session was read-only, with shell, browser and other tools disabled. |
+| Student `model_error`, line 3 [0,1621); `scene_error`, line 4 [0,3770) | The timeout propagated through the request and scene runtime. No student program, build, render, inspection or subsequent correction is recorded. |
+
+**Outcome:** Technical interruption; the reconstruction outcome is unknown. This is not evidence of formal success, partial geometric correctness, an algorithmic failure, or an empty patch. No actual scene changes or visible validation are recorded. The prompt's request for multiple separate objects and materials is a goal, not evidence they were created. Object count, textures, part connections, pose, camera, lighting and render quality therefore cannot be assessed; neither can the reference scene's contents.
+
+**Teacher and exploration:** This is a student trajectory, not a teacher-only trace. No teacher input, detection, diagnosis, proposed update, execution or adoption is visible. No autonomous tool exploration is recorded; the session's zero tool calls do not establish what internal reasoning occurred.
+
+**Lessons and uncertainty:** Transferably, a model-call timeout can prevent any observable build or validation, independently of scene quality. Task-specifically, the requested single-view reconstruction and its camera/material matching remain untested. The cause of the timeout and whether any unrecorded intermediate output existed are unresolved; the trace does not support a visual or geometric judgment.
+
+{"source_id": "S0016", "original_file": "/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/H0/fixed_version_test/commons_92056365/trajectory.jsonl", "kind": "student_trajectory", "original_bytes": 72454, "units": 10, "inventory": null}
+
+FULL-OBSERVATION AUDIT REPORT /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/scene/S0016_chunk001.md
+## Historical audit: S0016
+
+**Source:** `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/H0/fixed_version_test/commons_92056365/trajectory.jsonl`. References below are JSONL lines in this file; all observations are unsplit.
+
+| Aspect | Evidence and interpretation |
+|---|---|
+| Goal | The task requested a separate-mesh reconstruction of one indoor photograph, matching viewpoint, framing, materials and placement. The student's “Window dining room” is an **inferred scene interpretation**, not independent confirmation of the reference (lines 1, 3). |
+| Initial construction | The program specifies multiple tables, chairs, booths, pendant lamps, plants and architectural elements. Furniture assets contain separately included parts; coordinates and opposing chair facings specify intended placement and pose, but do not verify physical connection or reference correspondence. It uses colored primitives and modeled seams rather than evident image textures; its monochrome compositor rests on the student's claim about the source (lines 3–4). |
+| Camera and lighting | The code sets a 33 mm camera, three area emitters and Cycles settings. These are attempted settings, not evidence that framing, lighting or rendering matched the photograph (lines 3–5). |
+| Validation and correction | Execution 1 failed after 391.64 seconds at `world.color`: the world was `None`; no image was returned (line 5). The next student request actually included that traceback (line 6). The revised program conditionally creates a world, simplifies floor seams, replaces Boolean lamp shades with custom meshes, and reduces samples; it retains the camera and lights (lines 8–9). This is an executed revision, not a verified fix. |
+| Final result | Execution 2 timed out after approximately 29.76 seconds, with empty stdout/stderr and no image (line 10). The visible outcome is **technical interruption following an initial runtime failure**; visual or geometric correctness and ultimate submission are unknown. It was not an empty patch. |
+| Input and exploration | No teacher detection, diagnosis, recommendation, receipt or adoption is visible. The traceback was runner feedback, not teacher instruction. The student independently produced and revised code; the two recorded student sessions report zero tool calls (lines 2, 7). No rendered-view inspection is evidenced. |
+
+**Lessons and uncertainty.** Transferably, runtime feedback can motivate explicit initialization and a less expensive construction, but a proposed optimization is not demonstrated to work until execution completes. Task-specific hypotheses—whether the dining-room interpretation, furniture connections, materials, poses, camera and lighting match the reference, and whether the revised scene would finish with more time—remain unresolved. The reference and rendered images are not visible in this audit; neither the scene name nor the student's monochrome claim is visual verification.
+
+{"source_id": "S0017", "original_file": "/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/H0/fixed_version_test/commons_192968130/trajectory.jsonl", "kind": "student_trajectory", "original_bytes": 55750, "units": 9, "inventory": null}
+
+FULL-OBSERVATION AUDIT REPORT /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/scene/S0017_chunk001.md
+## Historical audit: S0017
+
+**Source:** `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/H0/fixed_version_test/commons_192968130/trajectory.jsonl`. References below are JSONL lines in this file; each cited observation is unsplit.
+
+| Evidence | Observed operation or result |
+|---|---|
+| Goal — line 1 | The student was asked to reconstruct a 512 × 342 indoor photograph using separate meshes, matching viewpoint and framing. The image itself is not visible in this audit. |
+| Build — lines 3–4 | The student submitted and the runner executed a substantial kitchen program: room shell, door, cabinets, counter, sink, cooktop and hood. It specified multiple meshes, grain and fleck geometry, material roughness and metallic properties, a camera, and lights. |
+| Part placement and pose — lines 3–4 | The program positions sink walls and rim around a recessed basin and counter sections around an opening. It specifies a static arrangement, not an articulated pose. These coordinates are evidence of intended connections, not proof that parts connect correctly or match the photograph. |
+| Validation — line 5 | Execution failed after 422.34 seconds at `world.use_nodes=True`: the scene world was `None`. The result reports `image: null`; there is no visible render to compare, and camera, lighting, materials and geometry are not visually verified. |
+| Feedback and continuation — lines 6–9 | The next student request actually included the traceback and asked for a complete correction, with about 82 seconds remaining. The second student session timed out; the trace records a model error and scene error, with no revised response or second execution. |
+
+**Interpretation and outcome.** The kitchen identity and detailed object choices are the student’s inferred scene interpretation, not independently established properties of the unseen reference. The observed outcome is a **technical build failure followed by a timeout**, not formal success or a verified partial reconstruction. The initial submission was not an empty patch. No successful build or final submission is shown. The traceback identifies the immediate failure; whether repairing it alone would produce a satisfactory render remains unknown.
+
+There is no teacher message, teacher detection, diagnosis, proposed update, or evidence of teacher-guided adoption in this student trajectory. The runner’s error feedback was received in the next request, but no resulting correction is visible. The first session recorded zero tool calls; the program and one execution are the visible autonomous work, not evidence of iterative visual exploration (lines 2–5).
+
+**Lessons and uncertainty.** Transferably, a scene can contain detailed object and material specifications yet fail before visual validation; checking runtime assumptions and allowing time for a render-and-correct cycle would address the observed failure mode, though no such fix was tested here. The kitchen layout, selected surfaces and camera are task-specific hypotheses. Without the reference or a rendered image, object completeness, texture fidelity, connections, pose, framing, illumination and occlusion remain unresolved; a scene name or code comments do not verify them.
+
+{"source_id": "S0018", "original_file": "/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/H0/fixed_version_test/commons_96943062/trajectory.jsonl", "kind": "student_trajectory", "original_bytes": 14980, "units": 4, "inventory": null}
+
+FULL-OBSERVATION AUDIT REPORT /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/scene/S0018_chunk001.md
+### Historical audit
+
+**Source:** S0018, original file `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/H0/fixed_version_test/commons_96943062/trajectory.jsonl`. Citations below identify JSONL lines and character ranges.
+
+| Evidence | Observation |
+|---|---|
+| Student `model_request`, line 1, [0,5630) | The stated goal was to reconstruct an indoor RGB scene in Blender with SceneAct, matching camera, framing, geometry, placement and materials using separate meshes. The image was supplied by path; its contents are not visible in this audit. The prompt allowed three model calls and two executions and requested a runnable program followed by render inspection. |
+| Student `codex_session`, line 2, [0,3959) | One fresh, read-only session was launched with the image. It failed after approximately 300 seconds with `TimeoutExpired`; the record reports zero tool calls and no tool events. |
+| Student `model_error`, line 3, [0,1621); `scene_error`, line 4, [0,3770) | The timeout propagated through the scene runner. No student program, scene execution, render, revision or final `DONE` is recorded. |
+
+**Outcome:** Technical interruption before a visible build or validation. This is not evidence of algorithm failure, an empty patch, partial correctness or formal success. Whether the model generated any unrecorded intermediate content, and why it timed out, remain unknown.
+
+**Scene checks:** The request calls for multiple objects and material fidelity, but the visible record establishes neither the reference image’s actual objects nor any constructed meshes, textures, part connections or poses. No camera, lighting or render result is available to diagnose. There is no independent visual or geometric verification.
+
+**Teacher and exploration:** No teacher input, detection, diagnosis, proposed update or execution is recorded, and no adoption can be established. No autonomous tool exploration is visible; the session reports zero tool calls. The requested reconstruction is a goal, not an observed result.
+
+**Transferable lesson and uncertainty:** A timed-out model call can terminate the scene workflow before any reconstruction is testable; distinguish that infrastructure outcome from reconstruction quality. The particular scene’s geometry and appearance, and whether a later attempt could have succeeded, remain unresolved.
+
+{"source_id": "S0019", "original_file": "/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/r1_C2/fixed_version_test/commons_104864364/trajectory.jsonl", "kind": "student_trajectory", "original_bytes": 435973, "units": 15, "inventory": null}
+
+FULL-OBSERVATION AUDIT REPORT /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/scene/S0019_chunk001.md
+### Historical audit: S0019
+
+**Source:** `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/r1_C2/fixed_version_test/commons_104864364/trajectory.jsonl`. Only chunk 1 of 2 is visible; the reference and rendered images themselves are not visible to this audit.
+
+| Evidence | Observation and limit |
+|---|---|
+| Student `model_request`, line 1 | The assigned goal was a separate-mesh reconstruction of a single indoor RGB view, including camera and framing, under two executions. The classroom interpretation below is the student’s inventory, not independent image identification. |
+| Student `model_response`, line 3; `execute`, line 4 | The first complete program constructed multiple named assets: room, openings, stage, desks and benches, bags, books, fans and pictures. It grouped desk legs and shelves, bag pockets and straps, and fan blades under assets; grouping does not verify physical connections or visual correctness. It specified an upright room arrangement, fan rotations, a camera, three lights, colors and an attempted procedural floor texture. |
+| `execution_result`, line 5, characters [0,58528); `select`, line 6 | Step 1 reported `ok: true`, saved a render and blend file in 23.67 seconds, and was selected. This establishes technical execution, not image fidelity. |
+| Student `model_request`, line 7, characters [0,82867); `model_response`, line 9 | The student was given the first render and asked to compare it with the reference. Its own feedback claimed pale furniture, displaced foreground desks, a low stage header and absent floor tiles, attributing the last issue to generic realized mesh names. These are student detections and a diagnosis, not independently verified findings. |
+| Student `model_response`, line 9; `execute`, line 10 | The executed revision darkened materials and lighting, moved and added desk rows, raised stage elements, reshaped and repositioned bags, and changed floor selection from part name to dimensions. The camera parameters stayed unchanged. These are actual code changes, not proof that the claimed defects were fixed. |
+| `execution_result`, line 11, characters [0,63241); `select`, line 12 | Step 2 reported `ok: true`, saved a render and blend file in 29.92 seconds, and was selected. No visible comparison of that render or final formal correctness assessment appears in this chunk. |
+
+**Input and exploration.** The visible guidance came from the task system and runner: the latter supplied the render and requested comparison or `DONE`. No separate teacher detection, diagnosis, proposed update, or student receipt of teacher feedback is visible. The revision is student-authored; the two recorded student sessions report zero tool calls (lines 2 and 8). The two builds and the student’s comparison are the visible exploration, not evidence of additional unseen experiments.
+
+**Outcome and uncertainty.** Both builds technically succeeded; overall reconstruction correctness is **unknown**, not formally successful or demonstrably failed. In particular, object coverage, relative pose and placement, part contact, texture application, camera framing, lighting and any render artifacts cannot be verified without seeing the images. Whether geometry-based floor selection actually applied the intended material remains unresolved. The student also explicitly marked occluded furniture and stage depth uncertain.
+
+**Lessons.** Transferably, execution success and an editable hierarchy are weaker evidence than a rendered comparison; a diagnosis should remain separate from its attempted repair. The floor-name hypothesis and the particular desk, stage and lighting adjustments are task-specific and remain visually unverified.
+
+
+FULL-OBSERVATION AUDIT REPORT /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/scene/S0019_chunk002.md
+## Historical audit — S0019
+
+**Scope:** Only chunk 2 is visible. All citations below refer to `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/r1_C2/fixed_version_test/commons_104864364/trajectory.jsonl`. The referenced images are not available to this audit.
+
+| Evidence | Observed operations and limits |
+|---|---|
+| Goal and first build | The requested goal was a photo-matched indoor scene with separate meshes and camera framing. The student’s inventory **interpreted** it as a classroom with desks, bags, stage, openings and fans; that interpretation is not independently verified here. The program constructs multiple assets and named child parts, including desk legs and shelves, bag straps, and fan blades. Hierarchical inclusion does not prove physical connection or correct pose. [S0019, line 13, student `model_request`, chars 0–158746] |
+| First validation and diagnosis | Step 1 reported `ok: true`, saved a render and supplied its image to the student. In the revision comments, the student diagnosed pale furniture, displaced foreground desks, a low stage header and missing floor tiles, attributing the latter to generic realized mesh names. These are student assessments, not independently inspected image findings. [S0019, line 13, chars 0–158746] |
+| Executed revision | The complete second program darkened materials, repositioned desk rows and bags, raised the stage header, reshaped backpacks and selected the procedural tile material by geometry instead of part name. It retained the camera parameters but reduced light power and exposure. Step 2 reported `ok: true` and saved a render. Whether the tile selector actually matched the floor, parts connected correctly, or lighting, pose and framing improved remains unverified. [S0019, line 13, chars 0–158746] |
+| Completion | The final student session received paths for the reference and both renders, had no tool calls, and returned `DONE`. The runner instructions say the last successful build is submitted automatically; the excerpt does not independently show a submission result or visual score. [S0019, line 14, student `codex_session`, chars 0–3861; line 15, student `model_response`, chars 0–352] |
+
+**Teacher and exploration:** No teacher detection, diagnosis, proposed update, or teacher-message receipt is visible in this chunk; availability or influence cannot be inferred from the missing chunk. The visible student independently produced a revision after render feedback. The final session was read-only with shell, browsing and other tools disabled, and records zero tool calls; this does not establish what happened in other sessions. [S0019, lines 13–14, cited ranges above]
+
+**Outcome and lessons:** Two builds and renders formally completed; reconstruction correctness is **unknown**, not established by `DONE` or the asset names. No empty patch, algorithm failure, or technical interruption is visible. Transferably, comparing a render and changing an editable scene is a testable workflow, but successful execution is not visual verification. Task-specific hypotheses are the student’s desk-placement, stage-height and floor-name diagnoses; without the images, their accuracy and the revision’s effect remain unresolved.
+
+{"source_id": "S0020", "original_file": "/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/r1_C2/fixed_version_test/commons_31294395/trajectory.jsonl", "kind": "student_trajectory", "original_bytes": 432634, "units": 15, "inventory": null}
+
+FULL-OBSERVATION AUDIT REPORT /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/scene/S0020_chunk001.md
+## Historical audit: S0020, chunk 1 of 2
+
+**Source:** `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/r1_C2/fixed_version_test/commons_31294395/trajectory.jsonl`. Citations below are JSONL events in that file. Only the supplied chunk is assessed.
+
+| Evidence | Observation and limit |
+|---|---|
+| Goal: student `model_request`, line 1 | Reconstruct an indoor photograph with separate SceneAct meshes and a matched camera. The student’s bedroom inventory is an interpretation of the reference, not independent verification of it. |
+| Initial build: student `model_response`, line 3; `execute`, line 4 | The program defines multiple named assets: room, windows, portraits, bed, chairs, screen, tables and rugs. It groups parts such as bed rails and pillows and chair arms and back. These are coded relationships, not proof of physical connection or image completeness. Procedural wallpaper, linen, wood and emissive glazing, plus camera and lights, are specified. |
+| First validation: `execution_result`, line 5; `select`, line 6 | Step 1 reports `ok: true`, saves a render and scene, and is selected. The render image itself is not visible in this audit. |
+| Student diagnosis and revision: `model_request`, line 7; student `model_response`, line 9 | The render and reference were supplied for comparison. The student claims the bed ran in the opposite image direction, the chair was too far right and bulbous, framing showed too much floor and ceiling, and lighting flattened dark surfaces. These are student judgments, not independently verified defects. The revised code rotates and moves the bed, moves and reshapes the chair, changes screen placement, camera, lighting, colors and procedural materials. |
+| Second validation: `execute`, line 10; `execution_result`, line 11; `select`, line 12 | The complete revision was executed; step 2 reports `ok: true`, saves a render and scene, and is selected. This establishes technical execution and selection, not visual or geometric correctness. |
+
+**Teacher and autonomy.** No teacher detection, diagnosis, proposed update, or teacher input appears in the visible chunk; consequently there is no evidence of teacher receipt or adoption. The student’s comparison and revision are visible autonomous work within the prescribed two-execution workflow. Both recorded student CLI sessions report zero tool calls (lines 2 and 8); the runner’s Blender executions are separate events.
+
+**Outcome and uncertainty.** The visible outcome is two successful executions, with step 2 selected; the overall reconstruction outcome is **unknown**, not a demonstrated formal success, algorithm failure, empty patch, or technical interruption. The reference and renders are paths, not images available to this audit. Thus object coverage, material appearance, actual part contacts, furniture pose, camera alignment, illumination and render quality remain unverified. In particular, whether the rotated bed and darker lighting improved the match is unresolved; no post-step-2 review is visible here. Chunk 2 is unavailable, so later events cannot be inferred.
+
+**Lessons.** Transferable: a successful render and a named hierarchy establish execution and emitted structure, not reference fidelity; reported discrepancies and their proposed causes should remain separate from verified results. Task-specific: this student chose a bedroom inventory and adjusted bed orientation, chair shape and framing based on its own comparison. Neither those choices nor the approximately 400-mesh cost estimate establish a general optimum.
+
+
+FULL-OBSERVATION AUDIT REPORT /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/scene/S0020_chunk002.md
+## Historical audit: S0020
+
+**Source:** `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/r1_C2/fixed_version_test/commons_31294395/trajectory.jsonl`. Only chunk 2 of 2 is visible; line 13 embeds prior student messages and runner results. Image files themselves are not visible to this audit.
+
+| Evidence | Observation |
+|---|---|
+| Line 13, student `model_request`, characters [0,151490) | **Goal:** reconstruct a single photograph as an editable, separately meshed indoor scene, matching viewpoint, framing, geometry and materials. The student’s inventory describes a historic bedroom; these are the student’s interpretations, not independently verified image contents. |
+| Line 13, embedded first student program and step 1 result, [0,151490) | The program constructs multiple named assets: architecture, windows, portraits, furniture, screen and rugs. Bed and chair have named child parts; screen leaves are grouped and rotated. Procedural wallpaper, linen and wood, luminous glazing, camera and lights are configured. Grouping establishes emitted hierarchy, not physical connection or reference fidelity. Runner reports `ok: true`, a saved render and blend file, in 20.06 seconds. |
+| Line 13, embedded second student program and step 2 result, [0,151490) | Following the first render, the student **claims** the bed direction, chair placement/shape, framing and illumination were wrong. The revised code rotates and moves the bed, moves and rotates the chair, alters its side upholstery, adjusts the screen, camera, lighting, exposure and materials. This is an executed revision, not proof that its diagnosis or correction was visually right. Step 2 reports `ok: true` and saved output in 20.66 seconds. |
+| Lines 14–15, student `codex_session` [0,3856), `model_response` [0,350) | The final session received paths for the reference and both renders; it completed with zero tool calls and responded `DONE`. The runner instructions say the last successful build is submitted automatically. No separate final evaluation is visible. |
+
+**Teacher input and exploration.** No teacher message, detection, diagnosis or proposed update is visible in this chunk’s embedded student conversation; therefore no teacher receipt or adoption is established. The comparison-and-revision cycle is visible student exploration, prompted by the runner, rather than evidence of independent external investigation. The final session had tools disabled and made no tool calls.
+
+**Outcome and uncertainty.** Both builds achieved **technical execution and render completion**, and the final student response was `DONE`; visual or geometric task success remains **unknown**. There is no visible empty patch, algorithm failure or technical interruption. The code provides multiple objects, material/texture mechanisms, part hierarchy, pose transformations, and camera/light settings, but the unavailable images prevent checking actual visible coverage, intersections or connections, pose, texture appearance, framing, lighting or remaining render defects. The student’s first-render assessment is not independent verification. Whether the second revision improved the scene, and whether unobserved earlier events included teacher interaction, remain unresolved.
+
+**Lessons.** Transferable: distinguish executable builds and named hierarchies from verified visual accuracy, and record revision hypotheses separately from results. Task-specific: this student hypothesized a reversed bed and excessive floor/ceiling; those claims and the chosen corrections cannot be generalized or confirmed from the visible text alone.
+
+{"source_id": "S0021", "original_file": "/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/r1_C2/fixed_version_test/commons_49800017/trajectory.jsonl", "kind": "student_trajectory", "original_bytes": 16376, "units": 4, "inventory": null}
+
+FULL-OBSERVATION AUDIT REPORT /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/scene/S0021_chunk001.md
+### Historical audit: S0021
+
+**Source:** `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/r1_C2/fixed_version_test/commons_49800017/trajectory.jsonl`.
+
+| Evidence | Observation |
+|---|---|
+| Student `model_request`, JSONL line 1, chars [0,11556) | The requested goal was to reconstruct a 512 × 406 indoor reference image with separate editable meshes, matching viewpoint, framing, visible parts, colors and materials. The image is referenced by path but is not visible in this audit. The instructions called for an inventory, a complete first build, rendered comparison and a correction if supported. These are requested procedures, not observed achievements. |
+| Student `codex_session`, line 2, chars [0,2657) | A fresh, read-only session was launched with the image; shell, browsing, image-viewing tools and multi-agent operation were disabled. It failed with exit code 1 after about 13.7 seconds and recorded zero tool calls. The actual model and underlying inference rounds are unknown. |
+| Student `model_error` and `scene_error`, lines 3–4, chars [0,566) and [0,1597) | The failure propagated from the Codex call through `runtime.ask`; the error points to a stderr log whose contents are not included. No student program, Blender execution, render, revision or `DONE` response is visible. |
+
+**Scene checks and outcome.** Multiple objects, materials or textures, part connections, object pose, camera, lighting and render quality cannot be assessed: neither the reference pixels nor a generated scene or render is available here. There is no visible validation or autonomous exploration beyond the attempted session. This is a **technical interruption**, not evidence of an algorithmic reconstruction failure, partial geometric correctness, or an empty patch. The cause of the process exit and any work internal to the failed call remain unknown.
+
+**Teacher and lessons.** No teacher message, detection, diagnosis, proposed update, execution, or adoption is visible; the system’s reconstruction instructions are not evidence of teacher receipt. The transferable operational lesson is to distinguish a failed model invocation from a failed scene or render, and inspect the actual stderr before diagnosing the cause. The task-specific unresolved hypothesis is whether this particular scene could have been reconstructed within the stated budget; this trace provides no result with which to test it.
+
+{"source_id": "S0022", "original_file": "/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/r1_C2/fixed_version_test/commons_92056365/trajectory.jsonl", "kind": "student_trajectory", "original_bytes": 496340, "units": 15, "inventory": null}
+
+FULL-OBSERVATION AUDIT REPORT /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/scene/S0022_chunk001.md
+## Historical audit: S0022
+
+**Scope.** This is chunk 1 of 2 only. All citations below refer to source **S0022**, original file `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/r1_C2/fixed_version_test/commons_92056365/trajectory.jsonl`. Neither the reference nor rendered images are visible to this audit.
+
+| Evidence | Observation and interpretation |
+|---|---|
+| Student request, line 1 | The stated goal was a separately meshed indoor reconstruction matching a single photograph’s viewpoint, framing, placement and materials. The student’s inventory interprets it as a window-side cafeteria; that interpretation is not independent image verification (student response, line 3). |
+| Student response and execution, lines 3–5 | The first program constructed multiple named assets: architecture, booths, tables, chairs, pendants and plants. It specified chair backs, seats, pedestals and bases; pendant shades, cords and ceiling roses; and palm stems and leaflets. These are emitted hierarchy and intended connections, not proof of physical contact or correct geometry. It used colored materials, a near-monochrome conversion, camera and three area lights; no image texture is specified. Step 1 reported `ok: true` and saved a render and blend file in 28.02 seconds. |
+| Review and revision, lines 7–10 | The next student request included the first render and reference and asked for comparison. The student **reported**, rather than independently established here, that the foreground pendant and palm were out of frame, furniture too pale, shrubs too prominent, ceiling line too low and booth too small. The revised program moved the pendant and palm, enlarged/repositioned booths, darkened materials, raised the ceiling, moved shrubs back, added table accessories, changed the camera target and adjusted lighting. Chair rotations and palm frond directions specify poses, whose correctness is unverified. |
+| Validation, lines 11–12 | Step 2 reported `ok: true`, saved another render and blend file in 36.03 seconds, and was selected. This is **technical execution success**, not formal proof of scene fidelity or of improvement over step 1. No failure, empty patch or technical interruption is visible in this chunk. Overall formal outcome remains unknown. |
+| Input and exploration, lines 1–2, 7–9 | The visible guidance was the reconstruction and review procedure plus execution feedback; no teacher-authored detection, diagnosis, proposed update, receipt or adoption is shown. The student independently generated and revised programs; the recorded CLI sessions show zero tool calls. This does not establish what may appear in the unseen chunk. |
+
+**Transferable lesson:** A successful render and a named part hierarchy establish execution and emitted structure, not visual completeness, object connections or camera accuracy. Comparing a full render against an inventory can guide a revision, but the reported discrepancies remain the student’s observations.
+
+**Task-specific uncertainty:** Whether the revisions actually brought the pendant and palm into frame, improved furniture appearance or fixed the ceiling line is unknown. Material/texture fidelity, object counts and overlaps, part contact, pose, camera alignment, lighting and any render artifacts cannot be independently assessed without the images. Hidden furniture and exterior geometry were also explicitly uncertain in the student’s inventory (lines 3 and 9).
+
+
+FULL-OBSERVATION AUDIT REPORT /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/scene/S0022_chunk002.md
+## Historical audit: S0022
+
+**Source:** `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/r1_C2/fixed_version_test/commons_92056365/trajectory.jsonl`. Only chunk 2 is available; the reference and rendered images themselves are not visible to this audit.
+
+| Evidence | Observation and limits |
+|---|---|
+| Student `model_request`, JSONL line 13, chars [0,184670) | **Goal:** reconstruct an indoor photograph with separate editable meshes, matching viewpoint and appearance. The student's inventory interprets it as a window-side cafeteria; that interpretation is not independent visual verification. |
+| Same event, line 13 | **Operations:** the first program defines multiple architectural, booth, table, chair, pendant and plant assets. Named child parts include chair seats, backs and pedestals, and pendant shades and cords. These establish intended hierarchy and placement, not verified physical connections. Chairs are rotated in opposing directions; there is no articulated character pose to assess. Materials use colors and roughness, not image textures. |
+| Same event, line 13 | **Autonomous review and revision:** after the first render, the student reported the foreground pendant and palm outside the frame, pale furniture, prominent shrubs, a low ceiling line and a small booth. The revised program moved and reshaped scene elements, darkened finishes, raised the ceiling, changed the camera target and lights, and added tabletop accessories. Those diagnoses are student observations, not independently checked findings. |
+| Same event, line 13 | **Validation:** both executions returned `ok: true`, with saved renders, in approximately 28 and 36 seconds. The second image was supplied for review with no executions remaining. This is technical execution success, not proof of geometric or visual correctness; no independent score or formal correctness result is visible. |
+| Student `codex_session`, line 14, chars [0,3855); `model_response`, line 15, chars [0,351) | The final session received paths for the reference and two renders, reported zero tool calls, and returned `DONE`. This is completion behavior, not an independent assessment of image fidelity. |
+
+**Teacher input:** No teacher detection, diagnosis, proposed update, or teacher-message receipt appears in the visible chunk. The detailed system instructions were supplied to the student, and the programs visibly follow some of them, including an inventory and primitive estimates; that does not establish receipt or adoption of any separate teacher feedback.
+
+**Outcome and uncertainty:** Two nonempty builds rendered successfully, followed by `DONE`; overall reconstruction correctness remains **unknown**, rather than a demonstrated visual success or algorithm failure. Whether the revision fixed framing, lighting, part contact, materials, coverage or occlusions cannot be determined without viewing the images. Hidden furniture and exterior details were also explicitly uncertain in the student's inventory. No conclusion about the unseen chunk is warranted.
+
+**Lessons:** Transferably, a render-and-revise loop can distinguish runnable output from image-match evidence, and named parts make targeted changes inspectable. The particular palm, pendant and ceiling adjustments are task-specific hypotheses; their effectiveness remains unverified here.
+
+{"source_id": "S0023", "original_file": "/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/r1_C2/fixed_version_test/commons_192968130/trajectory.jsonl", "kind": "student_trajectory", "original_bytes": 283830, "units": 15, "inventory": null}
+
+FULL-OBSERVATION AUDIT REPORT /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/scene/S0023_chunk001.md
+## Historical audit — S0023
+
+**Source:** `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/r1_C2/fixed_version_test/commons_192968130/trajectory.jsonl`. References below are JSONL lines in this file; supplied observations were complete lines, not split observations.
+
+| Evidence | Observed operation or result |
+|---|---|
+| Student request, line 1 | Goal: reconstruct a single indoor RGB view with separate SceneAct meshes and a matching camera. The image itself is not visible in this audit; the student's kitchen inventory is an interpretation, not independent evidence. |
+| Student response and execution, lines 3–5 | The first program defined multiple named assets: architecture, slats, door, bench, counter, sink, hob, cabinets and fixtures. It placed named child parts, used a Boolean sink opening, procedural wood/stone/floor finishes, a camera and lights. These establish intended hierarchy and placement, not verified physical connections or visual fidelity. Execution returned `ok: true` and saved a render. |
+| Student request and response, lines 7–10 | The first render was supplied to the student. The student reported close door/bench placement but a left-diverging counter, overly deep cabinets, distant sink and washed-out finishes. These are student diagnoses, not independently verified observations. The executed revision shifted the camera laterally, narrowed cabinetry, moved the sink, added tile joints and reduced light power while retaining multiple assets. |
+| Execution and selection, lines 11–15 | The second execution returned `ok: true`, saved a render and was selected. The render was supplied for review; the student replied `DONE`. No independent visual comparison or geometric check is recorded. |
+
+**Input and exploration.** The system provided detailed inventory, budgeting and review instructions, and the runner supplied execution feedback and rendered images (lines 1 and 7). No separate teacher detection, diagnosis, proposed update, or teacher-message receipt is recorded; adoption of teacher-specific advice cannot be established. The student independently produced and revised code after render feedback, but the session records show no student tool calls (lines 2, 8, 14).
+
+**Outcome and uncertainty.** This is a successful *technical build and render*, with step 2 selected, not a demonstrated successful reconstruction. There is no visible formal correctness score, algorithm failure, empty patch or technical interruption. Whether the final scene matches object coverage, materials, texture, silhouette, gaps, occlusion, pose, part connections, camera or lighting remains unknown without the images or geometric verification. In particular, the student's assertion that the revision corrected the defects is a hypothesis, not proof; simultaneous camera, geometry and lighting changes also prevent isolating their effects.
+
+**Lessons.** Transferable: a complete first build, explicit part hierarchy and a rendered review can support a targeted second attempt, while execution success must be distinguished from visual correctness. Task-specific: the sink relocation, cabinet-depth change and darker lighting were responses to this student's kitchen interpretation and should not be generalized as fixed adjustments.
+
+{"source_id": "S0024", "original_file": "/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/r1_C2/fixed_version_test/commons_96943062/trajectory.jsonl", "kind": "student_trajectory", "original_bytes": 16373, "units": 4, "inventory": null}
+
+FULL-OBSERVATION AUDIT REPORT /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/scene/S0024_chunk001.md
+## Historical audit: S0024
+
+**Source:** `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_2/results/r1/fixed_h/r1_C2/fixed_version_test/commons_96943062/trajectory.jsonl`. Citations below identify JSONL lines and character ranges in the supplied observations.
+
+| Aspect | Evidence and assessment |
+|---|---|
+| Goal versus observation | The requested goal was to reconstruct a 384 × 512 indoor photograph as a SceneAct/Blender scene, matching geometry, viewpoint, framing, colors and materials, with separate meshes and no reference-image projection. The photograph itself is not visible in the supplied text, so its contents cannot be independently inventoried (student `model_request`, line 1, chars [0,11555)). |
+| Actual operations and changes | A fresh student Codex session was launched with the image staged and tools disabled. It failed with exit code 1 after about 19 seconds; the session records zero tool calls (student `codex_session`, line 2, chars [0,2655)). No generated program, scene change, Blender execution, or autonomous exploration is visible. |
+| Validation and outcome | The student `model_error` points to a stderr file, whose contents are not supplied (line 3, chars [0,566)). The `scene_error` traceback shows failure while `runtime.ask` called the student, before any visible build or render (line 4, chars [0,1597)). This is a **technical interruption**, not evidence of an algorithmic reconstruction failure, partial correctness, or an empty patch. No visual validation or formal successful outcome is visible. |
+| Scene-specific checks | The instructions request multiple separate objects, materials, meaningful part relationships, camera and lighting, but no scene implementation is observed. Consequently object coverage, textures, part connections, pose, camera, lighting and rendering cannot be assessed (line 1, chars [0,11555); lines 2–4). |
+| Teacher input | No teacher message, detection, diagnosis, proposed update, execution, or student adoption appears in this trajectory. The system instructions are task guidance, not evidence of teacher feedback or its receipt. |
+
+**Transferable lesson:** A failed model invocation without an image or generated program cannot support conclusions about scene quality or the cause of any visual defect. **Task-specific uncertainty:** The reference image and stderr contents are unavailable here; the exit cause and the intended scene’s actual objects and appearance remain unknown.
+

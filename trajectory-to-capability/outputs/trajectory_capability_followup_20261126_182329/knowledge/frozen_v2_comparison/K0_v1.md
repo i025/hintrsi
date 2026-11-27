@@ -1,0 +1,41 @@
+<persistent_capabilities>
+
+This library offers optional process guidance. Follow the actual task instructions and observations first; use only what is useful. The guidance comes from development descriptions and a generic teacher prior, not observed implementations or test results. Causal transfer has not been established.
+
+### 1. Model stateful control flow and failure propagation
+
+- **Applicable problems:** Recursive workflows, orchestration, callback chains, and other operations that invoke another operation and resume with its result.
+- **Transferable knowledge/behavior constraint:** Trace dispatch, execution, output accumulation, outcome classification, response construction, and resumption. Track identifier ownership across boundaries. Distinguish the active invocation path from previously invoked components, and empty success from failure. Define which failures are streamed, returned, or both.
+- **Candidate methods:** Draw a lifecycle and failure-channel map; use a path-based cycle check where appropriate.
+- **Verification steps:** Exercise nested success, fragmented and empty output, missing destinations, exceptions, and cycles. Check external events and the resumed caller’s response, including identifier correlation.
+- **When not applicable:** Avoid imposing a generic cycle or exception policy when the surrounding API specifies different semantics; catch-all handling may hide diagnostics.
+- **Evidence sources:** Development descriptions; generic teacher prior.
+
+### 2. Treat persisted schemas as an inference contract
+
+- **Applicable problems:** Pipelines that transform named inputs during training and must reproduce the transformation at inference.
+- **Transferable knowledge/behavior constraint:** Separate configuration validation, schema selection, persistence, and application. Preserve deterministic ordering and enough information to reconstruct the input mapping. Apply the contract at every inference entry point; handle missing, extra, and equivalent sources explicitly. If equivalent sources coexist, check consistency rather than silently choosing one.
+- **Candidate methods:** Persist the selected schema alongside the artifact; derive downstream dimensions from the relevant persisted contract.
+- **Verification steps:** Test supported entry points with reordered, extra, missing, alternate, and conflicting inputs; invalid configuration; and empty selections. Reload in a fresh process and check documented error responses and artifact consistency.
+- **When not applicable:** Do not assume equality rules, schema versioning, or compatibility with older artifacts; these require an explicit policy or supporting evidence.
+- **Evidence sources:** Development descriptions; generic teacher prior.
+
+### 3. Use syntax structure without losing source fidelity
+
+- **Applicable problems:** Formatters, parsers, migration tools, and analyzers that recognize nested constructs while retaining meaningful source text.
+- **Transferable knowledge/behavior constraint:** Inspect existing token and line representations. Identify boundaries using syntax and nesting depth rather than blindly splitting on punctuation. Separate structural classification, rendering, and public data models. Preserve spacing where required, and leave unsupported forms unchanged when specified.
+- **Candidate methods:** Use depth-aware traversal and narrowly scoped normalization; rely on parser support where heuristics cannot distinguish syntax reliably.
+- **Verification steps:** Check nested expressions, named and unnamed constructs, optional clauses, and valid parsed layouts. Independently verify formatting invariants, public fields, and parse results; check formatting stability where appropriate.
+- **When not applicable:** Keyword heuristics may misclassify identifiers, quoted text, comments, or nested expressions. Do not rewrite unsupported syntax as though it were understood.
+- **Evidence sources:** Development descriptions; generic teacher prior.
+
+### 4. Translate contracts into observable checks
+
+- **Applicable problems:** Changes with multiple requirements, boundary cases, or interactions across layers.
+- **Transferable knowledge/behavior constraint:** Turn each requirement into an observable invariant, identify its responsible layer, and trace inputs and outputs. Include negative requirements as well as success cases. Inspect existing conventions and cover documented entry points without expanding scope unnecessarily.
+- **Candidate methods:** Build a requirement-to-check matrix and add integration checks at boundaries alongside focused unit checks.
+- **Verification steps:** Check outputs, error channels, messages, and visible metadata. Run relevant existing checks and inspect the final change set; verify branch and commit operations if required by the workflow.
+- **When not applicable:** Scale the matrix to the task’s complexity; finite checks do not prove correctness for all valid inputs.
+- **Evidence sources:** Development descriptions; generic teacher prior. These are proposed checks, not observed test results.
+
+</persistent_capabilities>

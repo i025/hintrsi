@@ -1,0 +1,15 @@
+## 工程诊断备忘录（事后记录）
+
+**已确认事实。** K2_v2 仅发起一次学生模型请求、未用工具，明确表示未修改代码，导出补丁为 0 字节；评分器记录 `no model.patch submitted — grading pristine base state`。其正式结果为 P2P 1285/1286、F2P 0/72、binary 0。HTExploration 应用了 14250 字节补丁，正式结果为 P2P 1285/1286、F2P 69/72、binary 0。两次唯一 P2P 失败均为 `tests/test_weighted_transitions.py::TestWeightedTransitionsBasic::test_statistical_distribution`，在 `tests/test_weighted_transitions.py:47` 的 10000 次循环中触发 pytest 的 60 秒单项超时；K2_v2 中断栈指向 `statemachine/engines/base.py:107`，HTExploration 指向同文件第 542 行。中断栈位置只是超时时的采样位置，并非已证实的耗时根因。
+
+两次验证器均正常结束，分别耗时约 261.45 秒、217.72 秒，`verifier_timed_out=false`；不能把完整测试中的单项 timeout 说成外层评测中断。两份结果分别见：
+- `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/runs/capability_followup_v2_test_python-statemachine-state-data-scoping_K2_v2_r1/eval_output/python-statemachine-state-data-scoping/eval_result.json`
+- `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/runs/capability_followup_hint_transfer_hint_transfer_python-statemachine-state-data-scoping_HT_Exploration_r1/eval_output/python-statemachine-state-data-scoping/eval_result.json`
+
+**解释与限制。** 未修改的 pristine base 已在同一测试超时，故不能仅凭 HTExploration 的同名失败直接称为学生引入的 P2P 退化；但同名失败也不能证明补丁对性能完全没有影响。HT 的 F2P 69/72 显示部分功能进展，剩余三项失败涉及返回空字典而非 `None`（`tests/test_state_data.py:556、428`）；F2P 仅供辅助诊断，不能替代完整解或独立判定成功。两份正式结果的 binary 均为 0，原始成绩不覆盖、不换算。
+
+**环境与未确认根因。** 已提供的只读环境检查显示现为 QEMU TCG 多线程、8 vCPU、144 GiB、Nehalem、nice 10；`/dev/kvm` 不存在，`/var/run/docker.sock` 和 `/run/user/1005/docker.sock` 不存在，亦未发现原生容器命令。驱动仍为 base `pytest -n 4 --timeout=60`、新测试 `pytest tests/test_state_data.py --timeout=60`，外层各 600 秒；学生 8 CPU/128 GiB 和 verifier 8 GiB 未变。TCG 或资源竞争可能影响耗时，但现有输出不能证明 TCG 是唯一原因，也不能排除调度、负载、测试波动或补丁性能影响。
+
+**可行性与证据缺口。** 在现有无 KVM、无原生 Docker 且不能重写容器框架的约束下，尚无证据支持直接修复评测环境或断言该失败可消除。若后续获准，应在不改变测试断言、次数、60 秒时限、评测流程和资源预算的前提下，独立记录同条件的 pristine base 与补丁运行时分布、节点负载及调度信息，并寻找可用的同配置硬件加速对照；对照结果只能用于事后解释，不能替换正式成绩。当前未执行这些基准、修复或重评。
+
+两个学生队列继续按原条件运行；本报告仅供事后记录，绝不进入学生。所有新 Test 知识库保持冻结。

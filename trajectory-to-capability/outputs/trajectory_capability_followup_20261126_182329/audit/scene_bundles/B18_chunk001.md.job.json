@@ -1,0 +1,35 @@
+{
+  "name": "followup-bundle-B18_chunk001",
+  "completed": true,
+  "started_at": 1795689790.8664114,
+  "finished_at": 1795689820.7170057,
+  "characters": 5190,
+  "words": 614,
+  "response": {
+    "id": "chatcmpl-fc2d39205a3549a281a6482e93d470dd",
+    "object": "chat.completion",
+    "created": 1795689820,
+    "model": "gpt-6.1-terra",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "## Scope and evidence\n\nThis audit uses only the selected B18 records supplied, not the whole archive or the images. Archive: `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/work/scene_archive/bundles/r2--generic_rsi.tar.gz`. Member paths below are relative to `experiments/scene_rsi_pilot/` in that archive. Character ranges are those supplied; JSON keys identify the relevant evidence.\n\n## Detection, diagnosis, and proposed changes\n\n- **Technical versus quality failure.** The C1 teacher reported one reconstruction with no final artifacts after an invalid fillet radius, a 600-second timeout, and a missing-world exception; its final correction was not executed. Primitive expansion was a plausible timeout hypothesis, not an established cause. The teacher also reported a completed reconstruction with 426 finite meshes, passing prescribed edits but scoring 0.3965542485 overall. These are teacher-reported findings; the underlying trajectories and render are not included in this selection (`candidates/r2/generic_rsi/C1/proposal_result.json`, `diagnosis`, chars [0,16112)).\n- **Coverage and connections.** C1 proposed a compact first build containing all prominent objects and supports in named semantic assets. C2 strengthened this into an object/anchor ledger, filled silhouette-defining surfaces, and complete subassemblies with their trim (`candidates/r2/generic_rsi/C1/policy.py`, `PROCEDURE`, [0,8703); `C2/policy.py`, `PROCEDURE`, [0,14972)). C2's teacher reported that first builds represented major objects but simplified some profiles and furnishings; it also reported apron edging as siblings rather than members of the tested helper. Those are diagnoses, not independently viewable image or source observations here (`C2/proposal_result.json`, `diagnosis`, [0,36009)).\n- **Material and texture.** C2 attributed a missed material filter to semantic names on parent EMPTY markers rather than primitive mesh names, and hypothesized that per-mesh texture coordinates on scaled floor geometry explain an oversized pattern. Its proposed remedy traverses descendants, checks matches, copies shared materials for local edits, and uses a common texture-coordinate reference. The reported contribution to scores is unmeasured (`C2/proposal_result.json`, `diagnosis`; `C2/policy.py`, `PROCEDURE`, ranges above). These records do not independently establish the appearance of the rendered floor.\n- **Pose, camera, light and render.** C2's proposed procedure separates camera pose/framing from local geometry and appearance, and compares brightness, texture and light direction with camera and geometry fixed. It treats camera hypotheses as estimates, not calibration, and forbids changing fixed renderer settings merely because of noise (`C2/policy.py`, `PROCEDURE`, [0,14972)). No selected record establishes true object pose or physical contact.\n\n## Actual recorded mechanisms\n\nC1's proposal-stage meta execution requested no probes; its diagnostic record likewise contains none. For C2, the **C1 meta program** actually requested two probes before proposal (`candidates/r2/generic_rsi/C1/diagnostic_observations.json`, `probes`, [0,46); `C2/meta_execution.json`, `source`, `plan.probes`, `actually_used_for_proposal`, [0,2292)). The recorded completed focal probe changed 50 to 55 with geometry unchanged: overall 0.3998448 to 0.4038153, while DINO and PSNR decreased. The scale probe enlarged only the selected 13-mesh `apron_-1` group by 1.1 at fixed camera: overall fell to 0.3946717. Neither establishes an optimal camera, whole-object scaling effect, or 3D accuracy (`C2/diagnostic_observations.json`, `probes`, [0,3624)).\n\nC2's teacher reported two completed development reconstructions, three successful executions apiece and two additional diagnostic renders, but this selection does not contain the student trajectories themselves. The proposed controller code is evidence of intended execution and fallback logic, not proof that every instructed mechanism was followed (`C2/proposal_result.json`, `diagnosis`; `C2/policy.py`, `solve`, ranges above).\n\n## Acceptance and limits\n\nThe eight supplied C1/C2 development and selection functional summaries all report structure, material and required composite passes. Their own interpretation limits this to prescribed edit operability; semantic completeness and support/collision truth are null, not passes. For example, the C1 development targets are `apron_-1` and `Architecture` (`results/r2/generic_rsi/C1/development/commons_109923183/functional/summary.json`, [0,353); `commons_118588033/functional/summary.json`, [0,357)). AABB candidates cannot establish contact.\n\nProposal revalidation marked both candidates `accepted`, but this is not demonstrated task-program retention: C2's teacher says C1 was not retained, without a scene-level selection explanation. C2 revalidation changed an earlier `proposal_failed` status with `Candidate introspection outside contract` to accepted and `newly_eligible: true`; no candidate-quality gain or acceptance threshold is supplied (`C1/proposal_result.json` and `C2/proposal_result.json`, `status`, `revalidation`, `diagnosis`, ranges above)."
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 26531,
+      "completion_tokens": 1174,
+      "total_tokens": 27705,
+      "prompt_tokens_details": {
+        "cached_tokens": 2048
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      }
+    }
+  }
+}

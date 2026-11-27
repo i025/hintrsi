@@ -1,0 +1,14 @@
+## Historical Scene RSI audit: B23
+
+The supplied records contain two functional summaries: one from replay development and one from replay selection. They are selected records, not the entire archive, and do not establish what happened elsewhere in the run.
+
+**Acceptance evidence and limits.** Both summaries report `structure_pass`, `material_pass`, `composite_required`, `composite_pass`, and `functional_pass` as `true`. Their shared interpretation limits these results to “Structural/edit operability only” and states that an expected composite being absent counts as failure, never N/A. Thus, both records report a functional pass under that rule; they do not independently show how the checks were performed or demonstrate broader scene quality. Both set `target_object` to `architecture`, while `semantic_object_completeness` and `support_collision_truth` are `null`. In particular, the passes do not establish complete multi-object coverage or physical support/contact.
+
+**Other requested dimensions.** The `material_pass` flags are reported, but the records provide no texture assessment or visual-quality evidence. They contain no specific findings about part connections, pose, camera, lighting, or rendering. No technical error or quality failure is reported in these summaries; their silence is not evidence that none occurred.
+
+**Process distinctions.** The supplied summaries do not document teacher problem detection, a diagnostic hypothesis, a proposed H/M/code update, or actual student mechanism execution. The selection summary reports a functional pass, but it does not itself document a separate candidate-acceptance decision or its full acceptance rules. No image appearance or unseen execution can be inferred from these flags.
+
+**Sources.** Archive: `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/work/scene_archive/bundles/replay_s1_r1--M_initial.tar.gz`.
+
+- Development member: `experiments/scene_rsi_pilot/results/replay_s1_r1/M_initial/C1/replay_development/commons_2238909/functional/summary.json`, characters `[0,357)`, keys `structure_pass`, `material_pass`, `composite_required`, `composite_pass`, `functional_pass`, `target_object`, `semantic_object_completeness`, `support_collision_truth`, and `interpretation`.
+- Selection member: `experiments/scene_rsi_pilot/results/replay_s1_r1/M_initial/C1/replay_selection/commons_29206714/functional/summary.json`, characters `[0,357)`, same keys.

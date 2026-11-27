@@ -1,0 +1,390 @@
+Pre-Test read-only mechanism comparison. Output English at most 1800 words. No Selection or Test task descriptions or results are provided; do not predict scores or adjust libraries. Compare the actual K0/K1/K2 V1/V2 texts and K1/K2 V2 intermediate analyses semantically. Identify shared implementation-independent constraints, advice already plausible from K0 teacher prior, constraints explicitly grounded in K2 functional-state alignment but not explicit in K1 chronology, and claims that are only clearer wording rather than additional knowledge. Distinguish representation differences from genuinely different delivered instructions. Cite unit headings and provided source event IDs. K1/K2 V1 had the same fixed raw D01-D08 cohort; V2 uses independent on-policy own traces and previous arm memory, so content changes cannot isolate alignment alone. Delivered V2 K1 is619words/4units; K2raw707 exceeded shared700cap and pre-saved atomic rule delivered505words/3units. Do not restore its dropped unit, grant refinement, or treat omitted guidance as delivered. Describe applicability conflicts, risks of overgeneralization/unnecessary operations, and what direct student actions would support adoption without proving causality. Conclude with bounded pre-Test hypotheses, not outcomes. This report will never enter student or extraction input.
+
+FILE /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/knowledge/K0_v1.md
+<persistent_capabilities>
+
+This library offers optional process guidance. Follow the actual task instructions and observations first; use only what is useful. The guidance comes from development descriptions and a generic teacher prior, not observed implementations or test results. Causal transfer has not been established.
+
+### 1. Model stateful control flow and failure propagation
+
+- **Applicable problems:** Recursive workflows, orchestration, callback chains, and other operations that invoke another operation and resume with its result.
+- **Transferable knowledge/behavior constraint:** Trace dispatch, execution, output accumulation, outcome classification, response construction, and resumption. Track identifier ownership across boundaries. Distinguish the active invocation path from previously invoked components, and empty success from failure. Define which failures are streamed, returned, or both.
+- **Candidate methods:** Draw a lifecycle and failure-channel map; use a path-based cycle check where appropriate.
+- **Verification steps:** Exercise nested success, fragmented and empty output, missing destinations, exceptions, and cycles. Check external events and the resumed caller’s response, including identifier correlation.
+- **When not applicable:** Avoid imposing a generic cycle or exception policy when the surrounding API specifies different semantics; catch-all handling may hide diagnostics.
+- **Evidence sources:** Development descriptions; generic teacher prior.
+
+### 2. Treat persisted schemas as an inference contract
+
+- **Applicable problems:** Pipelines that transform named inputs during training and must reproduce the transformation at inference.
+- **Transferable knowledge/behavior constraint:** Separate configuration validation, schema selection, persistence, and application. Preserve deterministic ordering and enough information to reconstruct the input mapping. Apply the contract at every inference entry point; handle missing, extra, and equivalent sources explicitly. If equivalent sources coexist, check consistency rather than silently choosing one.
+- **Candidate methods:** Persist the selected schema alongside the artifact; derive downstream dimensions from the relevant persisted contract.
+- **Verification steps:** Test supported entry points with reordered, extra, missing, alternate, and conflicting inputs; invalid configuration; and empty selections. Reload in a fresh process and check documented error responses and artifact consistency.
+- **When not applicable:** Do not assume equality rules, schema versioning, or compatibility with older artifacts; these require an explicit policy or supporting evidence.
+- **Evidence sources:** Development descriptions; generic teacher prior.
+
+### 3. Use syntax structure without losing source fidelity
+
+- **Applicable problems:** Formatters, parsers, migration tools, and analyzers that recognize nested constructs while retaining meaningful source text.
+- **Transferable knowledge/behavior constraint:** Inspect existing token and line representations. Identify boundaries using syntax and nesting depth rather than blindly splitting on punctuation. Separate structural classification, rendering, and public data models. Preserve spacing where required, and leave unsupported forms unchanged when specified.
+- **Candidate methods:** Use depth-aware traversal and narrowly scoped normalization; rely on parser support where heuristics cannot distinguish syntax reliably.
+- **Verification steps:** Check nested expressions, named and unnamed constructs, optional clauses, and valid parsed layouts. Independently verify formatting invariants, public fields, and parse results; check formatting stability where appropriate.
+- **When not applicable:** Keyword heuristics may misclassify identifiers, quoted text, comments, or nested expressions. Do not rewrite unsupported syntax as though it were understood.
+- **Evidence sources:** Development descriptions; generic teacher prior.
+
+### 4. Translate contracts into observable checks
+
+- **Applicable problems:** Changes with multiple requirements, boundary cases, or interactions across layers.
+- **Transferable knowledge/behavior constraint:** Turn each requirement into an observable invariant, identify its responsible layer, and trace inputs and outputs. Include negative requirements as well as success cases. Inspect existing conventions and cover documented entry points without expanding scope unnecessarily.
+- **Candidate methods:** Build a requirement-to-check matrix and add integration checks at boundaries alongside focused unit checks.
+- **Verification steps:** Check outputs, error channels, messages, and visible metadata. Run relevant existing checks and inspect the final change set; verify branch and commit operations if required by the workflow.
+- **When not applicable:** Scale the matrix to the task’s complexity; finite checks do not prove correctness for all valid inputs.
+- **Evidence sources:** Development descriptions; generic teacher prior. These are proposed checks, not observed test results.
+
+</persistent_capabilities>
+
+
+FILE /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/knowledge/K0_v2.md
+<persistent_capabilities>
+
+## 1. Translate requirements into cross-interface contracts
+
+**Applicable problems:** A capability is exposed through library calls, command-line interfaces, HTTP endpoints, or persisted metadata.
+
+**Transferable knowledge/behavior constraint:** Specify inputs, outputs, validation, errors, state transitions, and compatibility per interface. Preserve shared semantics while respecting boundary-specific representations. Do not assume similarly named interfaces behave identically without inspection.
+
+**Candidate methods:** Map operations to entry points, result shapes, and failure modes. Separate shared domain behavior from transport-specific parsing and rendering.
+
+**Verification steps:** Trace stated requirements to checks for valid and invalid inputs at each boundary. Compare equivalent operations across interfaces and check exact output or error shapes where specified. Report what was actually checked.
+
+**When not applicable:** A contract matrix cannot settle unspecified behavior; consult applicable specifications and repository conventions before choosing it.
+
+**Evidence sources:** Development descriptions `aiomonitor-task-snapshots-diff`, `igel-persist-feature-schema`, and `claude-code-by-agents-recursive-delegation`; general programming knowledge. These support proposals, not observations of existing implementations.
+
+## 2. Model lifecycle, recovery, and recursive execution
+
+**Applicable problems:** Stateful records, iterative recovery, or nested delegation require identity and failure handling over time.
+
+**Transferable knowledge/behavior constraint:** Distinguish stable identity from display names and mutable state. Define creation, lookup, retention, deletion, and failure transitions. Preserve accepted information during recovery; distinguish complete success, partial success, and no value. Distinguish a delegation cycle from an ordinary sub-operation failure.
+
+**Candidate methods:** Describe transitions and invariants before selecting data structures. Represent outcomes explicitly, track the active delegation path, and propagate correlation information where required.
+
+**Verification steps:** Exercise sequences such as creation followed by deletion or eviction, partial recovery followed by refinement, and nested work followed by continuation. Check missing identifiers, repeated operations, cycles, and failure propagation against the stated contract.
+
+**When not applicable:** Do not invent unspecified isolation or retention behavior, including what happens when all records are protected. Clarify those cases first.
+
+**Evidence sources:** Development descriptions `aiomonitor-task-snapshots-diff`, `cattrs-partial-structuring-recovery`, and `claude-code-by-agents-recursive-delegation`; general programming knowledge.
+
+## 3. Preserve boundaries in structured data and source text
+
+**Applicable problems:** Nested conversion with field-level diagnostics, or parsing and formatting that must preserve a faithful public representation.
+
+**Transferable knowledge/behavior constraint:** Separate absent, successfully converted, fallback, and partially recovered values. Honor specified recursion boundaries and retain detailed errors. For source text, distinguish top-level constructs from nested expressions, preserving spacing where required while applying only specified normalization.
+
+**Candidate methods:** Track field outcomes, fallback availability, and errors independently. Refine eligible failures without altering prior results. Traverse parsed structure with nesting awareness and retain source spans or token spacing when reconstruction requires them.
+
+**Verification steps:** Check required and defaulted fields, invalid and absent inputs, nested partial values, collection failures, extra keys, and non-mutating refinement. For formatting, check nested expressions, constraints, pass-through cases, public fields, and idempotence where appropriate.
+
+**When not applicable:** Framework hooks, constructor semantics, and parser token models require inspection. Idempotence alone does not establish semantic preservation.
+
+**Evidence sources:** Development descriptions `cattrs-partial-structuring-recovery` and `sqlfmt-create-table-ddl-formatting`; general programming knowledge.
+
+## 4. Carry training schema across serving boundaries
+
+**Applicable problems:** Feature selection or normalization during fitting must be reproduced during evaluation, prediction, and export.
+
+**Transferable knowledge/behavior constraint:** Persist selected raw-feature order and necessary provenance. Ignore extras only when permitted, reject missing required inputs, and check agreement among sources representing the same canonical feature. Validate configuration before model invocation and translate errors at the HTTP boundary.
+
+**Candidate methods:** Use a versionable schema artifact and a shared schema-application routine. Separate selection and alias resolution from model execution.
+
+**Verification steps:** Check reordered and extra columns, missing columns, aliases individually and together, conflicting values, invalid configuration, and consistency across supported paths. Verify validation precedes model invocation.
+
+**When not applicable:** Storage compatibility, coercion, and equality for unusual or missing values must follow the actual contract rather than assumptions.
+
+**Evidence sources:** Development description `igel-persist-feature-schema`; general programming knowledge. No repository or execution results were supplied, so these checks are proposed, not observed outcomes.
+
+</persistent_capabilities>
+
+
+FILE /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/knowledge/K1_v1.md
+<persistent_capabilities>
+
+## 1. Trace behavior across boundaries
+- **Applicable problems:** Changes spanning handlers, adapters, providers, persisted artifacts, or multiple entry points.
+- **Transferable knowledge/behavior constraint:** Treat supplied guidance as a hypothesis to check against actual interfaces and behavior. Trace the full flow rather than assuming that a local change completes it.
+- **Candidate methods:** Map inputs, execution, outputs, and downstream consumers. For multi-step operations, examine feedback, continuation, and identity. For persisted data, check input ordering and errors at each entry point; do not assume a saved raw schema also preserves preprocessing.
+- **Verification steps:** Exercise a representative round trip and inspect the resulting artifact or downstream input, including an error path.
+- **When not applicable:** A genuinely isolated change with no relevant downstream boundary; scale the investigation to the task.
+- **Evidence sources:** D02 events 24–33, 59–61; D05 events 84–85; D06 events 31–38, 68–77; D07 teacher guidance. These show selected checks, not complete coverage or established causal transfer.
+
+## 2. Reproduce and inspect observable behavior
+- **Applicable problems:** Bugs or behavior changes that can be exercised through a public interface or focused test.
+- **Transferable knowledge/behavior constraint:** Prefer an observed failing case before editing, then verify meaningful outputs and downstream inputs rather than only counting calls.
+- **Candidate methods:** Build a small reproduction; inspect context and new input together; test normal, failure, and unknown-input paths, including identity matching where relevant.
+- **Verification steps:** Run the same reproduction before and after the change, then add focused checks for relevant edge cases. Treat one passing round trip as limited evidence.
+- **When not applicable:** A safe, representative reproduction is unavailable or the task does not permit execution; explain what remains unverified.
+- **Evidence sources:** D02 events 24–33, 59–61; D05 events 27–28, 49–57, 84–85, 95–98. D02 left broader verification outstanding.
+
+## 3. Verify transformations beyond an example
+- **Applicable problems:** Formatters and other transformations expected to preserve meaning or support repeated application.
+- **Transferable knowledge/behavior constraint:** Semantic preservation and idempotence are separate properties; neither follows from attractive output for one example.
+- **Candidate methods:** Check equivalence or safety validation, repeated transformation, varied inputs, and interactions between mixed forms.
+- **Verification steps:** Run focused examples and relevant regression suites, inspecting failures and boundary cases rather than relying on suite size alone.
+- **When not applicable:** Transformations intentionally change meaning or are not expected to be idempotent; use the actual contract instead.
+- **Evidence sources:** D08 events 52–63, 68–69, 78–82. Local checks passed, but formal evaluation still reported preservation failures of unidentified cause.
+
+## 4. Interpret and report verification precisely
+- **Applicable problems:** Changes with test failures, environmental setup issues, incomplete output, or ambiguous repository instructions.
+- **Transferable knowledge/behavior constraint:** Distinguish a verified result from an unrun check, truncated output, an environmental failure, or an instruction-driven stop. Do not present partial success as a clean full run.
+- **Candidate methods:** Check the expected working directory and generated prerequisites; compare a failure with an appropriate baseline when feasible. Investigate ambiguous branch instructions and either disclose a justified choice or seek clarification as circumstances require.
+- **Verification steps:** Report commands or checks that passed, failed, or were not run, and qualify conclusions whose output is incomplete.
+- **When not applicable:** The task requires no execution or repository changes; still avoid claims beyond the available evidence.
+- **Evidence sources:** D02 events 54–62; D05 events 64–71, 92–93, 101–112; D06 events 3–7, 55–63; D07 events 2–18. Baseline and environment explanations have the limits of the observed record.
+
+</persistent_capabilities>
+
+
+FILE /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/knowledge/K1_v2.md
+<persistent_capabilities>
+
+## 1. Trace behavior across boundaries and time
+
+**Applicable problems:** Features spanning public interfaces, stored state, lifecycle stages, or multiple consumers.
+
+**Transferable knowledge/behavior constraint:** Map inputs, execution, identity, retained state, outputs, and downstream use. Treat prior guidance as a hypothesis, not a demonstrated cause of an agent’s choices. Distinguish stored data from later preprocessing, and account for transitions as well as initial capture.
+
+**Candidate methods:** Inspect public entry points and consumers; trace representative success and error paths; compare what is stored with what later operations read.
+
+**Verification steps:** Exercise representative round trips and lifecycle transitions, inspecting actual artifacts and downstream inputs. In snapshot-like features, check all relevant categories of retained items rather than only the most visible one.
+
+**When not applicable:** A full lifecycle map may be unnecessary for a genuinely local, stateless change; scale the investigation to the contract.
+
+**Evidence sources:** Development descriptions of aiomonitor events 38–40 and 49–53; earlier Development capability 1. The visible diff limitation is a reason to probe analogous boundaries, not an established explanation of the formal failure.
+
+## 2. Reproduce, probe, and retest repairs
+
+**Applicable problems:** Changes for which a safe public-interface reproduction or focused check is feasible.
+
+**Transferable knowledge/behavior constraint:** Separate an absent API from a demonstrated behavioral defect. Check meaningful values and errors, and rerun the observation that motivated a repair before claiming it was resolved.
+
+**Candidate methods:** Establish a pre-change observation; probe invalid and missing inputs, nested or repeated operations, and identity or custom hooks when relevant; add a durable regression check where feasible.
+
+**Verification steps:** Compare the same focused probe before and after repair, then run relevant regression tests. Interpret hook results against the intended contract rather than assuming a difference is necessarily a defect.
+
+**When not applicable:** An initial behavioral reproduction may be impossible when the interface does not yet exist; record that limitation instead of inventing one.
+
+**Evidence sources:** Development description of cattrs events 24–26, 74–79, and 82–89: annotation inspection failed and succeeded on rerun; the nested-state edit has no visible rerun of the same probe.
+
+## 3. Verify transformation properties independently
+
+**Applicable problems:** Transformations expected to preserve meaning, tolerate repetition, or retain successful information through refinement.
+
+**Transferable knowledge/behavior constraint:** Treat semantic preservation, repeated application, and preservation of prior work as distinct contract properties. A plausible example or one property alone does not establish the others.
+
+**Candidate methods:** Design focused checks for mixed and boundary inputs; compare results across repeated applications; inspect retained information alongside newly produced results.
+
+**Verification steps:** Check each required property independently and supplement examples with relevant regression tests. Describe the tested cases rather than generalizing to all combinations.
+
+**When not applicable:** Do not impose meaning preservation or repeatability where the contract intentionally changes meaning or does not require repetition.
+
+**Evidence sources:** Earlier Development capability 3 and its cited D08 events; cattrs Development description of selected refinement, collection-failure, and TypedDict checks.
+
+## 4. Interpret and report verification precisely
+
+**Applicable problems:** Failures, incomplete setup, clipped output, unfinished runs, or ambiguous instructions.
+
+**Transferable knowledge/behavior constraint:** Separate observed outcomes from hypotheses about cause. Report the scope of passing checks, unavailable tools, blocked or unfinished work, and supplied formal outcomes without conflating them.
+
+**Candidate methods:** Compare failures with an appropriate baseline when feasible; inspect instructions and seek clarification or disclose a justified choice when needed.
+
+**Verification steps:** Confirm completion and inspect actual results before reporting a pass. If no baseline exists, leave the failure’s cause open; do not equate unidentified formal failures with local failures.
+
+**When not applicable:** Baseline comparison may be infeasible or irrelevant; explicitly state the resulting uncertainty.
+
+**Evidence sources:** Development descriptions of cattrs events 52–56 and 88–94 and aiomonitor events 36–41 and 52–56. The supplied formal evaluations describe those evaluations, not universal reliability.
+
+</persistent_capabilities>
+
+
+FILE /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/knowledge/K2_v1.md
+<persistent_capabilities>
+
+### 1. Inspect state across transitions
+- **Applicable problems:** Workflows where a later request, operation, or component consumes state produced earlier.
+- **Transferable knowledge/behavior constraint:** Preserve the information and ordering the next consumer needs. Distinguish new input from continuation state rather than assuming prior context replaces it.
+- **Candidate methods:** Capture the representation immediately before and after the boundary; compare ordinary requests with continuations, including mixed input types where relevant.
+- **Verification steps:** Exercise both paths and inspect the next consumer’s actual input, not just whether it was invoked.
+- **When not applicable:** No meaningful state crosses the boundary, or the task explicitly requires discarding it.
+- **Evidence sources:** D05 events 49–57, 95–100; D02 events 30–33, 59–61. D05’s later saved-context change was not separately exercised by the displayed probe.
+
+### 2. Check identity and failure feedback end to end
+- **Applicable problems:** Delegation, callbacks, or other multi-step operations requiring responses to be associated with requests.
+- **Transferable knowledge/behavior constraint:** Preserve request identity through the round trip and distinguish materially different failure classes in feedback to the consumer.
+- **Candidate methods:** Trace identifiers and payloads through a mock or public entry point; exercise success, worker failure, and unknown targets where relevant.
+- **Verification steps:** Compare the outward result and the next consumer’s input; test repeated cycles if supported. Call count alone is insufficient.
+- **When not applicable:** There is no associated response or downstream consumer, or the task defines different error semantics.
+- **Evidence sources:** D05 events 84–85, 108–109; the probes followed an online teacher prompt.
+
+### 3. Carry input contracts into later use
+- **Applicable problems:** Systems that learn or establish an input schema and later accept fresh data for evaluation or execution.
+- **Transferable knowledge/behavior constraint:** A later consumer should receive inputs consistent with the established selection, names, and order; raw inputs and transformed representations may have different contracts.
+- **Candidate methods:** Make the contract explicit at the boundary, persist it when needed, and validate or reorder later inputs according to the task’s semantics.
+- **Verification steps:** Compare the inputs actually used during establishment and later use; exercise relevant aliases, missing or extra inputs, and error propagation.
+- **When not applicable:** Inputs have no persistent contract, or the task specifies a different reconciliation policy.
+- **Evidence sources:** D06 events 25–26, 27–54, 68–70. Some targeted output was truncated, and the recorded result was partial.
+
+### 4. Preserve meaning when changing representation
+- **Applicable problems:** Formatters, serializers, and other transformations that alter surface structure while expected to retain meaning.
+- **Transferable knowledge/behavior constraint:** A safety comparison must reflect the representation’s meaningful units; physical layout alone may be either too strict or too permissive.
+- **Candidate methods:** Inspect how the existing parser or tokenizer represents the input; use an appropriately scoped equivalence check without disabling safety for unrelated categories.
+- **Verification steps:** Check representative semantic edge cases, transformation idempotence, focused tests, and existing regression suites.
+- **When not applicable:** The task intentionally changes meaning or has no meaningful equivalence relation.
+- **Evidence sources:** D08 events 18–21, 53–63, 78–79. Focused checks passed, but the formal record also reported change and preservation failures whose causes are not visible.
+
+</persistent_capabilities>
+
+
+FILE /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/knowledge/K2_v2.md
+<persistent_capabilities>
+
+## 1. Preserve usable state during continuation
+
+**Applicable problems:** Refinement, resumption, incremental processing, or other operations where a later consumer needs earlier results alongside new input.
+
+**Transferable knowledge/behavior constraint:** Preserve the prior values, ordering, and context required by the consumer. When the contract distinguishes successful and failed components, repair failures without unnecessarily replacing successful work. This is an inferred shared constraint, not evidence that the tasks used the same implementation.
+
+**Candidate methods:** Inspect what the next consumer actually receives; represent successful, failed, and nested state distinctly when needed; compare ordinary and continuation paths.
+
+**Verification steps:** Exercise a partial result before and after refinement, checking both the repaired component and retained successful values. Check relevant nested cases separately; bound conclusions to those exercised.
+
+**When not applicable:** Prior state is intentionally discarded or the operation has no continuation contract.
+
+**Evidence sources:** Cattrs / `main_agent` / 41–42, 63–64 observed a passing reproduction and a nested child retaining a structured value; D05 events 49–57, 95–100 and D06 events 25–26, 27–54 provide related development descriptions. D05’s later saved-context edit was not separately probed.
+
+## 2. Preserve meaningful identity across transitions
+
+**Applicable problems:** Comparing entities across lifecycle changes, snapshots, serialization, or other boundaries where surface labels may change or collide.
+
+**Transferable knowledge/behavior constraint:** Use the identity meaningful to the consumer rather than assuming a name or other convenient representation is stable and unique. Identity policy depends on the contract.
+
+**Candidate methods:** Inspect representations on both sides of the transition; identify the intended continuity and distinguish it from display labels; compare independently captured states.
+
+**Verification steps:** Test both retained identity across the relevant transition and distinction between separate entities. Include lifecycle and eviction cases where applicable, and state explicitly which transitions were not exercised.
+
+**When not applicable:** The contract deliberately treats each representation as a new entity, or no identity comparison is needed.
+
+**Evidence sources:** Snapshot / `main_agent` / 33–45 describes an identity-field change and a passing selected probe; the probe did not establish a hooked running-to-terminated identity match. D05 events 84–85, 108–109 describe teacher-prompted identifier and error checks.
+
+## 3. Reconcile representations without weakening contracts
+
+**Applicable problems:** Typed fields, schemas, serialized forms, or formatted syntax crossing representation boundaries.
+
+**Transferable knowledge/behavior constraint:** Preserve contractually meaningful names, types, ordering, and behavior while adapting representations. Reconciliation should not bypass unrelated validation; the appropriate policy is task-specific.
+
+**Candidate methods:** Inspect existing adapters and helpers before introducing a new conversion path; consider optional wrappers, aliases, nested structures, generic types, and missing or extra input as relevant.
+
+**Verification steps:** Reproduce a relevant mismatch, check the adapted case, and rerun earlier reproductions after subsequent edits. Treat focused passes as evidence for those cases rather than universal equivalence.
+
+**When not applicable:** No representation boundary exists, or the intended contract explicitly changes the information being carried.
+
+**Evidence sources:** Cattrs / `main_agent` / 43–45, 47–62, 65–84 observed a wrapper repair and a generic repair that initially regressed, then passed, the basic reproduction. D06 events 68–70 were partly truncated; D08 events 53–63, 78–79 had focused passes alongside unexplained formal failures.
+
+</persistent_capabilities>
+
+
+FILE /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/knowledge/K1_v2_analysis.md
+# V2 capability update — K1
+
+## Chronological development evidence
+
+### cattrs-partial-structuring-recovery
+
+The main_agent created the requested branch, inspected converter interfaces and confirmed that the new public API was absent. A more specific pre-implementation check also stopped at the missing API, so it did not yet establish behavior for its later assertions (main_agent events 1–6, 15–26). The agent then added the implementation and public exports (events 37–48). This sequence is consistent with V1’s reproduction and boundary-tracing guidance; the record does not establish that the guidance caused the choices.
+
+After implementation, the focused script passed its nested refinement, collection-failure and TypedDict assertions. A separate probe showed recovery after a nested object could not initially be constructed; another checked selected attrs, validation-mode and extra-key cases (events 51–52, 62–64, 70–72). These are examples, not exhaustive verification. A later custom-hook probe printed a result different from the hook’s registered return and exposed behavior the agent labelled “stale nested”; the semantic significance of the hook difference depends on the intended hook contract. The agent edited nested-state handling, but the record does not show the same probe rerun after that edit (events 74–77).
+
+A separate observable defect was repaired: runtime annotation inspection raised a NameError, an import was added, and the same inspection then succeeded (events 77–79, 82–89). The converter regression file passed 61 tests. Full-suite collection was blocked by missing dependencies, Ruff was unavailable, and the filtered broader run was still in progress at the last observation; progress output is not a completed pass (events 52–56, 59, 63, 67, 71, 73–75, 80, 86, 88–90, 94). The agent committed the change (events 91–95). The supplied formal development evaluation reported success, 69/69 change-focused and 7/7 preservation checks; that result does not retroactively turn the unfinished local run into a full pass.
+
+### aiomonitor-task-snapshots-diff
+
+The main_agent created a branch, inspected monitor, terminal and web interfaces, and confirmed the requested monitor method was absent (main_agent events 1–25). It then changed the monitor, command group and web interface, and added a page (events 26–35). This is another observable instance of investigating multiple boundaries, not proof of causal transfer from V1.
+
+The local suite produced one console failure; an isolated rerun also failed. The final report attributes the observed failure to a disconnected transport but explicitly notes that no baseline comparison was made, leaving its cause unconfirmed (events 36–37, 39, 41, 56). Focused checks passed for selected capture, stack-header, removal, eviction and CLI-list/completion behaviors. Selected web calls returned the expected statuses and response shapes, including missing-delete cases; printed task and diff responses were clipped, and the probe did not cover every endpoint or every task lifecycle (events 38–40, 52–53). Ruff fixed an import-order issue and formatted files; the agent committed the changes (events 42–46, 54–56).
+
+The supplied formal development evaluation was partial: 52/53 change-focused and 8/8 preservation checks, with formal success zero. The failing formal case is not identified, so it cannot be equated with the local console failure. One visible implementation limitation worth checking in analogous work is that the diff reads only the running lists, although snapshots also contain terminated items; whether this explains the formal failure is unknown (final patch, main_agent events 49–50).
+
+## Persistent capabilities
+
+### 1. Trace behavior across boundaries and time
+- **Apply when:** A feature spans interfaces, lifecycle stages, persisted data or multiple consumers.
+- **Method:** Treat supplied guidance as a hypothesis. Map inputs, execution, outputs, identity and downstream use. For stateful features, inspect transitions and retained state as well as initial capture; distinguish stored raw schema from preprocessing. Check public entry points and error paths at a scale appropriate to the change.
+- **Verification and limits:** Exercise representative round trips and inspect actual artifacts or downstream inputs. A successful local boundary check does not prove all lifecycle paths. Sources: D02 events 24–33, 59–61; D05 events 84–85; D06 events 31–38, 68–77; D07 teacher guidance; aiomonitor-task-snapshots-diff main_agent events 38–40, 49–53.
+
+### 2. Reproduce, probe and retest the repair
+- **Apply when:** A safe public-interface reproduction or focused test is feasible.
+- **Method:** Observe a failure before editing, then check meaningful values and errors, not merely calls. Probe missing and invalid inputs, defaults, nested or repeated operations, and identity where relevant. Separate a missing API from a demonstrated algorithmic failure. If a probe motivates a repair, rerun that probe and add a durable regression check when feasible.
+- **Verification and limits:** The annotation failure and rerun demonstrate a visible repair; the nested-state edit lacks a visible same-probe rerun. Selected examples cannot establish all combinations or hook semantics. Sources: D02 events 24–33, 59–61; D05 events 27–28, 49–57, 84–85, 95–98; cattrs-partial-structuring-recovery main_agent events 24–26, 51–52, 74–79, 82–89.
+
+### 3. Verify transformation properties independently
+- **Apply when:** A transformation is expected to preserve meaning, support repetition, or retain successful work through refinement.
+- **Method:** Test the actual contract separately for semantic preservation, repeated application and mixed or boundary inputs; where state is retained, inspect both the new result and preservation of prior successful information. Use focused checks alongside relevant regression suites.
+- **Limits:** Do not infer broad correctness from a good-looking example, idempotence alone, or suite size. This constraint is not applicable where the contract intentionally changes meaning or does not require repetition. Sources: D08 events 52–63, 68–69, 78–82; cattrs-partial-structuring-recovery main_agent events 51–52, 62–64, 70–72.
+
+### 4. Interpret and report verification precisely
+- **Apply when:** Tests fail, setup is incomplete, outputs are clipped, or instructions require a stop or clarification.
+- **Method:** Separate implementation failures from missing dependencies, unavailable tools, unfinished runs, empty patches and instruction-driven stops. Compare a failure against an appropriate baseline when feasible; otherwise leave its cause open. Report the precise scope of passing checks, formal outcomes and unrun work. Investigate ambiguous repository instructions and disclose a justified choice or seek clarification as circumstances require.
+- **Limits:** Formal results describe the supplied evaluation, not general reliability; clipped output and background progress do not establish completion. Sources: D01 event 29; D02 events 54–62; D03 event 7; D05 events 64–71, 92–93, 101–112; D06 events 3–7, 55–63; D07 events 2–18; D08 events 78–82; cattrs-partial-structuring-recovery main_agent events 52–56, 73–75, 88–90, 94; aiomonitor-task-snapshots-diff main_agent events 36–41, 52–53, 56.
+
+The earlier development analysis remains historical evidence rather than newly reread raw trajectories. The new attempts used the loaded V1 library, but observed consistency is not proof of teacher-prior causation. The arms generated their own on-policy trajectories; this update neither assumes identical raw evidence nor isolates state alignment as a cause. No Selection/Test feedback was supplied.
+
+
+FILE /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/knowledge/K2_v2_analysis.md
+## Scope and evidence rules
+
+This V2 update uses the supplied D01–D08 development analysis and the two new K2 development trajectories only. New citations use **task / agent / event**; abbreviated task names below are **Cattrs** = `cattrs-partial-structuring-recovery` and **Snapshot** = `aiomonitor-task-snapshots-diff`. Subgoal names and cross-task analogies are **inferred**; tool returns, code and test results are observations. Neither new trajectory records an online teacher intervention. The two arms generated their own on-policy trajectories; this evidence does not isolate a causal effect of state alignment.
+
+## Evidence-grounded state-transition units
+
+1. **Inferred subgoal: recover partial work without overwriting successful state.** Cattrs / `main_agent` / events 4–13: a dataclass reproduction asked for a missing defaulted field to be reported as failed and later refined; the pre-change call raised `AttributeError` because the public entry point did not exist. Events 31–40 report successful creation of a partial-result module and converter/top-level entry points; the visible code stores input, successful values and nested results for refinement. The reproduction passed at events 41–42. A nested probe at events 63–64 displayed an incomplete child becoming complete while retaining its previously structured value. These are exercised examples, not proof of every refinement or collection case.
+
+2. **Inferred subgoal: reconcile field representations with the existing conversion contract.** Cattrs / `main_agent` / events 43–45: a present `NotRequired` field failed with an unsupported-type error. Inspection found an existing unwrapping helper (events 47–55); edits returned success (57–60), and the same kind of TypedDict check passed (61–62). Separately, a generic field failed on an unresolved type variable (65–66). An attempted generic repair caused the previously passing basic reproduction to fail (71–76); after another edit returned success (78–82), both the basic and generic checks passed (83–84). This is an observed repair and regression-repair sequence, not merely successful tool invocation.
+
+3. **Inferred subgoal: distinguish partial values, field failures and global validation failures.** Cattrs / `main_agent` / events 85–86: a forbidden-extra-key probe displayed a usable value with incomplete status and a global error; after refinement the field failure disappeared while the extra-key error remained. Existing test groups reported 61 passes at events 41–42, 52–54 and 37 passes at 85–86. The first suite completed *before* the later generic edits, so its result is not a final-state rerun. The formal development record reports 69/69 change and 7/7 preservation tests, formal success. Missing Black and Ruff modules at event 49 were tooling availability issues, not algorithm failures; the malformed search command at event 6 was likewise a command error.
+
+4. **Inferred subgoal: freeze state and compare identities across lifecycle transitions.** Snapshot / `main_agent` / events 13–17: a pre-change assertion showed the capture method absent. Monitor, CLI and web edits returned without error (21–27). Inspection then showed the terminated-task trace identifier derived from task identity and name (33–38); the agent added an object-identity field and used it in snapshot comparisons (39–41). A later probe passed for capture, stack access, cancellation/removal, named-versus-unnamed eviction and selected web routes (43–45). It did **not** demonstrate a hooked running-to-terminated identity match, all timing and stack shapes, or every CLI path; the identity change is therefore a plausible repair, not fully verified by that probe.
+
+5. **Inferred subgoal: maintain existing behavior while exposing the feature.** Snapshot / `main_agent` / events 29–34: lint initially flagged import ordering; formatting and a later lint check succeeded. A full existing-suite run visibly failed `test_monitor_with_console` (31–32), and the individual retry also failed (44–46); both failure outputs are clipped. The final report attributes missing output and an `OSError` to that test (49), but no baseline comparison establishes the cause. The non-console selection returned success with five progress markers (40–42; output clipped). Formal development evaluation reports 52/53 change and 8/8 preservation tests, formal success 0; it does not identify the missing change case. The formal preservation result and local console failure are distinct observations, not grounds to explain one away.
+
+Both attempts committed nonempty patches: Cattrs / `main_agent` / events 89–90; Snapshot / `main_agent` / events 47–48. Branching and committing are workflow facts, not semantic verification. There is no budget stop in these two records. Earlier D01, D03, D04 and D07 were empty-patch/clarification or reported-permission stops, not evidence of failed algorithms; D02’s missing generated prerequisite and D06’s wrong-directory run were setup issues (D02 events 56–60; D06 events 59–63).
+
+## Compact functional alignment
+
+| Functional goal and test class | Old and new aligned evidence | Interpretation |
+|---|---|---|
+| Preserve usable state across an update | D05 events 49–57, 95–100; D06 events 25–26, 27–54; Cattrs / `main_agent` / 41–42, 63–64 | **Shared constraint:** the next consumer needs the right prior state and new input. Cattrs adds selective repair of successful versus failed components; it is complementary to message continuation and schema ordering, not the same implementation. D05’s later saved-context edit was not separately probed. |
+| Preserve identity across a transition | D05 events 84–85, 108–109; Snapshot / `main_agent` / 33–41, 43–45 | **Shared constraint:** compare the identity meaningful to the consumer, not a convenient surface label. D05’s teacher-prompted round-trip checks visibly exercise identifiers and distinct errors; Snapshot’s removal probe does not establish the running-to-terminated match. |
+| Adapt representations without losing contract | D06 events 68–70; D08 events 53–63; Cattrs / `main_agent` / 43–45, 57–62, 65–84 | **Effective local repair:** inspect existing representation helpers, reproduce an edge case, then retest the original case as well as the new one. Cattrs visibly introduced and repaired a regression; D08’s focused passes coexist with unexplained formal failures. D06’s targeted details were truncated. |
+| Separate error classes and observable outcomes | D05 events 84–85; Cattrs / `main_agent` / 85–86; Snapshot / `main_agent` / 43–46 | **Complementary applicability:** worker/unknown-target feedback, field/global validation, and missing snapshot HTTP responses are different contracts. The probes support only their displayed cases; they do not establish exhaustive error semantics. |
+| Regression and verification scope | D02 events 56, 59–62; D08 events 78–79 and formal record; both new formal records | **Constraint:** local reproductions, existing suites and formal change/preservation tests answer different questions. Cattrs has formal success despite limited displayed local coverage; Snapshot remains formally partial despite a passing selected probe. |
+
+## Updated persistent capabilities
+
+### 1. Preserve state and identity at consumer boundaries
+- **Apply when:** a later operation resumes, refines, compares or otherwise consumes earlier state.
+- **Constraint:** retain the information, ordering and identity required by that consumer; distinguish already-successful state from new or failed state where the contract requires it. Do not assume a surface identifier survives a lifecycle transition.
+- **Method:** inspect representations on both sides; exercise ordinary and continuation paths, incremental repair, and identity changes as relevant. Compare actual consumer inputs or outputs, not invocation count alone.
+- **Limits:** not applicable when prior state is deliberately discarded. Evidence: D02 events 30–33, 59–61; D05 events 49–57, 84–85, 95–100, 108–109; Cattrs / `main_agent` / 41–42, 63–64; Snapshot / `main_agent` / 33–45. Snapshot’s lifecycle identity remains incompletely probed.
+
+### 2. Carry and reconcile contracts across representations
+- **Apply when:** schemas, typed fields, serialized forms or formatted syntax are consumed in a different representation.
+- **Constraint:** preserve meaningful names, ordering, types and behavior according to the actual contract; equivalence checks must operate on meaningful units without disabling unrelated safety checks.
+- **Method:** inspect existing adapters and representation helpers; test aliases, missing/extra input and relevant nested or generic cases; rerun earlier reproductions after a targeted repair.
+- **Limits:** the correct reconciliation policy is task-specific. Evidence: D06 events 25–26, 27–54, 68–70; D08 events 18–21, 53–63, 78–79; Cattrs / `main_agent` / 43–45, 57–62, 65–84. D06 output was partly truncated; D08’s formal failures remain unexplained.
+
+### 3. Make failures and verification boundaries explicit
+- **Apply when:** an operation can partly succeed or has multiple failure modes, prerequisites or consumers.
+- **Constraint:** report materially different failures separately from usable output; distinguish an algorithmic failure from a setup problem, empty patch, missing evaluation or stopped work. Never promote a clipped result or focused passing probe to full verification.
+- **Method:** inspect outward feedback and downstream inputs; exercise success and relevant failure classes; run focused and regression checks, including earlier reproductions after later edits. Compare with a suitable baseline before attributing a regression, and record which code state each test exercised.
+- **Limits:** error semantics and available baselines differ by task. Evidence: D05 events 84–85, 108–109; D02 events 56–62; D06 events 59–63; D08 events 78–79 and formal record; Cattrs / `main_agent` / 71–86; Snapshot / `main_agent` / 29–32, 40–46. The old D05 probes followed actual teacher guidance; no comparable guidance is recorded in the new trajectories.
+
+**Unresolved:** The cause of Snapshot’s one formal change failure and local console failure is not established. Formal success for Cattrs does not prove behavior beyond the evaluated cases. No claim about the relative efficacy of the two arms or a causal effect of this update follows from these independently generated trajectories.

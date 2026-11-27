@@ -1,0 +1,7 @@
+[Zhu et al., *Socratic Skill Learning*](https://arxiv.org/html/2610.17860) describes fixed-model adaptation through a reusable instruction-and-resource package, not weight updates (§1, lines 00147–00156; §3.1, 00254–00266).
+
+SSL overlaps with teacher-guided trajectory-based skill development: the Student explores an anchor, tests advice and edits the package; the Educator reviews recent work (§4.1–4.2, 00344–00370). Adapted Trace2Skill consolidates independent anchor trajectories; adapted SKILL-KD contrasts Teacher and Student trajectories, accepting proposed edits only after a fully successful fresh Student rerun (§C.3–C.3.1, 01226–01230, 01259–01274).
+
+Issue-guided review tracks evidence, revisions and acceptance criteria; verified closure requires a post-lesson check (§4.3, 00383–00407). This overlaps with skill verification and evidence-based alignment, but specifies no functional program-state matching between trajectories. Public family invariants and permitted variations define task scope, not such matching (§3.1, 00254–00259).
+
+The authors report transfer using frozen packages in fresh held-out sessions, with independent acquisitions (§3.2–3.3, 00293–00324). Whole protocols differ in evidence gathering and cost, so they do not isolate our fixed-evidence, fixed-budget functional-state-versus-chronological comparison (§C.2, 01209–01213; Appendix H, 02334–02338). We did not replicate the results.

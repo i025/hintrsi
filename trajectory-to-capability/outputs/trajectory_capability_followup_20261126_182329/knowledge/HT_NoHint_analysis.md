@@ -1,0 +1,23 @@
+## Scope and evidence
+
+This is one **NoHint** Development trajectory: no hint was delivered, and no later Selection or Test information is available. The observations below are chronological distillation, not evidence of hint transfer or causal learning. The formal evaluation timed out; it supplies neither a pass nor a normal zero.
+
+## Chronological distillation
+
+1. **Orient before changing behavior.** The agent created the requested branch, located relevant code, and inspected the handler, registry, streaming interfaces, adapters, package scripts, and existing tests (events 1–26). Reusable practice: trace a request across its boundaries and inspect repository conventions before choosing a change. The initial broad search included dependencies and produced unwieldy output; narrower searches improved focus (events 6, 10, 20, 22).
+
+2. **Establish a focused behavioral baseline.** A small mock-driven reproduction checked whether delegated work was invoked and whether its output reached the caller. It initially failed at the invocation check (events 27–30). After the implementation, the same reproduction passed (events 52, 54). This supports a narrow before-and-after observation, not full contract compliance: the reproduction did not independently establish nested behavior, all error paths, correlation correctness, or real adapter continuity.
+
+3. **Preserve protocol identity and distinguish execution outcomes.** The implementation attempted to carry a correlation identifier across layers, accumulate textual output, resume the caller with a structured result, detect cycles using the active ancestry, and distinguish child execution failures from stream-level errors (events 31–44, 75–77). Generalizable principles are to preserve request–response identity across transformations, keep recursive path state scoped to the active chain, and make error routing explicit. These are design lessons from the attempted implementation; the supplied checks do not verify every branch.
+
+4. **Treat tool and build failures as diagnostic evidence.** A type-check was first run in the wrong package, then exposed a missing generated file in the correct package. Generation allowed type-checking to pass, while the full build still required a frontend artifact (events 45–53). A later correctly ordered build succeeded (events 55–61). Likewise, a test command initially duplicated a runner option and had to be corrected (events 56–60). Reusable practice: check package context, script defaults, generated prerequisites, and build ordering before interpreting a command failure as a code defect.
+
+5. **Compare failures against a baseline, but retain uncertainty.** The existing handler suite failed both with the changes and when the original handler was temporarily restored (events 62–67, 81). The final report identified an abort-cleanup failure as pre-existing (event 87); the supplied test output is truncated, so the exact failure details are supported by that report rather than fully visible logs. Baseline comparison is useful for attribution, but a failing suite remains a qualification, not a clean verification.
+
+6. **Review and finish the requested workflow.** The agent inspected the diff, checked whitespace, removed the temporary reproduction, reduced formatting-only churn, reran type-checking and bundling, and committed on the new branch (events 72–74, 76–86). Removing the reproduction also meant no durable new regression test was included in the final commit (events 83–86). A stronger transferable practice is to retain focused automated tests for the behavior and its failure modes when appropriate.
+
+## Applicability and limits
+
+These practices apply broadly to asynchronous orchestration and other systems that relay structured results across component boundaries. In particular, test both the externally observable stream and the receiving component’s actual continuation semantics; a mock that merely detects returned text cannot prove a real integration preserves conversational state (events 27, 54). Also test empty output, multiple chunks, nested calls, cycles, unknown destinations, thrown and reported failures, and completion ordering against the applicable public contract; those cases are not shown as independently verified here (events 43–44, 75–81).
+
+The observed result is a committed change, a passing narrow reproduction and type-check, a successful ordered build, and a failing existing suite with a reported baseline match (events 54, 61, 67, 81, 86–87). The evaluation timeout leaves overall correctness unresolved; neither it nor the chronological sequence establishes learning or a causal advantage.

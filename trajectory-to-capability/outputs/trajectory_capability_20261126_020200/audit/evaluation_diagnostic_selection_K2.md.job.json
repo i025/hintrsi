@@ -1,0 +1,35 @@
+{
+  "name": "capability-evaluation-diagnostic-audit",
+  "completed": true,
+  "started_at": 1795641512.4868245,
+  "finished_at": 1795641531.9413743,
+  "characters": 3630,
+  "words": 434,
+  "response": {
+    "id": "chatcmpl-ff0568bec3a54d2eb608ae336ddc4395",
+    "object": "chat.completion",
+    "created": 1795641531,
+    "model": "gpt-6.1-terra",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "## Evaluation-recovery addendum\n\n**Disposition.** The K2 student attempt completed normally after committing its patch; this recovery was not a new student attempt. Preserve the original recorded grade while reporting the first complete valid same-patch re-evaluation separately as the recovered outcome. The classification is `initial_evaluation_incomplete_recovered_same_patch`.\n\n**Original observation.** The original result at `outputs/trajectory_capability_20261126_020200/runs/capability_v1_matched_prompt_selection_superjson-error-stack-serialization_K2_r1/eval_output/superjson-error-stack-serialization/eval_result.json` recorded binary reward **0**, F2P **0/80**, and P2P **80/116**. The verifier reported F2P cases missing from the report, and stderr reported `/logs/verifier/new-ctrf.json: No such file or directory`. These are grader results in the presence of missing report data, not evidence that 80 feature assertions executed and failed. The original 8,000-character output tails do not establish why the report was missing; Node/JIT, code nondeterminism, and an external fault are not proven causes.\n\nThe student's own execution included successful builds and focused inline checks of stack serialization behavior, but these were not the official F2P assertions. Two full local suite runs failed a performance threshold, and a later run passed with that test excluded. The student completed and committed the work without modifying tests; these observations remain unchanged.\n\n**Recovery.** Diagnostic invocation 01 found no top-level patch after archival and did **not** run the evaluator. Its approximately **0.206-second** record is `outputs/trajectory_capability_20261126_020200/runs/evaluation_diagnostics_state.json`. It is distinct from the only actual diagnostic evaluation, invocation 02, recorded at `outputs/trajectory_capability_20261126_020200/runs/evaluation_diagnostic_02_state.json`, which took **89.220 seconds**.\n\nDirect content comparison confirmed that the original **13,143-byte** patch copy was identical. No student, model, effort, tool, environment, test, or grader change occurred. The only evaluator code change, in `eval_deep_swe.py`, saves full stdout and stderr after the container command finishes; evaluation commands and container limits were unchanged. There was no student retry or code edit.\n\nThe complete diagnostic result at `outputs/trajectory_capability_20261126_020200/runs/capability_eval_diagnostic_selection_K2_02/eval_output/superjson-error-stack-serialization/eval_result.json` reports **80/80 F2P**, **116/116 P2P**, and binary reward **1**. Its output records successful JUnit-to-CTRF conversions and the complete grade. This is evidence of passing the actual feature and regression assertions in that re-evaluation, not evidence that the patch improved after the original run. The missing-report recovery policy uses this first complete valid report from the one actual same-patch diagnostic; it is not a best-of-many selection.\n\n**Accounting and interpretation.** Student costs remain **34 returned tool calls, 769,918 input tokens, 6,208 output tokens, and 914.896 seconds** of initial wall time; the SDK's **$4.00479** cost is a proxy estimate, not an actual CLI fee. Recovered end-to-end wall time was **1,476.782 seconds**, about **561.886 seconds** beyond the initial wall time, encompassing diagnostic and triage overhead; do not attribute that extra time to student execution or add the diagnostic duration again to the end-to-end total. The frozen capability library was never updated. This recovery supplies no new transfer or causal-knowledge evidence."
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 7993,
+      "completion_tokens": 805,
+      "total_tokens": 8798,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      }
+    }
+  }
+}

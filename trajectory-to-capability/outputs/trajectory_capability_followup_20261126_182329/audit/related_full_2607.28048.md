@@ -1,0 +1,7 @@
+[SKILL-KD](https://arxiv.org/html/2607.28048) optimizes an external textual skill library, not student weights. It contrasts a failed student rollout with a teacher rollout on the same task, including when the teacher fails; this overlaps with trajectory distillation, teacher guidance and fixed-model adaptation (§3.1, lines 00139–00155).
+
+Candidate patches are tested by same-instance student reruns, refined until success or a round limit, and committed only after success. Trace-linked history informs subsequent add, modify, delete or skip decisions. This overlaps with skill verification, but success on one instance is not proof of general validity (§3.2, lines 00160–00176; §3.3, lines 00181–00191).
+
+The specified alignment is same-task behavioral contrast and student-response validation, not an explicit mapping of equivalent program states. Thus program-state alignment could overlap in purpose, but the paper does not specify the functional-state-aligned versus chronological extraction comparison under fixed evidence and budgets (Appendix B, lines 00867–00888).
+
+The authors report held-out gains across two model-family settings, without assuming identical model internals; libraries are benchmark-specific. Results are single runs, not replicated here. Limitations include evaluator availability, informative contrasts and instruction-following ability (§4.1, lines 00316–00323; Appendix A, lines 00786–00789, 00856–00860; §6, lines 00538–00542).

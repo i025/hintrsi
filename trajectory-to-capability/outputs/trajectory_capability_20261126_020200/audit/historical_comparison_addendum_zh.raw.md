@@ -1,0 +1,13 @@
+## 历史比较补充：结果与停止类型
+
+批次08的 B 是有记录的**无 Hint 官方全通过**：初始提示未追加 Hint，在线事件未见教师 Hint；独立复现及后续检查见 E03 事件22–25、50–51、64–65。正式评测为新增测试7/7、保留测试31/31；同一评测标准错误中也有 Node/Vitest 堆内存溢出记录，二者如何并存并不清楚，不能臆测原因。[E03轨迹]( /srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/codex_parallel_08/lanes/codex_parallel_08_lane0/codex_parallel_08_lane0_B_r1/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json)；[正式评测](../../../../hint-codex-experiments/runs/codex_parallel_08/lanes/codex_parallel_08_lane0/codex_parallel_08_lane0_B_r1/eval_output/claude-code-by-agents-recursive-delegation/eval_result.json)。
+
+批次08的 H、I 则提交了实质性算法实现，却分别只通过新增测试6/7、2/7，属于**完成实现后的算法性部分失败**，不是空补丁。H 的补丁实现递归、路径环检测和父代理续接（E04事件38–51、63–66）；I 实现递归及工具结果转换，并检查续接请求和工具 ID（E05事件45–46、49–50）。两者实际收到问题求解参考；I 还收到一次在线教师问题，其后检查行为与问题方向一致，但不能据此量化教师的因果贡献。[E04轨迹](../../../../hint-codex-experiments/runs/codex_parallel_08/lanes/codex_parallel_08_lane0/codex_parallel_08_lane0_H_r1/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json)；[E05轨迹](../../../../hint-codex-experiments/runs/codex_parallel_08/lanes/codex_parallel_08_lane0/codex_parallel_08_lane0_I_r1/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json)。
+
+批次12的 H2 非空补丁仅含复现脚本，没有修复；实际收到参考，但只观察到探索，未见可执行方案采纳。其调用的技能要求遇到非 Anthropic 提供商标记时停下询问，最终请求许可，属指令驱动的未完成，而非完成算法失败（E06事件1–3、22–26、36–40）。B2 补丁为空，复现后按技能指引询问；B3 补丁为空，未复现或实现，停止原因未确立（E07事件33–35；E08事件27）。M3 实际收到参考，却在技能指引及提供商搜索后请求澄清，未实现（E09事件1–6）。这些均不应与已完成算法的部分失败混同；也没有共同中间状态证据，不能称 H2 破坏性回退了 H1。[E06](../../../../hint-codex-experiments/runs/codex_parallel_12/lanes/codex_parallel_12_lane0/codex_parallel_12_lane0_H_r2/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json)；[E07](../../../../hint-codex-experiments/runs/codex_parallel_12/lanes/codex_parallel_12_lane0/codex_parallel_12_lane0_B_r2/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json)；[E08](../../../../hint-codex-experiments/runs/codex_parallel_12/lanes/codex_parallel_12_lane0/codex_parallel_12_lane0_B_r3/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json)；[E09](../../../../hint-codex-experiments/runs/codex_parallel_12/lanes/codex_parallel_12_lane0/codex_parallel_12_lane0_M_r3/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json)。
+
+## 解释边界与覆盖
+
+B08 配有原生 API 技能，历史运行时和预算不同或不可比，部分历史 CLI 实际成本未知；不能作因果组间比较，也不能替代当前 B0 或可选 NoHint。其有限全通过反驳历史记录中「只有 I2 成功／教师是必要条件」的排他叙事，但不证明完整公共契约，更不证明教师无用。Hint 档案可用不等于实际收到；上述判断以捕获提示和在线事件为据。
+
+现深审学生17/117、共1210事件：知识队列8人397事件，加冻结后仅审计9人813事件，其中旧 E01/E02 为516、新 E03–E09 为297；仍有100名学生未深审。教师仍为4/104、49事件；36条 preflight 未深审。新增七份审计均在知识冻结后，未输入生成、Selection、Test 或学生。E03–E09 的每个事件 ID 均已提供，但逐事件字符串上限1800字符；另行捕获的提示、补丁和评测未受该裁剪限制，不能称为完整原始字节审计。新案例没有来源消融或迁移试验，不能排序边际轨迹学习价值；可能的经验仅为待验证假设。本补充未修复任务代码，也未更新库。

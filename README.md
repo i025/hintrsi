@@ -2,6 +2,12 @@
 
 这里整理了原始 Hint 实验交接包、Ofox 补充 baseline，以及后续通过 Codex CLI 运行的各版代码、配置、测试、实验成绩和诊断记录。上传整理时间：2026-11-24。原始实验目录保留，仓库是独立的脱敏副本。
 
+## 2026-11-27：Trajectory-to-Capability RSI
+
+新增[研究交付入口](trajectory-to-capability/README.md)：原六小时实验与授权续做分别归档，包含中文报告、修改后源码、全部能力库、29 次扩展尝试的完整成绩和原始轨迹，以及 Hint RSI／Scene 审计。后续两道终测各主要条件均正式通过 1/2，未提供 K2 优于普通轨迹总结的证据；共同基线超时、空补丁与技术中断均单独保留。详见[最终研究报告](trajectory-to-capability/outputs/trajectory_capability_followup_20261126_182329/research_report_zh.md)与[本次上传说明](publication/trajectory-capability/README.md)。
+
+下方原版本说明和状态表保留 2026-11-24 的历史口径；最新研究结果以上述新增目录为准。
+
 ## 先看哪些文件
 
 | 内容 | 入口 |

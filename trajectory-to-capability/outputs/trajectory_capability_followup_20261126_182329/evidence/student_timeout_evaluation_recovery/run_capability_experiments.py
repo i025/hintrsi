@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+"""Run one frozen task queue through the original no-online-teacher solve/eval steps."""
+import argparse
+import json
+import logging
+import os
+import signal
+import shutil
+import time
+from pathlib import Path
+
+from benchmark.deepswe.run_loop_by_hint import HintLoopOrchestrator, build_parser, _sigint_handler
+
+ROOT=Path(__file__).resolve().parents[1]
+OLD=Path('/srv/lab-disks/disk2/users/xymo')
+DATA=OLD/'hint-baseline-run/data'
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--stage',choices=['development','selection','test','hint_transfer'],required=True)
+    parser.add_argument('--task',required=True)
+    parser.add_argument('--run_tag',default='capability_v1')
+    parser.add_argument('--interleave_hint_transfer',action='store_true')
+    parser.add_argument('--resume',action='store_true')
+    args=parser.parse_args()
+    split=json.loads((ROOT/'config/task_split.json').read_text())
+    protocol=json.loads((ROOT/'config/protocol.json').read_text())
+    if args.task not in (split['test'] if args.stage=='hint_transfer' else split[args.stage]):raise ValueError('Task is outside the pre-saved split')
+    preflight=json.loads((ROOT/'evidence/injection_preflight/attempt_01/capability_injection.json').read_text())
+    if not preflight['content_present']:raise RuntimeError('Capability injection preflight did not pass')
+    freeze_path=ROOT/'config'/('knowledge_freeze_hint.json' if args.stage=='hint_transfer' else 'knowledge_freeze.json')
+    if args.stage in ('test','hint_transfer') and not freeze_path.exists():
+        raise RuntimeError('Freeze capability libraries before Test')
+    if args.stage=='hint_transfer' and not (ROOT/'config/knowledge_freeze.json').exists():
+        raise RuntimeError('Freeze main libraries before the shared independent Test')
+    image=json.loads((ROOT/'config'/f'image_{args.task}.json').read_text())
+    if not image['ready']:raise RuntimeError('Task image is unavailable')
+    lane=image['lane']
+    order=split['hint_transfer_order'] if args.stage=='hint_transfer' else split['group_orders'][args.task]
+    if args.interleave_hint_transfer:
+        if args.stage!='test' or args.task!=split['hint_transfer_test']:
+            raise ValueError('Interleaving is only pre-saved for the shared transfer Test')
+        order=split['interleaved_test_order']
+    state_path=ROOT/'runs'/f'{args.run_tag}_{args.stage}_{args.task}_state.json'
+    if state_path.exists():
+        if not args.resume:raise FileExistsError(state_path)
+        state=json.loads(state_path.read_text())
+        if (state['stage'],state['task'],state['run_tag'],state['planned_groups'])!=(args.stage,args.task,args.run_tag,order):
+            raise RuntimeError('Resume must preserve the saved queue and order')
+        if any(a['status'] not in ('complete','evaluation_timeout') for a in state['attempts']):
+            raise RuntimeError('Inspect interrupted attempts before resuming; never rerun them implicitly')
+        state.setdefault('resumptions',[]).append({'at':time.time(),'previous_pid':state['pid'],'previous_status':state['status'],'previous_stop_reason':state.get('stop_reason'),'pid':os.getpid()})
+        state.update(pid=os.getpid(),status='running')
+        state.pop('finished_at',None)
+        state.pop('stop_reason',None)
+    else:
+        if args.resume:raise FileNotFoundError(state_path)
+        state={'stage':args.stage,'task':args.task,'lane':lane,'pid':os.getpid(),'run_tag':args.run_tag,
+            'model':'gpt-6.1-terra','reasoning_effort':'low','started_at':time.time(),
+            'planned_groups':order,'attempts':[],'status':'running'}
+    def save():state_path.write_text(json.dumps(state,indent=2)+'\n')
+    os.environ.update(DOCKER_HOST=image['docker_host'],
+        HINT_CODEX_RUNTIME='/opt/hint-codex-runtime/python',PYTHONDONTWRITEBYTECODE='1',
+        PYTHON_BIN=str(OLD/'hint-baseline-run/env/bin/python'))
+    for name in ('HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','http_proxy','https_proxy','all_proxy'):os.environ.pop(name,None)
+    signal.signal(signal.SIGINT,_sigint_handler)
+    save()
+    try:
+        revision_path=ROOT/'config/verification_budget_revision.json'
+        if args.resume and args.stage=='selection' and revision_path.exists():
+            from benchmark.deepswe.eval_deep_swe import evaluate_task
+            revision=json.loads(revision_path.read_text())
+            name=revision['repair_run_name']
+            repair_state_path=ROOT/'runs'/(name+'_state.json')
+            if repair_state_path.exists():raise FileExistsError('Inspect existing evaluation recovery before another queue resume')
+            original=next(a for a in state['attempts'] if a['run_name']==revision['affected_original_run'])
+            source=ROOT/'runs'/(original['run_name']+'_r1')/'infer_logs'/args.task/'turn_1/patch.diff'
+            directory=ROOT/'runs'/name;patch_dir=directory/'fixed_patch_input'/args.task
+            patch_dir.mkdir(parents=True);shutil.copy2(source,patch_dir/'patch.diff')
+            assert source.read_bytes()==(patch_dir/'patch.diff').read_bytes()
+            os.environ.update(HINT_EXPERIMENT_NAME=name,HINT_VERIFIER_TIMEOUT_SEC=str(protocol['verifier_seconds']))
+            recovery={'task':args.task,'stage':'uniform_evaluation_recovery','pid':os.getpid(),'status':'running','started_at':time.time(),
+                'original_run':original['run_name'],'new_student_attempts':0,'model_calls':0,'same_patch_direct_content':True,
+                'attempts':[{'run_name':name,'group':'Selection_K1_v1_uniform_evaluation_recovery','status':'running','started_at':time.time()}]}
+            repair_state_path.write_text(json.dumps(recovery,indent=2)+'\n')
+            result=evaluate_task(DATA/'tasks'/args.task,args.task,patch_dir.parent,directory/'eval_output')
+            recovery.update(status='evaluation_timeout' if result.get('verifier_timed_out') else 'complete' if result.get('reward') is not None else 'evaluation_incomplete',result=result,finished_at=time.time())
+            recovery['attempts'][0].update(status=recovery['status'],finished_at=recovery['finished_at'])
+            repair_state_path.write_text(json.dumps(recovery,indent=2)+'\n')
+        for group in order:
+            if any(a['group']==group for a in state['attempts']):continue
+            stage='hint_transfer' if group.startswith('HT_') else args.stage
+            tag='capability_followup_hint_transfer' if stage=='hint_transfer' else args.run_tag
+            name=f'{tag}_{stage}_{args.task}_{group}'
+            os.environ['HINT_EXPERIMENT_NAME']=name
+            argv=['--instance_id',args.task,'--run_name',name,'--output_base',str(ROOT/'runs'),
+                '--python_bin',str(OLD/'hint-baseline-run/env/bin/python'),
+                '--parquet_file',str(DATA/'deep_swe_tasks.parquet'),'--tasks_dir',str(DATA/'tasks'),
+                '--model_name','gpt-6.1-terra','--api_base','http://127.0.0.1:8765',
+                '--container_api_base','http://172.17.0.1:8765','--api_key','codex-local',
+                '--codex_session',name,'--container_cpus','8','--mem_limit','128g',
+                '--task_timeout','1800','--max_rounds','1','--baseline_rounds','1',
+                '--no_hint_run','--skip_docker_login','--monitor_interval','30']
+            if group!='B0':
+                capability=ROOT/'knowledge'/f'{group}.md'
+                if args.stage in ('test','hint_transfer'):
+                    group_freeze=ROOT/'config/knowledge_freeze_hint.json' if stage=='hint_transfer' else freeze_path
+                    freeze=json.loads(group_freeze.read_text())
+                    capability=Path(freeze['libraries'][group]['path'])
+                argv += ['--capability_path',str(capability)]
+            loop=HintLoopOrchestrator(build_parser().parse_args(argv))
+            loop.sub_env.update(HTTP_PROXY='http://10.0.2.2:7897',ALL_PROXY='',all_proxy='',
+                NO_PROXY='localhost,127.0.0.1,172.17.0.1',no_proxy='localhost,127.0.0.1,172.17.0.1',HINT_VERIFIER_TIMEOUT_SEC=str(protocol['verifier_seconds']))
+            loop.summary.update(group=group,stage=stage,knowledge_version='none' if group=='B0' else group,online_teacher=False)
+            attempt={'group':group,'stage':stage,'run_name':name,'started_at':time.time(),'status':'running','pid':os.getpid()}
+            state['attempts'].append(attempt);save()
+            code=loop.run()
+            attempt.update(status='complete' if code in (0,1) else 'technical_incomplete',
+                exit_code=code,finished_at=time.time(),summary=loop.summary)
+            if group!='B0' and code in (0,1):
+                proof_path=ROOT/'runs'/(name+'_r1')/'infer_logs'/args.task/'turn_1/capability_injection.json'
+                proof=json.loads(proof_path.read_text()) if proof_path.exists() else {}
+                if proof.get('content_present') is not True:
+                    attempt.update(status='invalid_knowledge_condition',injection_proof=proof)
+                    code=2
+            save()
+            if code not in (0,1):
+                state.update(status='needs_engineering_review',stop_reason='Original solve/eval chain did not complete; preserve failure and inspect before continuing')
+                break
+        else:state['status']='complete'
+    except BaseException as exc:
+        state.update(status='interrupted',stop_reason=str(exc));raise
+    finally:
+        state['finished_at']=time.time();save()
+    print(json.dumps({'state':str(state_path),'status':state['status']}),flush=True)
+
+if __name__=='__main__':
+    logging.basicConfig(level=logging.INFO,format='%(asctime)s [%(levelname)s] %(message)s')
+    main()

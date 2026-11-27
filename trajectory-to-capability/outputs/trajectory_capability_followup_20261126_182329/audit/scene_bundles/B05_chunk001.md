@@ -1,0 +1,23 @@
+## Audit scope
+
+The supplied records are selected members, not the entire archive. Citations below refer to archive `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/work/scene_archive/bundles/ablation_r2--ours_without_probes.tar.gz`; member paths are relative to `experiments/scene_rsi_pilot/candidates/ablation_r2/ours_without_probes/`. No images, execution logs, student transcripts, final candidate decisions, or acceptance results are supplied.
+
+## Detection and diagnosis
+
+For both C1 and C2, `diagnostic_observations.json`, `initial_diagnoses` (characters [0,1056)), reports **no valid output** for `commons_109923183`, with object, code location, and hypothesis unknown; it directs investigation of a general runtime failure before visual diagnosis. This is a technical failure report, not evidence of a particular error or visual defect.
+
+For `commons_118588033`, the same key reports reference/render disagreement for target `bunks`, characterized as measured by fixed visual metrics, but gives neither metric values nor a resolved cause. Camera framing or object scale is expressly a **hypothesis**, not an attribution. The code location remains unknown. These are reported observations, not independent confirmation of image appearance.
+
+## Proposed mechanism versus execution
+
+Both `C1/meta_execution.json` and `C2/meta_execution.json`, `plan` and `actually_used_for_proposal` (characters [0,2407)), record the same pre-proposal plan as used: regression priorities are `composite_pass`, `material_pass`, then `structure_pass`. Active probes are disabled; `probes` is empty. Although `C1/meta.py` and `C2/meta.py`, `plan` (characters [0,2819)), construct a local list of camera-focal and object-scale interventions, they return `probes: []`; this does not establish that either intervention ran.
+
+The plan calls for a reusable shared H and executable M using existing evidence, not a scene-specific patched program. It asks for camera/scale confusion, support and spatial relations, occlusion or omission, object structure, preservation of non-target materials, and composite movement checks to be considered where applicable. It says to modify `meta.py` only for a justified executable strategy change, not merely a memory append. These are **instructions for a proposed update**, not evidence that an H or M update was implemented or improved outcomes (`C1/meta_execution.json`, `plan.instruction`; likewise C2).
+
+The supplied `C1/policy.py` and `C2/policy.py`, `solve` (characters [0,1537)), define a student loop: request an image reconstruction matching camera and framing, execute the last Python block if budget permits, and return execution feedback and any rendered image for revision. This establishes the available mechanism, not that a particular student program, render, revision, or final answer actually executed.
+
+## Coverage and acceptance limits
+
+The records address multi-object coverage only as an instruction to consider occlusion/omission; material only through `material_pass` and non-target preservation; and part connections or pose only indirectly through structure, support/spatial relations, and composite movement. They give no concrete texture, joint, pose, lighting, or rendered-appearance findings. Camera/framing is both a student objective and an unresolved diagnostic hypothesis; rendering is part of the defined feedback loop, not proof of a successful render. Nothing establishes physical contact.
+
+The plan says final objectives and acceptance remain fixed, but the selected members do not specify thresholds or a candidate acceptance decision. Thus neither compliance with acceptance rules nor acceptance or rejection of C1 or C2 is substantiated. `C1/evidence_projection.json` and `C2/evidence_projection.json` (characters [0,201)), report no projection changes and selection by size and fixed source order rather than score; their claim that full raw evidence was retained on disk does not make that evidence available in this selection.

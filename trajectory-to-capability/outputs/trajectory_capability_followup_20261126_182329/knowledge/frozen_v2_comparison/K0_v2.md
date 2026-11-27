@@ -1,0 +1,59 @@
+<persistent_capabilities>
+
+## 1. Translate requirements into cross-interface contracts
+
+**Applicable problems:** A capability is exposed through library calls, command-line interfaces, HTTP endpoints, or persisted metadata.
+
+**Transferable knowledge/behavior constraint:** Specify inputs, outputs, validation, errors, state transitions, and compatibility per interface. Preserve shared semantics while respecting boundary-specific representations. Do not assume similarly named interfaces behave identically without inspection.
+
+**Candidate methods:** Map operations to entry points, result shapes, and failure modes. Separate shared domain behavior from transport-specific parsing and rendering.
+
+**Verification steps:** Trace stated requirements to checks for valid and invalid inputs at each boundary. Compare equivalent operations across interfaces and check exact output or error shapes where specified. Report what was actually checked.
+
+**When not applicable:** A contract matrix cannot settle unspecified behavior; consult applicable specifications and repository conventions before choosing it.
+
+**Evidence sources:** Development descriptions `aiomonitor-task-snapshots-diff`, `igel-persist-feature-schema`, and `claude-code-by-agents-recursive-delegation`; general programming knowledge. These support proposals, not observations of existing implementations.
+
+## 2. Model lifecycle, recovery, and recursive execution
+
+**Applicable problems:** Stateful records, iterative recovery, or nested delegation require identity and failure handling over time.
+
+**Transferable knowledge/behavior constraint:** Distinguish stable identity from display names and mutable state. Define creation, lookup, retention, deletion, and failure transitions. Preserve accepted information during recovery; distinguish complete success, partial success, and no value. Distinguish a delegation cycle from an ordinary sub-operation failure.
+
+**Candidate methods:** Describe transitions and invariants before selecting data structures. Represent outcomes explicitly, track the active delegation path, and propagate correlation information where required.
+
+**Verification steps:** Exercise sequences such as creation followed by deletion or eviction, partial recovery followed by refinement, and nested work followed by continuation. Check missing identifiers, repeated operations, cycles, and failure propagation against the stated contract.
+
+**When not applicable:** Do not invent unspecified isolation or retention behavior, including what happens when all records are protected. Clarify those cases first.
+
+**Evidence sources:** Development descriptions `aiomonitor-task-snapshots-diff`, `cattrs-partial-structuring-recovery`, and `claude-code-by-agents-recursive-delegation`; general programming knowledge.
+
+## 3. Preserve boundaries in structured data and source text
+
+**Applicable problems:** Nested conversion with field-level diagnostics, or parsing and formatting that must preserve a faithful public representation.
+
+**Transferable knowledge/behavior constraint:** Separate absent, successfully converted, fallback, and partially recovered values. Honor specified recursion boundaries and retain detailed errors. For source text, distinguish top-level constructs from nested expressions, preserving spacing where required while applying only specified normalization.
+
+**Candidate methods:** Track field outcomes, fallback availability, and errors independently. Refine eligible failures without altering prior results. Traverse parsed structure with nesting awareness and retain source spans or token spacing when reconstruction requires them.
+
+**Verification steps:** Check required and defaulted fields, invalid and absent inputs, nested partial values, collection failures, extra keys, and non-mutating refinement. For formatting, check nested expressions, constraints, pass-through cases, public fields, and idempotence where appropriate.
+
+**When not applicable:** Framework hooks, constructor semantics, and parser token models require inspection. Idempotence alone does not establish semantic preservation.
+
+**Evidence sources:** Development descriptions `cattrs-partial-structuring-recovery` and `sqlfmt-create-table-ddl-formatting`; general programming knowledge.
+
+## 4. Carry training schema across serving boundaries
+
+**Applicable problems:** Feature selection or normalization during fitting must be reproduced during evaluation, prediction, and export.
+
+**Transferable knowledge/behavior constraint:** Persist selected raw-feature order and necessary provenance. Ignore extras only when permitted, reject missing required inputs, and check agreement among sources representing the same canonical feature. Validate configuration before model invocation and translate errors at the HTTP boundary.
+
+**Candidate methods:** Use a versionable schema artifact and a shared schema-application routine. Separate selection and alias resolution from model execution.
+
+**Verification steps:** Check reordered and extra columns, missing columns, aliases individually and together, conflicting values, invalid configuration, and consistency across supported paths. Verify validation precedes model invocation.
+
+**When not applicable:** Storage compatibility, coercion, and equality for unusual or missing values must follow the actual contract rather than assumptions.
+
+**Evidence sources:** Development description `igel-persist-feature-schema`; general programming knowledge. No repository or execution results were supplied, so these checks are proposed, not observed outcomes.
+
+</persistent_capabilities>

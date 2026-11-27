@@ -1,0 +1,35 @@
+{
+  "name": "capability-K1-library-corrected",
+  "completed": true,
+  "started_at": 1795630868.9956641,
+  "finished_at": 1795630891.0333974,
+  "characters": 4302,
+  "words": 578,
+  "response": {
+    "id": "chatcmpl-32ab6f68c26843128099363b162264eb",
+    "object": "chat.completion",
+    "created": 1795630891,
+    "model": "gpt-6.1-terra",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "<persistent_capabilities>\n\n## 1. Trace behavior across boundaries\n- **Applicable problems:** Changes spanning handlers, adapters, providers, persisted artifacts, or multiple entry points.\n- **Transferable knowledge/behavior constraint:** Treat supplied guidance as a hypothesis to check against actual interfaces and behavior. Trace the full flow rather than assuming that a local change completes it.\n- **Candidate methods:** Map inputs, execution, outputs, and downstream consumers. For multi-step operations, examine feedback, continuation, and identity. For persisted data, check input ordering and errors at each entry point; do not assume a saved raw schema also preserves preprocessing.\n- **Verification steps:** Exercise a representative round trip and inspect the resulting artifact or downstream input, including an error path.\n- **When not applicable:** A genuinely isolated change with no relevant downstream boundary; scale the investigation to the task.\n- **Evidence sources:** D02 events 24\u201333, 59\u201361; D05 events 84\u201385; D06 events 31\u201338, 68\u201377; D07 teacher guidance. These show selected checks, not complete coverage or established causal transfer.\n\n## 2. Reproduce and inspect observable behavior\n- **Applicable problems:** Bugs or behavior changes that can be exercised through a public interface or focused test.\n- **Transferable knowledge/behavior constraint:** Prefer an observed failing case before editing, then verify meaningful outputs and downstream inputs rather than only counting calls.\n- **Candidate methods:** Build a small reproduction; inspect context and new input together; test normal, failure, and unknown-input paths, including identity matching where relevant.\n- **Verification steps:** Run the same reproduction before and after the change, then add focused checks for relevant edge cases. Treat one passing round trip as limited evidence.\n- **When not applicable:** A safe, representative reproduction is unavailable or the task does not permit execution; explain what remains unverified.\n- **Evidence sources:** D02 events 24\u201333, 59\u201361; D05 events 27\u201328, 49\u201357, 84\u201385, 95\u201398. D02 left broader verification outstanding.\n\n## 3. Verify transformations beyond an example\n- **Applicable problems:** Formatters and other transformations expected to preserve meaning or support repeated application.\n- **Transferable knowledge/behavior constraint:** Semantic preservation and idempotence are separate properties; neither follows from attractive output for one example.\n- **Candidate methods:** Check equivalence or safety validation, repeated transformation, varied inputs, and interactions between mixed forms.\n- **Verification steps:** Run focused examples and relevant regression suites, inspecting failures and boundary cases rather than relying on suite size alone.\n- **When not applicable:** Transformations intentionally change meaning or are not expected to be idempotent; use the actual contract instead.\n- **Evidence sources:** D08 events 52\u201363, 68\u201369, 78\u201382. Local checks passed, but formal evaluation still reported preservation failures of unidentified cause.\n\n## 4. Interpret and report verification precisely\n- **Applicable problems:** Changes with test failures, environmental setup issues, incomplete output, or ambiguous repository instructions.\n- **Transferable knowledge/behavior constraint:** Distinguish a verified result from an unrun check, truncated output, an environmental failure, or an instruction-driven stop. Do not present partial success as a clean full run.\n- **Candidate methods:** Check the expected working directory and generated prerequisites; compare a failure with an appropriate baseline when feasible. Investigate ambiguous branch instructions and either disclose a justified choice or seek clarification as circumstances require.\n- **Verification steps:** Report commands or checks that passed, failed, or were not run, and qualify conclusions whose output is incomplete.\n- **When not applicable:** The task requires no execution or repository changes; still avoid claims beyond the available evidence.\n- **Evidence sources:** D02 events 54\u201362; D05 events 64\u201371, 92\u201393, 101\u2013112; D06 events 3\u20137, 55\u201363; D07 events 2\u201318. Baseline and environment explanations have the limits of the observed record.\n\n</persistent_capabilities>"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 4073,
+      "completion_tokens": 892,
+      "total_tokens": 4965,
+      "prompt_tokens_details": {
+        "cached_tokens": 2048
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      }
+    }
+  }
+}

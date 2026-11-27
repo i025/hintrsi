@@ -1,0 +1,279 @@
+# Trajectory-to-Capability RSI：六小时封存实验与后续扩展报告
+
+截至北京时间 2026-11-27 07:53 的事实快照，四个研究问题的回答是：**多条轨迹能否产生可迁移的候选知识并提高成功率**——已提炼出带来源和适用条件的冻结文本并用于新任务，但没有展示出可隔离归因的正式成功率增益，也不等于模型参数学会了知识；**状态对齐与原始时间线总结相比如何**——匹配 V1 和事先选中的部署版本在新 Test 上均未表现出正式成功优势，且 V2 的证据来源和交付长度不同，不能单独归因于对齐；**最终任务得分与轨迹的学习价值是否相同**——相同分数可以伴随不同程序进展，但没有逐来源边际消融，也没有从 Test 轨迹学习后再作新迁移的验证，不能据此排列长期学习价值；**可选 Hint 来源轨迹的学习价值如何**——四个冻结的历史轨迹来源库各自独立迁移到同一道 Test，正式成绩均为 0，不能据此确定 Hint 风格的因果作用或学习价值排序。Scene 迁移候选与限制见 F，而非原第四问。样本极小，无正式统计显著性；同一任务下的多个参数化测试不是多个独立任务。
+
+本稿仅呈现既有实验和审计，不继续实验、改动学生、能力库或评测，也不编写新任务解答。原六小时实验已封存；后续扩展的 29 条计划尝试已取得正式成绩，但快照时报告工作和资源关闭尚未完成。最终关闭记录、最后两次报告调用及最终成本以之后真实操作的附记为准，不在此预先声称新实验 VM 或服务已关闭。
+
+## A. 两项工程审计：实际覆盖与证据边界
+
+### A.1 Hint RSI：文件、分块与历史不可访问范围
+
+扩展清单中可访问的 **117 份学生、104 份教师、36 份预检文件，共 257 份**，解码全文分为 **294 个块，均完成 CLI 模型文本审阅**，该历史全文队列未按字段或前缀截断。另捕获 116 份实际学生系统提示、117 份提示配置、28 份在线教师状态、12 份教师事件文件，并形成 20 个 guidance 审阅任务。文件、关联轮次、教师材料和副本不是独立尝试；模型文本审阅也不是全部程序重放或人工核验。原交接中不可访问的完整 rollout 仍未补齐，不纳入可访问分母。
+
+原六小时报告的学生 **17/117**、教师 **4/104** 是当时截止状态，不能反写旧报告，也不能用来描述现时覆盖。另有 152 份历史 CSV 的 **1,130 条元数据记录**，包括 260 条尝试记录、860 条分组或 driver 汇总、10 条任务汇总以及计划、共享引用和缺失路径，既不是 1,130 次独立尝试，也不是全部深审的轨迹。详见[扩展 Hint 审计](audit_hintrsi.md)、[轨迹清单](trajectory_inventory.csv)和[历史记录表](audit/historical_attempt_records.csv)。
+
+**具体结果和干预链：**
+
+- Claude 递归委派 D05 的教师要求检查旧上下文与新输入、成功和不同失败的反馈及调用 ID。学生事件 49–57 暴露并修改续接输入，84–85 检查结果和 ID；正式 **F2P 7/7、P2P 31/31**。后续图像上下文修改未被展示的同一探针单独验证，本地仍有 handler 失败；高度对应支持可能采纳，不证明教师因果贡献。[原轨迹](../../../hint-codex-experiments/runs/codex_parallel_12/lanes/codex_parallel_12_lane0/codex_parallel_12_lane0_I_r2/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json)。
+- D02 有实质实现和先失败后通过的窄 mock，正式 **6/7、31/31**，空文本案例未通过，内部原因未确定。D01 和 D04 则因调用的 Skill 所涉提供者歧义而停问、空补丁；D03 声称只读但无工具拒绝证据。H2 有非空复现脚本而无可见修复，不能与零字节补丁混同。它们不都是完成实现后的算法失败。
+- 历史 B08 实际无任务教师 Hint，却正式 **7/7、31/31**；同批收到参考的 H、I 分别为 **6/7、2/7**。运行时和预算不构成严格受控比较，但反驳“教师是历史成功必要条件”。[B08 轨迹](../../../hint-codex-experiments/runs/codex_parallel_08/lanes/codex_parallel_08_lane0/codex_parallel_08_lane0_B_r1/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json)。
+- Igel D06 无任务教师参考，自主复现并实现 schema 保存和使用，正式 **23/24、2/2**；较早评价摘录指出 `feature_schema.joblib` 的生产者／消费者路径契约问题。D07 收到指导却因分支问题停问，**0/24、2/2**。[D06 审计](../trajectory_capability_20261126_020200/audit/audit_D06.md)。
+- SQLfmt D08 是真实 source-13 接入预检而非正式九题成功：实现和聚焦检查后正式 **30/32、1271/1273**；一个可见间距差异不解释所有失败。历史另有 HTTP 400、进程退出 -11、取消及 API 402 后未评价等中断，缺失成绩不计为普通算法失败。[D08 审计](../trajectory_capability_20261126_020200/audit/audit_D08.md)。
+
+实际捕获的系统提示优先于组名和可用 Hint 档案；收到、行为一致、因指导而行动、正式通过和长期能力是不同命题。
+
+### A.2 Scene：索引、全文、像素和几何不是同一覆盖
+
+- 规范主轨迹 **360/360 文件、571 分块**完成全文审阅；工作档案 454 条路径中，410 为原导出／脱敏副本、32 为解码文本完全副本，另 **12 份不同内容、12 块**完成审阅。不是 814 次独立实验。
+- 27 个 tar 包的 **13,085 个成员已索引**；27 个归档控制块完成。执行映射涉及 1,483 个不同文件、1,644 条归档链接和 161 条轨迹链接，73 个执行块完成；另审阅 526 个选定控制文件和 722 个阶段／调用文件。索引、映射或归档保留不等于所有成员载荷深审；部分原始 API sidecar 未逐项重读。
+- 新增视觉审阅为事先保存清单的六案：18 个图像引用中有六份不同参考内容、八份不同渲染内容；按版本字典序选择有渲染轨迹并跳过重复任务 ID，非随机或总体代表样本。全量像素、全部 `.blend` 二进制与精确网格关系未审。两个连续旧几何检查点**各**观察 874 对象、筛选 48 mesh、计算 1,128 对 AABB 下界；AABB 为零不证明接触或拓扑连接。
+
+例如 Scene D01 教师指出植物可见性和显示器支撑疑问，补丁与阶段事件支持植物和面板实际修改，但遮挡、画外和过曝是竞争解释；抽样支架与底座未变，接触未知。S0087 第三步超时后保留第二步，S0078 第三步成功后仍选第二步；S0335 模型 CLI 超时且未开始 Blender，不是几何失败。S0354 局部锚点误差改善时另有误差变大。教师诊断、学生执行、候选接受、独立视觉质量必须分开。[Scene 全审报告及原始行号、归档成员、图像入口](audit_scene.md)；[主清单](config/scene_full_audit_manifest.json)；[视觉清单](config/scene_visual_expansion_manifest.json)。
+
+## B. 原框架、实际入口与工程修复
+
+原六小时实现是 `source_parallel_13` 的派生：复用原 SDK、Bridge、任务初始化、容器和评分器，通过 `capability_path` 将知识传给求解步骤，经已有 append-prompt 路径注入并保存实际加载文本；B0 走匹配的空追加路径，不注入知识。原有薄入口负责预存队列和 Hint 探索，不是重新训练学生或重写评分器。原工程曾修复能力路径未转发、空／非空追加的系统身份句不匹配，以及评价输出收集；被取代的尝试和成本保留。[原源码差异](../trajectory_capability_20261126_020200/results/source_changes.diff)。
+
+公开基线修订为 `c0132d7e381ff660354d7a4403e29ee6107354f9`；37 个文件直接内容匹配，此处不是哈希匹配的表述。实际修改或新增的七个源码文件及用途如下，链接指向扩展源码：
+
+| 类型与文件 | 目的和实际改动 |
+|---|---|
+| 修改 [benchmark/deepswe/run_loop_by_hint.py](source/benchmark/deepswe/run_loop_by_hint.py) | 解析 `capability_path`，仅向 `step_solve` 转发，不传给 `step_get_hint`。 |
+| 修改 [benchmark/deepswe/run_one_loop.sh](source/benchmark/deepswe/run_one_loop.sh) | 转发 `--capability_path` 参数。 |
+| 修改 [run_multi_turn_loop.py](source/run_multi_turn_loop.py) | 独立读取能力文本，与可选逐任务 Hint 合并，经既有 append-prompt 路径注入；保存 `loaded_capabilities.md` 和 `capability_injection.json`。 |
+| 修改 [run_cc_sdk.py](source/run_cc_sdk.py) | 让无 append 的默认条件与知识组一样走 preset 加 append 路径，使用空 reminder，不向 B0 添加知识。 |
+| 修改 [benchmark/deepswe/eval_deep_swe.py](source/benchmark/deepswe/eval_deep_swe.py) | 核心阶段仅在验证器执行后另存完整 stdout/stderr；后续可选评价的超时包装另见补充。 |
+| 新增薄入口 [run_capability_experiments.py](source/run_capability_experiments.py) | 调用原有循环，执行预存组顺序、Test 冻结检查和剩余预算保护。 |
+| 新增薄入口 [run_hint_exploration.py](source/run_hint_exploration.py) | 复用原 I 组 progress teacher，设置一次实际检查上限，并提供 Error、Strategy、Exploration 策略。 |
+
+后续扩展相对封存版本的源码差异清单仅列 `run_capability_experiments.py`：增加 Development、Hint-transfer、预存交错顺序、冻结检查、显式续跑及截止补丁首次评估处理；并未重写 Bridge、SDK、学生工具或评分逻辑。[扩展差异](results/source_changes_vs_closed_six_hour.diff)。
+
+实际模型请求标识为 **`gpt-6.1-terra`、effort `low`**，不是全局默认型号；基础 CLI 形式为 `codex exec --ephemeral --json --ignore-user-config --sandbox read-only --model gpt-6.1-terra -c 'model_reasoning_effort="low"'`。原实验命令见[原命令记录](../trajectory_capability_20261126_020200/commands_used.md)，后续扩展命令见[扩展命令记录](commands_used.md)。SDK 消息和工具经桥接序列化，不能宣称与原生 API 完全等价。实际首请求比较显示，同题组移除知识文本后公共系统文本、工具定义和非系统消息匹配；原生 Skill 禁用。未训练权重，只能保证已记录请求的模型标识和 effort 相同，服务端 checkpoint 不可见。
+
+工程事件包括：原 VM socket 路径超过 UNIX 长度限制，复用原覆盖层并将 socket 移至短路径；镜像仓库 429 后保留失败并在镜像就绪后才启动学生；`-1` 超时哨兵修正为成绩未知；一次只读事后审查重复调用保留并计费。模型访问曾报 `model_not_found / model_not_in_accessible_catalog`，不是已证实额度耗尽；恢复前登录文件元数据更新，但操作者未改认证或型号，更新主体和恢复完整原因未定；仅凭元数据不能确认恢复前后账户完全相同。受影响审计块以不同会话重发，已完成学生未重跑。用户中断后监控 PID 消失，核验后单独恢复控制器，保留监控空窗。[工程修复日志](logs/engineering_fixes.json)；[访问事件](config/model_access_incident.json)。
+
+## C. 对照、能力库、预算与冻结
+
+B0 不加载能力库。K0 仅用 Development 公开描述和教师一般先验，不看学生轨迹或解答；K1 沿时间线提炼检查、修改、探针和结果；K2 将**推断的**子目标与实际状态、操作和约束按跨任务功能对齐。V1 的 K1/K2 使用同一固定 D01–D08 队列；V2 则各自使用旧 V1、各自源自该队列的中间分析及两条各自在相同新 Development 题上生成的 on-policy 轨迹，故新证据不同，不能将 V2 差异单独归因于状态对齐。旧原始证据归档，增量更新时由先前分析代表。
+
+共同提取上限为每条件两次调用、每次最多 700,000 字符、中间分析最多 2,200 词，交付最多 700 词和四个完整单元；同上限不等于实际消耗相同。新轨迹输入逐字段上限 1,800 字符、补丁上限 30,000 字符；新尝试事后审查同样有裁剪，不是历史全文分块审计。原 V1 的 K1/K2 使用相同机械过滤的 615,929 字符来源；提取字段修复前后的调用均留存并计入额外成本。
+
+| 库 | 交付词数／单元 | 来源或部署状态 |
+|---|---:|---|
+| K0 V1 / V2 | 644／4；630／4 | 描述与先验；Selection 选 V2 |
+| K1 V1 / V2 | 578／4；619／4 | 时间线；Selection 选 V2 |
+| K2 V1 / V2 | 526／4；505／3 | 功能状态对齐；Selection 保留 V1 |
+| HT_NoHint / Error / Strategy / Exploration | 688／4；654／4；677／4；647／4 | 分别来自四条历史 Development 轨迹 |
+
+K2 V2 原稿 707 词、四单元，按事先规则整单元删除末项后交付 505 词、三单元；K1 V2 为 619 词、四单元。不能说等长，也不能把分析中被删的失败分类单元恢复成学生收到的内容。七个 V2 交付单元均以名称标题加六个标签满足七字段：适用问题、知识／行为约束、候选方法、验证步骤、不适用情形、证据来源。
+
+K2 的具体区别是将 Cattrs 部分结果保留、旧续接和 schema 例子按“后续消费者需要何种状态”对齐；将 Snapshot 身份变化与 D05 请求／响应 ID 按功能联系；将类型修复及旧格式／schema 问题归为表示协调。它不是声称实现相同。K1 也要求保留已有结果、重跑探针和检查身份；K0 已包含生命周期、身份、schema、失败通道和合同检查等许多相同通用知识。状态对齐的强调与组织有区别，但不能仅凭措辞证明新增知识或行为收益。[机制比较](audit/library_mechanism_comparison_pretest.md)；[冻结记录及全部主库路径](config/knowledge_freeze.json)；[HT 冻结记录](config/knowledge_freeze_hint.json)。
+
+HT 名称表示知识来源；**HT_NoHint 仍加载从旧无 Hint 轨迹提取的知识，不是 B0**。四个新迁移测试均无在线 Hint。本次没有重新执行同预算的四种主动 Hint 生成试验，也没有共同中间状态反事实回放。
+
+五个新任务的未见核查仅覆盖本机可访问历史元数据、精确任务 ID、公开需求及仓库明显重复；未读取 Test GT 做完整参考实现语义去重，也不能排除不可访问历史或模型预训练接触。[任务划分](config/task_split.json)；[公开需求筛查](audit/public_duplicate_screen.md)。
+
+## D. 封存结果、扩展成绩与成本
+
+正式成功是评价器二元标准；F2P 为目标测试、P2P 为既有行为保持的辅助计数。部分正确不代替正式全解，正式通过也不保证完整真实世界契约。技术缺失或中断不按算法失败填零。
+
+### D.1 原六小时封存结果：不可与后续 29 次合并
+
+匹配 Selection 的 SuperJSON：B0、K1、K2 正式成功，K0 未解；K2 原评价缺新增测试报告、记 0，唯一一次同补丁完整诊断为 **80/80、116/116**，原结果和恢复成本保留。两道 Test 每组各一次：K0 **2/2**、K2 **1/2**、B0 和 K1 均 **0/2**。TOMLKit 的 K2 为 **59/60、964/964**，不是全解；HTTPX 的 B0、K1 各 **115/115、1280/1281**，仍正式未解。原可选开发 Hint：Error、Strategy、Exploration 各正式 **7/7、31/31**；NoHint 评价中断、成绩未知。原逐题 Token、调用、耗时、额外启动与异常见[封存完整报告](../trajectory_capability_20261126_020200/research_report_zh.md)和[原尝试指标](../trajectory_capability_20261126_020200/attempt_metrics.csv)。
+
+旧 NoHint 原约 600 秒中断与后续同补丁 900 秒诊断计时起点不同；后者仍超时，F2P/P2P 未知。已知好 Error 补丁对照 **7/7、31/31**，证明该路线可以完成，不证明 NoHint 根因查清；对照 stderr 的 Node 堆 OOM 与正式通过并存，其影响未知。[分诊](audit/nohint_evaluator_triage_zh.md)。
+
+### D.2 扩展：29 条计划尝试的正式结果
+
+四次 Development、七次 Selection、十四次主 Test、四次 HT 均已取得正式成绩。下表列出全部逐尝试成绩及用量；异常与额外评测另列。空字段表示未知。Input 已含 Cached，不能再相加。
+
+### development：全部预定尝试
+
+| 任务 | 组 | 状态 / 轨迹类别 | 正式成功 | F2P | P2P | 补丁字节 | 停止原因 |
+|---|---|---|---|---|---|---|---|
+| cattrs-partial-structuring-recovery | K1_v1 | complete / 正式全通过 | 1 | 69/69 | 7/7 | 9329 | end_turn |
+| cattrs-partial-structuring-recovery | K2_v1 | complete / 正式全通过 | 1 | 69/69 | 7/7 | 8382 | end_turn |
+| aiomonitor-task-snapshots-diff | K2_v1 | complete / 部分通过、未全解 | 0 | 52/53 | 8/8 | 17299 | end_turn |
+| aiomonitor-task-snapshots-diff | K1_v1 | complete / 部分通过、未全解 | 0 | 52/53 | 8/8 | 16797 | end_turn |
+
+| 任务 / 组 | 请求 / 已报用量 | 工具请求 / 返回 | 输入 / 输出 / 缓存输入 | 墙钟 / SDK / 正式评测秒 | 学生实际执行秒 / 端到端秒 |
+|---|---|---|---|---|---|
+| cattrs-partial-structuring-recovery / K1_v1 | 21 / 21 | 47 / 47 | 1236551 / 6356 / 254464 | 1916.335 / 1646.343 / 46.84589984299964 | 1690.789 / 1916.335 |
+| cattrs-partial-structuring-recovery / K2_v1 | 23 / 23 | 45 / 45 | 1375248 / 5284 / 277376 | 1387.372 / 1130.911 / 48.80020839700228 | 1168.535 / 1387.372 |
+| aiomonitor-task-snapshots-diff / K2_v1 | 13 / 13 | 24 / 24 | 866556 / 6013 / 215680 | 763.203 / 487.714 / 54.67901903500024 | 526.964 / 763.203 |
+| aiomonitor-task-snapshots-diff / K1_v1 | 13 / 13 | 27 / 27 | 974955 / 6418 / 339968 | 762.188 / 494.767 / 54.3469738900003 | 532.063 / 762.188 |
+
+### selection：全部预定尝试
+
+| 任务 | 组 | 状态 / 轨迹类别 | 正式成功 | F2P | P2P | 补丁字节 | 停止原因 |
+|---|---|---|---|---|---|---|---|
+| mashumaro-flattened-dataclass-fields | K1_v1 | complete / 统一上限补评完成 | 1 | 66/66 | 30014/30014 | 9373 | end_turn |
+| mashumaro-flattened-dataclass-fields | K2_v2 | complete / 部分通过、未全解 | 0 | 66/66 | 30013/30014 | 9631 | end_turn |
+| mashumaro-flattened-dataclass-fields | B0 | complete / 正式全通过 | 1 | 66/66 | 30014/30014 | 9934 | end_turn |
+| mashumaro-flattened-dataclass-fields | K1_v2 | complete / 正式全通过 | 1 | 66/66 | 30014/30014 | 8719 | end_turn |
+| mashumaro-flattened-dataclass-fields | K0_v1 | complete / 部分通过、未全解 | 0 | 66/66 | 30013/30014 | 9293 | end_turn |
+| mashumaro-flattened-dataclass-fields | K0_v2 | complete / 正式全通过 | 1 | 66/66 | 30014/30014 | 8723 | end_turn |
+| mashumaro-flattened-dataclass-fields | K2_v1 | complete / 正式全通过 | 1 | 66/66 | 30014/30014 | 9949 | end_turn |
+
+| 任务 / 组 | 请求 / 已报用量 | 工具请求 / 返回 | 输入 / 输出 / 缓存输入 | 墙钟 / SDK / 正式评测秒 | 学生实际执行秒 / 端到端秒 |
+|---|---|---|---|---|---|
+| mashumaro-flattened-dataclass-fields / K1_v1（原始墙钟／最终补评） | 21 / 21 | 28 / 28 | 1245906 / 6839 / 297088 | 1682.79 / 584.754 / 1427.1788096160017 | 621.41 / 12277.35 |
+| mashumaro-flattened-dataclass-fields / K2_v2 | 39 / 39 | 70 / 70 | 2404198 / 8926 / 232320 | 2640.389 / 911.287 / 1530.8230551369998 | 945.613 / 2640.389 |
+| mashumaro-flattened-dataclass-fields / B0 | 30 / 30 | 39 / 39 | 1849715 / 6797 / 360320 | 2477.235 / 789.251 / 1483.243425503002 | 825.056 / 2477.235 |
+| mashumaro-flattened-dataclass-fields / K1_v2 | 24 / 24 | 31 / 31 | 1681410 / 7065 / 529536 | 2391.101 / 670.525 / 1513.4859336350055 | 706.671 / 2391.101 |
+| mashumaro-flattened-dataclass-fields / K0_v1 | 25 / 25 | 37 / 37 | 1314914 / 6854 / 156928 | 2541.733 / 651.228 / 1681.9424237659987 | 689.645 / 2541.733 |
+| mashumaro-flattened-dataclass-fields / K0_v2 | 15 / 15 | 21 / 21 | 979273 / 4846 / 316544 | 2743.15 / 572.049 / 1912.1729355569987 | 617.105 / 2743.15 |
+| mashumaro-flattened-dataclass-fields / K2_v1 | 33 / 33 | 56 / 56 | 1969109 / 7801 / 260096 | 2591.992 / 737.395 / 1633.513158085996 | 777.031 / 2591.992 |
+
+### test：全部预定尝试
+
+| 任务 | 组 | 状态 / 轨迹类别 | 正式成功 | F2P | P2P | 补丁字节 | 停止原因 |
+|---|---|---|---|---|---|---|---|
+| adaptix-name-mapping-aliases | K1_v2 | complete / 正式全通过 | 1 | 44/44 | 2738/2738 | 11433 | end_turn |
+| adaptix-name-mapping-aliases | B0 | complete / 解题预算耗尽、已评测 | 1 | 44/44 | 2738/2738 | 12646 | student_timeout |
+| adaptix-name-mapping-aliases | K2_v1 | complete / 正式全通过 | 1 | 44/44 | 2738/2738 | 12020 | end_turn |
+| adaptix-name-mapping-aliases | K0_v1 | complete / 正式全通过 | 1 | 44/44 | 2738/2738 | 11816 | end_turn |
+| adaptix-name-mapping-aliases | K0_v2 | complete / 正式全通过 | 1 | 44/44 | 2738/2738 | 11827 | end_turn |
+| adaptix-name-mapping-aliases | K2_v2 | complete / 正式全通过 | 1 | 44/44 | 2738/2738 | 13020 | end_turn |
+| adaptix-name-mapping-aliases | K1_v1 | complete / 正式全通过 | 1 | 44/44 | 2738/2738 | 13175 | end_turn |
+| python-statemachine-state-data-scoping | K2_v2 | complete / 空补丁 | 0 | 0/72 | 1285/1286 | 0 | end_turn |
+| python-statemachine-state-data-scoping | K0_v1 | complete / 空补丁 | 0 | 0/72 | 1285/1286 | 0 | end_turn |
+| python-statemachine-state-data-scoping | K0_v2 | complete / 空补丁 | 0 | 0/72 | 1285/1286 | 0 | end_turn |
+| python-statemachine-state-data-scoping | K1_v1 | complete / 部分通过、未全解 | 0 | 69/72 | 1285/1286 | 16185 | end_turn |
+| python-statemachine-state-data-scoping | K2_v1 | complete / 空补丁 | 0 | 0/72 | 1285/1286 | 0 | end_turn |
+| python-statemachine-state-data-scoping | B0 | complete / 部分通过、未全解 | 0 | 69/72 | 1285/1286 | 16528 | end_turn |
+| python-statemachine-state-data-scoping | K1_v2 | complete / 部分通过、未全解 | 0 | 69/72 | 1285/1286 | 14962 | end_turn |
+
+| 任务 / 组 | 请求 / 已报用量 | 工具请求 / 返回 | 输入 / 输出 / 缓存输入 | 墙钟 / SDK / 正式评测秒 | 学生实际执行秒 / 端到端秒 |
+|---|---|---|---|---|---|
+| adaptix-name-mapping-aliases / K1_v2 | 21 / 21 | 31 / 31 | 1453625 / 5903 / 343040 | 1837.432 / 1122.471 / 503.3864705070009 | 1160.39 / 1837.432 |
+| adaptix-name-mapping-aliases / B0 | 28 / 28 | 59 / 58 | 2020669 / 7802 / 280704 | 2843.717 / 缺失 / 470.7193844039939 | 1800.764 / 2843.717 |
+| adaptix-name-mapping-aliases / K2_v1 | 19 / 19 | 43 / 43 | 1213764 / 5599 / 220544 | 1477.866 / 808.04 / 464.08585102600046 | 843.978 / 1477.866 |
+| adaptix-name-mapping-aliases / K0_v1 | 23 / 23 | 44 / 44 | 1605014 / 6197 / 323072 | 1669.505 / 993.609 / 466.59178242099733 | 1031.102 / 1669.505 |
+| adaptix-name-mapping-aliases / K0_v2 | 17 / 17 | 47 / 47 | 1049111 / 5462 / 113408 | 1435.496 / 775.975 / 445.1053032179989 | 815.4 / 1435.496 |
+| adaptix-name-mapping-aliases / K2_v2 | 19 / 19 | 30 / 30 | 1138849 / 6321 / 82432 | 1590.682 / 909.937 / 470.4108983959959 | 947.504 / 1590.682 |
+| adaptix-name-mapping-aliases / K1_v1 | 17 / 17 | 29 / 29 | 1058550 / 5750 / 71808 | 1429.943 / 761.361 / 455.58817185599764 | 797.483 / 1429.943 |
+| python-statemachine-state-data-scoping / K2_v2 | 1 / 1 | 0 / 0 | 27827 / 41 / 0 | 480.789 / 10.617 / 261.4521008779993 | 46.872 / 480.789 |
+| python-statemachine-state-data-scoping / K0_v1 | 4 / 4 | 13 / 13 | 191015 / 721 / 4096 | 607.65 / 138.081 / 236.15435520700703 | 175.39 / 607.65 |
+| python-statemachine-state-data-scoping / K0_v2 | 6 / 6 | 16 / 16 | 310651 / 1024 / 6144 | 645.21 / 156.218 / 259.26163948599424 | 192.241 / 645.21 |
+| python-statemachine-state-data-scoping / K1_v1 | 31 / 31 | 67 / 67 | 3120611 / 8140 / 176128 | 1695.704 / 1234.646 / 233.64795515900187 | 1271.098 / 1695.704 |
+| python-statemachine-state-data-scoping / K2_v1 | 5 / 5 | 14 / 14 | 234436 / 728 / 6144 | 603.481 / 123.845 / 255.30956601099751 | 159.265 / 603.481 |
+| python-statemachine-state-data-scoping / B0 | 33 / 33 | 62 / 62 | 3379326 / 8204 / 541952 | 2016.643 / 1557.808 / 232.8200900869997 | 1593.239 / 2016.643 |
+| python-statemachine-state-data-scoping / K1_v2 | 36 / 36 | 93 / 93 | 3819688 / 9790 / 466560 | 1921.472 / 1485.112 / 214.58204621599725 | 1519.747 / 1921.472 |
+
+### hint_transfer：全部预定尝试
+
+| 任务 | 组 | 状态 / 轨迹类别 | 正式成功 | F2P | P2P | 补丁字节 | 停止原因 |
+|---|---|---|---|---|---|---|---|
+| python-statemachine-state-data-scoping | HT_Exploration | complete / 部分通过、未全解 | 0 | 69/72 | 1285/1286 | 14250 | end_turn |
+| python-statemachine-state-data-scoping | HT_NoHint | complete / 部分通过、未全解 | 0 | 69/72 | 1285/1286 | 15755 | end_turn |
+| python-statemachine-state-data-scoping | HT_Error | complete / 部分通过、未全解 | 0 | 69/72 | 1285/1286 | 17853 | end_turn |
+| python-statemachine-state-data-scoping | HT_Strategy | complete / 解题预算耗尽、已评测 | 0 | 69/72 | 1285/1286 | 16247 | student_timeout |
+
+| 任务 / 组 | 请求 / 已报用量 | 工具请求 / 返回 | 输入 / 输出 / 缓存输入 | 墙钟 / SDK / 正式评测秒 | 学生实际执行秒 / 端到端秒 |
+|---|---|---|---|---|---|
+| python-statemachine-state-data-scoping / HT_Exploration | 31 / 31 | 88 / 88 | 3440148 / 8368 / 576000 | 2019.28 / 1564.176 / 217.72446602099808 | 1601.667 / 2019.28 |
+| python-statemachine-state-data-scoping / HT_NoHint | 36 / 36 | 94 / 94 | 3885679 / 9358 / 362624 | 2178.254 / 1708.31 / 238.31172741099726 | 1747.521 / 2178.254 |
+| python-statemachine-state-data-scoping / HT_Error | 18 / 18 | 82 / 82 | 1905808 / 8062 / 281344 | 1640.912 / 1182.605 / 230.31391317299858 | 1216.569 / 1640.912 |
+| python-statemachine-state-data-scoping / HT_Strategy | 28 / 28 | 101 / 100 | 3253549 / 9259 / 485248 | 2313.716 / 缺失 / 229.5217995540006 | 1800.764 / 2313.716 |
+
+### 评价修复、异常与保留记录
+
+| 任务 / 组 | 评价次数 | 额外诊断秒 | 统一上限补评秒 | 记录 |
+|---|---|---|---|---|
+| mashumaro-flattened-dataclass-fields / K1_v1 | 3 | 912.661 | 1439.114 |  Original Selection evaluation timed out; one bounded identical-patch diagnostic is separately retained. No new student attempt. Diagnostic did not produce complete formal counts; outcome remains unknown. One uniform 3600s evaluation repair is retained separately after the 900s attempt and diagnostic; no additional student. |
+| adaptix-name-mapping-aliases / B0 | 1 | 缺失 | 缺失 |  Student stopped at the unchanged 1800s deadline. Original cancellation/technical state preserved; first formal evaluation of the identical saved deadline patch, no additional student or model call. Source: /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/runs/capability_followup_v2_test_adaptix-name-mapping-aliases_B0_r1/budget_stop_evaluation.json |
+| python-statemachine-state-data-scoping / K2_v2 | 1 | 缺失 | 缺失 |  Premature final response after one model request, zero tool calls and zero-byte patch; no access error was observed. The grader explicitly evaluated pristine base. Its sole P2P failure is the same 60s statistical-distribution timeout as HT_Exploration. Retain original formal0; distinguish empty-patch termination from attempted algorithm implementation and from baseline-associated timeout. Source: /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/statemachine_baseline_timeout_diagnosis_zh.md |
+| python-statemachine-state-data-scoping / K0_v1 | 1 | 缺失 | 缺失 |  Empty patch after branch creation, repository reads and missing-API reproduction; student explicitly reported no implementation or commit. One local uv setup command timed out, then reproduction succeeded. No forced budget/technical stop is established. Pristine-base grading reproduces the same known statistical-distribution 60s timeout; retain official score. Source: /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/posthoc_test_python-statemachine-state-data-scoping_K0_v1.md |
+| python-statemachine-state-data-scoping / K0_v2 | 1 | 缺失 | 缺失 |  Normal end_turn after branch creation and issue reproduction, with no implementation or commit and an empty saved patch. No budget stop, permission denial or bridge model error observed. The sole existing-suite failure is the same statistical-test 60s timeout on pristine base; official F2P0/72 and P2P1285/1286 retained. Source: /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/posthoc_test_python-statemachine-state-data-scoping_K0_v2.md |
+| python-statemachine-state-data-scoping / K1_v1 | 1 | 缺失 | 缺失 |  Normal end_turn with actual implementation, formal F2P69/72. The sole existing-suite failure is the same weighted statistical-distribution 60s timeout observed on pristine base, not established as a new student regression. Official P2P1285/1286 and formal success0 retained. Source: /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/posthoc_test_python-statemachine-state-data-scoping_K1_v1.md |
+| python-statemachine-state-data-scoping / K2_v1 | 1 | 缺失 | 缺失 |  Normal end_turn after branch creation and missing-API reproduction, 14 tool calls but no source modification or commit, empty patch. No student budget stop or bridge model error. Sole existing-suite failure matches the statistical-distribution 60s timeout on pristine base; official F2P0/72 P2P1285/1286 retained. Source: /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/posthoc_test_python-statemachine-state-data-scoping_K2_v1.md |
+| python-statemachine-state-data-scoping / B0 | 1 | 缺失 | 缺失 |  Base student completed normally with a real implementation and commit, formal F2P69/72. Sole existing-suite failure is the same statistical-distribution 60s timeout observed on pristine base; no other base-suite failed IDs observed. Official P2P1285/1286 and formal0 retained. Same pass counts as K1v1 and completed HT groups are not evidence of a knowledge-caused benefit. Source: /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/posthoc_test_python-statemachine-state-data-scoping_B0.md |
+| python-statemachine-state-data-scoping / K1_v2 | 1 | 缺失 | 缺失 |  Normal end_turn with a real implementation, formal F2P69/72. Sole existing-suite failure matches the weighted statistical-distribution 60s timeout on pristine base and other completed runs; no other formal base failure IDs observed. Official P2P1285/1286 and formal0 retained. Source: /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/posthoc_test_python-statemachine-state-data-scoping_K1_v2.md |
+| python-statemachine-state-data-scoping / HT_Exploration | 1 | 缺失 | 缺失 |  Formal log includes a 60-second pytest timeout in a callback path. Outer verifier completed normally and official scores remain unchanged. Historical posthoc assessment, superseded by the later complete failed-ID comparison below: Timeout cause and relationship to the single P2P failure are unverified; three F2P behavior mismatches are separately observed. Source: /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/posthoc_hint_transfer_python-statemachine-state-data-scoping_HT_Exploration.md Updated pristine-base comparison: the sole P2P failure is the same test_weighted_transitions.py::TestWeightedTransitionsBasic::test_statistical_distribution timeout on unchanged base and this patch. It cannot be attributed directly to student-introduced regression. Root cause remains unverified and formal scores are retained. Source: /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/statemachine_baseline_timeout_diagnosis_zh.md |
+| python-statemachine-state-data-scoping / HT_NoHint | 1 | 缺失 | 缺失 |  The sole existing-suite failure is the same statistical-distribution 60s timeout observed on pristine base; not established as a student-introduced regression. Official F2P69/72 and P2P1285/1286 retained; separate new-test failures still require posthoc analysis. Source: /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/runs/capability_followup_hint_transfer_hint_transfer_python-statemachine-state-data-scoping_HT_NoHint_r1/eval_output/python-statemachine-state-data-scoping/verifier_stdout.log |
+| python-statemachine-state-data-scoping / HT_Error | 1 | 缺失 | 缺失 |  Normal end_turn with real implementation, formal F2P69/72. The sole existing-suite failure is the same weighted statistical-distribution 60s timeout observed on pristine base, not established as a student-introduced regression. Official P2P1285/1286 and formal success0 retained. Source: /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/posthoc_hint_transfer_python-statemachine-state-data-scoping_HT_Error.md |
+| python-statemachine-state-data-scoping / HT_Strategy | 1 | 缺失 | 缺失 |  Student stopped at the unchanged 1800s deadline. Original cancellation/technical state preserved; first formal evaluation of the identical saved deadline patch, no additional student or model call. Source: /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/runs/capability_followup_hint_transfer_hint_transfer_python-statemachine-state-data-scoping_HT_Strategy_r1/budget_stop_evaluation.json Student stopped at the 1800s deadline; first formal evaluation of the unchanged exported patch completed with F2P69/72 and P2P1285/1286, formal0. Sole existing-suite failure matches the pristine-base weighted statistical-distribution 60s timeout; local thread-test teardown issues do not establish another formal P2P regression. No student retry or additional solving. Source: /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/posthoc_hint_transfer_python-statemachine-state-data-scoping_HT_Strategy.md |
+
+Input 已包含 Cached Input；两者不相加。Selection K1_v1 的 1682.79 秒是原始运行墙钟，1427.1788096160017 秒是之后统一上限最终补评的 verifier 耗时，不包含在原始墙钟内，而处于 12277.35 秒端到端跨度内；中间另有一次 900 秒同补丁诊断，三次评价均未重跑学生。其他行按各自字段及记录解释，墙钟、SDK 和 verifier 时长不自动相加或一概断言包含关系；截止案例使用修改后的闭合墙钟。技术中断与缺失正式成绩保持其实际分类。完整逐项路径与字段见 [attempt_metrics.csv](attempt_metrics.csv)。
+
+### 独立评价诊断：不新增学生
+
+| 运行 | 状态 | 原始reward | F2P | P2P | 墙钟 / 验证器秒 | 新增学生 / 模型调用 |
+|---|---|---|---|---|---|---|
+| capability_followup_nohint_same_patch_01 | evaluation_timeout | -1.0 | 缺失/缺失 | 缺失/缺失 | 913.327 / 901.3975106149992 | 0 / 0 |
+| capability_followup_known_good_control_01 | complete | 1 | 7/7 | 31/31 | 157.562 / 147.04349801399985 | 0 / 0 |
+
+NoHint 的 -1 是超时哨兵，F2P/P2P 缺失，不能改写为普通失败。此表两次诊断不属于29次学生尝试，也不与上表 Selection 的补评成本重复相加。完整记录见 [additional_evaluation_metrics.csv](additional_evaluation_metrics.csv)。
+
+| 题组 | 正式成功汇总 | 有证据的限制 |
+|---|---|---|
+| Development：cattrs | K1 V1、K2 V1 各 **1/1**，均 69/69、7/7 | 局部完整套件未必完成；正式通过限于评价覆盖。 |
+| Development：aiomonitor | K1 V1、K2 V1 各 **0/1**，均 52/53、8/8 | 空 snapshot 列表无输出；两者均有实现并正常结束，局部 console 失败无基线，原因未知。 |
+| Selection：mashumaro | B0、K0 V2、K1 V1/V2、K2 V1 各 **1/1**；K0 V1、K2 V2 各 **0/1** | 后两者均 66/66，但 30013/30014：默认 helper 返回新增键，是真实 P2P 合同退化。 |
+| Test：adaptix | B0、K0 V1/V2、K1 V1/V2、K2 V1/V2 各 **1/1**，均 44/44、2738/2738 | B0 是截止补丁首次正式评价通过，学生未正常完成。 |
+| Test：statemachine | 七个主组各 **0/1** | K0 V1/V2、K2 V1/V2 空补丁；B0、K1 V1/V2 有实现且各 69/72。全部 P2P 为 1285/1286；后续完整失败 ID 比较确认均为同一基线测试的 60 秒超时，根因及补丁对耗时的影响仍未知，见共同基线诊断。 |
+| HT：statemachine | NoHint、Error、Strategy、Exploration 各 **0/1** | 四组均 69/72、1285/1286；Strategy 为学生截止补丁首次评价，非正常结束。 |
+
+**匹配 V1 对 V1：**新 Test 的 K1 V1 与 K2 V1 均 **1/2**；adaptix 均通过，statemachine 均未解，但 K1 有实现且 69/72，K2 空补丁 0/72。B0 和 K0 V1 也均 **1/2**。这些辅助差异不是正式成功差异，更不是因果效应。
+
+**Selection 事先选择的部署版本：**K0 V2 因正式全解改善而保留；K1 V2 与 V1 正式成功相同，且 F2P、P2P 均未退化，故保留；K2 V2 未满足预先不退化规则，故保留 V1。选择不是依据 Test 成绩或解题成本。选中 K0 V2、K1 V2、K2 V1 在新 Test 均 **1/2**，但 K1 V2 与 K2 V1 是混合版本比较，不能当作状态对齐的纯因果效果。新 Test 未使用在线教师、GT 或旧会话，只加载各自冻结库；这不是脱离所有记忆后的参数能力证明。
+
+首个 Selection 的 K1 V1 原 900 秒评价与一次 900 秒同补丁诊断均保留，诊断无完整计数；在其余 Selection 和任何新 Test 前统一将正式上限改为 **3600 秒**，补一次同补丁正式评价，学生未重跑，最终 **66/66、30014/30014**。初次 `wall_seconds` 仍为 1682.790 秒，含恢复等待的 `end_to_end_seconds` 为 12277.350 秒；诊断 912.661 秒、统一上限补评 1439.114 秒分别列账，不再重复加到端到端跨度。旧 Development 正式上限为 900 秒；学生上限始终 1800 秒。[预算修订](config/verification_budget_revision.json)。
+
+**截止补丁与技术恢复。** Adaptix B0 和 HT_Strategy 均到 1800 秒 `student_timeout`，原编排器取消后未进入正式评价；原始 `CancelledError`／技术状态与 `student_timeout` 均保留，随后仅对原样保存补丁进行**首次**正式评价，不是学生重跑或重复评测，保留原取消及等待成本。B0 正式通过不等于正常结束或已提交；Strategy 正式未解。薄队列政策对后续确认的同类截止统一适用，学生模型、工具、权限、预算、冻结库和测试不变；已运行进程可能仍加载旧调度代码，遇同类情况同样保留并继续首次评价。控制器因原子进程 PID 退出而单独恢复，不是学生重新开始。[B0 截止记录](runs/capability_followup_v2_test_adaptix-name-mapping-aliases_B0_r1/budget_stop_evaluation.json)；[Strategy 截止记录](runs/capability_followup_hint_transfer_hint_transfer_python-statemachine-state-data-scoping_HT_Strategy_r1/budget_stop_evaluation.json)。
+
+**状态机共同基线问题。** 未修改 pristine base 也在 `test_statistical_distribution` 的既有测试触发 **60 秒单项 pytest 超时**；各完成运行唯一 P2P 失败 ID 与之相同，尚不能直接归为学生引入退化，也不能证明补丁没有性能影响。外层正式 verifier 上限为 3600 秒，相关 verifier 均正常结束；单项 60 秒不是外层中断。保留原正式分数；不能排除该测试的超时阻碍正式全通过。所有非空 State 补丁均为 69/72，空补丁均为 0/72，不能把仅三项 F2P 失败的描述套用于空补丁。对 HT_Exploration 的诊断指出，其三个 F2P 失败涉及无数据状态返回 `{}` 而非 `None`；这一具体原因未在每个非空补丁中独立核实。冻结后的工程诊断不是 K2 学生或提取方法的发现，不能算 K2 迁移收益。[最新诊断](audit/statemachine_baseline_timeout_diagnosis_zh.md)。
+
+### D.3 用量与资源快照
+
+截至快照，扩展记录 **1,857 个 CLI 请求，其中 1,748 个有用量**：Input **139,168,675**、Output **1,142,846**、Cached Input **9,114,752**，缓存已包含在 Input 内。未报告用量不能填零；分类包括历史文本审计、知识提取、学生各阶段、事后审计和报告等。历史 117 份学生文件中 108 份可关联 CLI Token，只有 56 份有逐 request 用量 ID；native CLI turn、Token 更新和 SDK 请求不是同一计数。原 SDK 美元为代理估计，不是真实 CLI 账单；结算美元未知。[历史成本表](audit/historical_attempt_costs.csv)；[各角色会话表](audit/historical_cli_usage_by_session.csv)。
+
+资源采样 1,258 次，最大间隔约 6,674 秒，存在中断空窗；观测到自有容器同时最多四个、采样内存合计峰值约 4.17 GB，短峰可能漏测。宿主负载含其他用户，不归为本实验；VM RSS 已含访客容器，不能相加。报告与复核后最终账本和关闭附记优先于此快照。
+
+## E. 采纳、行为变化、冗余与迁移失败
+
+**输入可见不等于因果采纳。** 冻结库与首请求检查证明文本可用；行为与指导一致仍可能来自任务要求、源码、模型先验或普通工程实践。D05 教师问题后的针对性探针是较强的同轮行为一致证据，仍无隔离教师效应的对照。
+
+- Cattrs K2 V1 的事件 63–64 检查修复失败字段时保留已有值；71–84 中泛型修复先破坏旧复现，再修正并重跑。该序列支持“状态保留、回归后重测”的语义提炼，不证明知识导致行动。K1 同题也做了复现和检查，事件 74–77 的自定义 hook／嵌套状态问题并未显示同一探针重跑。[K2 案例](audit/posthoc_development_cattrs-partial-structuring-recovery_K2_v1.md)。
+- Aiomonitor 两组均实现并测试若干边界，却漏掉空列表反馈；K2 事件 33–45 的身份修改和探针不证明运行中到终止的完整身份匹配。两组局部 console 失败均缺可靠基线，不能臆断退化原因。[K1](audit/posthoc_development_aiomonitor-task-snapshots-diff_K1_v1.md)；[K2](audit/posthoc_development_aiomonitor-task-snapshots-diff_K2_v1.md)。
+- Selection 的 B0 也自主复现、发现别名及默认值问题并修复；K2 V2 事件 41–44 的 helper 默认键改动最终造成 P2P 退化，尽管多次局部修复和 43 项选定测试通过。K1 V2 则发现同类默认键问题并在事件 33–42 修正。差异是可观察过程，不证明由库造成。[B0](audit/posthoc_selection_mashumaro-flattened-dataclass-fields_B0.md)；[K2 V2](audit/posthoc_selection_mashumaro-flattened-dataclass-fields_K2_v2.md)。
+- Statemachine 中 K2 V2 一次请求、零工具、空补丁即提前结束；K0 V1/V2 和 K2 V1 则读仓库并复现缺失 API 后空补丁。它们不是实际算法实现失败的同一类型，也不能把低成本提前结束称为效率提升。B0 与 K1 两版本有实质实现但均为 69/72；HT_NoHint、Error、Exploration 同样有实现但正式未解，Strategy 截止。HT_Exploration 的三个 F2P 失败被诊断为无数据状态返回 `{}` 而非 `None`，不能将这一具体原因直接推广到其他补丁。HT_NoHint 事件 161–178 检查并修复回调修改不持久，临时复现最终删除；Exploration 事件 161–164 则观察到修改未持久。相同行为或分数不证明库产生收益。[HT_NoHint](audit/posthoc_hint_transfer_python-statemachine-state-data-scoping_HT_NoHint.md)；[HT_Exploration](audit/posthoc_hint_transfer_python-statemachine-state-data-scoping_HT_Exploration.md)。
+
+重复宽泛搜索、依赖阻塞、重跑测试和临时探针有真实代价；有些发现缺陷，有些未完成，不能一概称浪费或归因于库。普通 K1 总结和 K0 先验已有大量边界追踪、验证与状态知识；K2 的功能对齐是分析假设及实际文本差异，不自动构成独有能力。
+
+## F. 值得迁往 Scene 的机制与待验证条件
+
+仅提出候选机制：将消费者所需状态映射到对象身份、几何关系与场景阶段；把局部探针扩展为对象清点、精确接触／支撑检查及渲染检查；保留参考、修改前后状态、教师诊断、实际补丁与独立验收的链接；对相机、几何、材质、光照分别记录可能混杂。保留状态仅在合同要求连续性时适用，不能对所有对象机械套用。
+
+验证前须固定或记录证据与预算，区分遮挡、出框和缺失，使用可复现的图像及几何检查，比较候选与普通总结及无库基线，并将提案复核、Selection 保留和独立质量验收分开。现有 Scene 的技术执行、有限像素观察及教师自评不足以证明上述机制有效；本次代码成绩不是 Scene 实证。
+
+## G. 九项近邻工作与贡献边界
+
+以下基于既有官方全文 CLI 审阅，不是复现或穷尽综述；论文结果为作者报告。[全文边界审阅](audit/related_work_fulltext_zh.md)。
+
+1. [GEPA](https://arxiv.org/abs/2507.19457)：用轨迹和反馈反思、演化并筛选提示；固定权重提示改进并非本研究首创。
+2. [DoVer](https://arxiv.org/abs/2512.06749)：在失败处恢复上下文与状态、干预重规划并验证假说；本研究没有完成相同中间状态的反事实回放。
+3. [Trace2Skill](https://arxiv.org/abs/2603.25158)：分析成功与失败轨迹并合并技能补丁；多轨迹总结和错误分析并非新颖点。
+4. [SkillGen](https://arxiv.org/abs/2605.10999)：检索相近案例并用修复与退化评价候选；验证集参与选择，不等同独立 Test。
+5. [SKILL-KD](https://arxiv.org/abs/2607.28048)：对照教师与失败学生轨迹，用学生重跑验证技能；教师指导及重跑验证已有先例。
+6. [Socratic Skill Learning](https://arxiv.org/abs/2610.17860)：学生测试建议并编辑资源，教育者审阅；教师—学生指导和跨会话技能并非首创。
+7. [SimWorld Studio](https://arxiv.org/abs/2605.09423)：从动作—观察失败形成规则，并结合场景图及视觉检查；其场景方法不证明本研究的 Scene 迁移。
+8. [SceneEvolve](https://arxiv.org/abs/2610.37046)：利用几何检查及开发评分选择工具／技能组合；整套候选选择不等于单项机制效果。
+9. [Liu 和 Wu：Teaching the Harness](https://arxiv.org/abs/2611.13144)：技能跟踪进度、语义与后置条件，候选须在匹配开发任务优于空库；其验证与本研究问题重叠。
+
+较具体、仍待严格检验的问题是：**在相同证据和预算下，跨轨迹按功能等价状态与约束对齐，是否比时间线提炼带来增量价值**。现有 V1 较接近该比较，V2 因 on-policy 证据及交付覆盖不同不能隔离该因素；上述审阅未见明确隔离同一比较，并不证明其他工作不存在或本方法新颖。
+
+**结语。** 已实现的是可追溯的历史全文审计、冻结文本知识与小样本新任务评价；观察到具体修复、正式通过、部分正确、空补丁、退化和技术中断并存。尚未验证状态对齐的独立因果收益、主动 Hint 风格效应、稳定效率收益或 Scene 迁移；后续最终成本和资源关闭状态应由真实操作附记补充。
+
+
+## 最终操作核验与成本附记
+
+北京时间 2026-11-27T08:09:22.693802+08:00 完成交付核验。原六小时封存窗口不变；本次用户授权扩展从北京时间 2026-11-26 18:23:29 持续至此，实际跨度 13.765 小时，包含接入故障、监控空窗和报告收尾，不冒充六小时内完成。29 次预定学生尝试、29 份对应事后审阅及全部正式评价已结束。
+
+最后一次报告复核／纠正调用之后的实际 CLI 账本共 1,861 个请求，1,752 个回报用量，另 109 个未报告用量；已报告 Input 139,635,598、Output 1,157,529、Cached Input 9,114,752。Cached 已包含在 Input 中。上述不是完整已结算账单，未报告用量与美元费用保持未知；本聊天操作开销未计入实验 CLI 账本。逐角色成本见 [最终成本分类](results/final_cost_breakdown.json)。
+
+实际关闭了本次恢复的三台 VM、对应隧道、模型桥接、进度服务和资源监控；关闭前无运行中的本实验容器，关闭后自有目标进程剩余 0。保留覆盖层、任务镜像、源码和全部原始失败记录。见 [实际关闭记录](logs/followup_cleanup.json)、[交付核验](results/final_verification.json)。共享服务器其他用户进程不在关闭范围。状态机共同基线超时的根因仍未查清；它作为限制保留，未改正式成绩，也未排除测试。
+
+
+调度与配置：两道不同 Test 任务两路并行，同题各组按预存交错顺序串行；并非所有组同时启动。实际复用三台 VM，每台 8 vCPU、144 GiB 配置，QEMU TCG、nice 10；每次学生 8 CPU、128 GiB 上限，正式验证器 8 GiB，CPU 受所在 VM 的 8 vCPU 约束。上述为配置／限额，非实际内存常驻量；关闭前 08:06:40 三台 VM 的 RSS 合计约 20.70 GiB，包含其访客内存。没有使用 GPU。采样峰值及空窗见 [资源统计](results/resource_summary.json)；关闭前点观测见 [宿主资源点记录](logs/host_resource_snapshots.jsonl)。

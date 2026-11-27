@@ -1,0 +1,2 @@
+{"content":"","tool_calls":[{"name":"Bash","arguments":{"entries":[{"key":"command","value":"python - <<'PY'\nfrom dataclasses import dataclass\nfrom adaptix import Retort,name_mapping,NameStyle\n@dataclass\nclass M:\n    foo_bar: int\nfor styles in [(NameStyle.CAMEL,NameStyle.CAMEL), (NameStyle.CAMEL,NameStyle.PASCAL)]:\n try: print(styles,Retort(recipe=[name_mapping(alias_style=styles)]).load({'fooBar':1},M))\n except Exception as e: print(type(e),str(e))\nPY\nrg -n 'class NameStyle|CAMEL|PASCAL' src/adaptix/_internal/name_style.py"}
+]}}]}

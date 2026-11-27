@@ -1,0 +1,270 @@
+Read-only historical Scene RSI archive audit. Output English at most 750 words. You receive complete selected control/program/teacher/candidate-acceptance records, not the entire archive. Cite original archive and member paths plus exact keys/line numbers/character ranges. Distinguish teacher problem detection, diagnostic hypothesis, proposed H/M/code update, actual student mechanism execution and candidate acceptance. Examine evidence about multi-object coverage, material/texture, part connections, pose, camera/light/render. Identify technical versus quality failures, acceptance rules and whether records actually substantiate them. Do not infer image appearance, physical contact or unseen execution from code or agent claims. Separate observations and hypotheses. No new experiments, solver answers or skill updates.
+{"archive": "/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/work/scene_archive/bundles/ablation_r2--ours_without_probes.tar.gz", "bundle_id": "B05", "chunk": 1, "chunks": 1, "member_inventory": "/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-26/trajectory-to-capability-rsi-hint-rsi/outputs/trajectory_capability_followup_20261126_182329/audit/scene_bundle_member_inventory.csv"}
+
+SOURCE B05 experiments/scene_rsi_pilot/candidates/ablation_r2/ours_without_probes/C1/diagnostic_observations.json characters [0,1056) of 1056
+{
+  "initial_diagnoses": [
+    {
+      "scene_id": "commons_109923183",
+      "object_id": "unknown",
+      "code_location": "unknown",
+      "observation": "No valid output; consult execution log",
+      "observation_type": "measured",
+      "hypothesis": "unknown",
+      "probe": "none",
+      "probe_result": "not_run",
+      "planned_change": "Investigate general runtime failure before visual diagnosis"
+    },
+    {
+      "scene_id": "commons_118588033",
+      "object_id": "bunks",
+      "code_location": "unknown",
+      "observation": "Reference/render disagreement; magnitude is measured by fixed visual metrics",
+      "observation_type": "measured_metric_with_unresolved_visual_cause",
+      "hypothesis": "Camera framing or object scale may contribute; this is a hypothesis, not attribution",
+      "probe": "disabled; passive evidence only",
+      "probe_result": "disabled by frozen ablation",
+      "planned_change": "Use passive visual/geometric and dependency regression evidence to choose a shared H change"
+    }
+  ],
+  "probes": []
+}
+
+
+SOURCE B05 experiments/scene_rsi_pilot/candidates/ablation_r2/ours_without_probes/C1/evidence_projection.json characters [0,201) of 201
+{
+  "original_compact_bytes": 390256,
+  "limit_bytes": 420000,
+  "changes": [],
+  "full_raw_evidence_retained_on_disk": true,
+  "selection_criterion": "size and fixed source order only, never score"
+}
+
+
+SOURCE B05 experiments/scene_rsi_pilot/candidates/ablation_r2/ours_without_probes/C1/meta.py characters [0,2819) of 2819
+"""scene_rsi_pilot M_initial: bounded intervention and dependency regression guidance."""
+def plan(packet):
+    scenes = packet['development']
+    probes = []
+    diagnoses = []
+    for scene in scenes:
+        if scene['status'] != 'complete':
+            diagnoses.append({'scene_id': scene['scene_id'], 'object_id': 'unknown', 'code_location': 'unknown', 'observation': 'No valid output; consult execution log', 'observation_type': 'measured', 'hypothesis': 'unknown', 'probe': 'none', 'probe_result': 'not_run', 'planned_change': 'Investigate general runtime failure before visual diagnosis'})
+            continue
+        target = scene.get('target_object', 'unknown')
+        # Paired one-factor interventions distinguish camera from geometry sensitivity.
+        probes = [{'scene_id': scene['scene_id'], 'kind': kind} for kind in ['camera_focal', 'object_scale']]
+        diagnoses.append({'scene_id': scene['scene_id'], 'object_id': target, 'code_location': 'unknown', 'observation': 'Reference/render disagreement; magnitude is measured by fixed visual metrics', 'observation_type': 'measured_metric_with_unresolved_visual_cause', 'hypothesis': 'Camera framing or object scale may contribute; this is a hypothesis, not attribution', 'probe': 'disabled; passive evidence only', 'probe_result': 'disabled by frozen ablation', 'planned_change': 'Use passive visual/geometric and dependency regression evidence to choose a shared H change'})
+        break
+    failures = {key: sum(not row.get('functional', {}).get(key, False) for row in scenes) for key in ['structure_pass', 'material_pass', 'composite_pass']}
+    priorities = sorted(failures, key=lambda key: (-failures[key], key))
+    return {'probes': [], 'diagnoses': diagnoses, 'regression_priorities': priorities, 'regression_guidance': True,
+            'instruction': 'Active diagnostics are disabled in this ablation. You MUST return requested_probes=[]; use existing evidence only. Improve shared H and executable M using existing visual/geometric observations and fixed functional regression evidence. Cover camera/object scale confusion, support/spatial relations, and occlusion/omission as applicable. Keep measured facts separate from visual hypotheses and historical heuristics. Link scene_id, object_id, code_location, observation, hypothesis, probe, probe_result, planned_change; unknown mappings must remain unknown. Do not assert causality from a single score delta. Use target modules/dependencies and modification risks to prioritize object structure, local material non-target preservation and composite movement checks. All final objectives and acceptance remain fixed. Modify meta.py only when an executable strategy change is justified; a memory append alone is not meta improvement. Return a reusable H, never a per-scene patched P.'}
+
+
+SOURCE B05 experiments/scene_rsi_pilot/candidates/ablation_r2/ours_without_probes/C1/meta_execution.json characters [0,2407) of 2407
+{
+  "source": "__EXPERIMENT_ROOT__/ablation_initial/ours_without_probes/meta.py",
+  "plan": {
+    "probes": [],
+    "diagnoses": [
+      {
+        "scene_id": "commons_109923183",
+        "object_id": "unknown",
+        "code_location": "unknown",
+        "observation": "No valid output; consult execution log",
+        "observation_type": "measured",
+        "hypothesis": "unknown",
+        "probe": "none",
+        "probe_result": "not_run",
+        "planned_change": "Investigate general runtime failure before visual diagnosis"
+      },
+      {
+        "scene_id": "commons_118588033",
+        "object_id": "bunks",
+        "code_location": "unknown",
+        "observation": "Reference/render disagreement; magnitude is measured by fixed visual metrics",
+        "observation_type": "measured_metric_with_unresolved_visual_cause",
+        "hypothesis": "Camera framing or object scale may contribute; this is a hypothesis, not attribution",
+        "probe": "disabled; passive evidence only",
+        "probe_result": "disabled by frozen ablation",
+        "planned_change": "Use passive visual/geometric and dependency regression evidence to choose a shared H change"
+      }
+    ],
+    "regression_priorities": [
+      "composite_pass",
+      "material_pass",
+      "structure_pass"
+    ],
+    "regression_guidance": true,
+    "instruction": "Active diagnostics are disabled in this ablation. You MUST return requested_probes=[]; use existing evidence only. Improve shared H and executable M using existing visual/geometric observations and fixed functional regression evidence. Cover camera/object scale confusion, support/spatial relations, and occlusion/omission as applicable. Keep measured facts separate from visual hypotheses and historical heuristics. Link scene_id, object_id, code_location, observation, hypothesis, probe, probe_result, planned_change; unknown mappings must remain unknown. Do not assert causality from a single score delta. Use target modules/dependencies and modification risks to prioritize object structure, local material non-target preservation and composite movement checks. All final objectives and acceptance remain fixed. Modify meta.py only when an executable strategy change is justified; a memory append alone is not meta improvement. Return a reusable H, never a per-scene patched P."
+  },
+  "actually_used_for_proposal": true,
+  "phase": "before_proposal"
+}
+
+
+SOURCE B05 experiments/scene_rsi_pilot/candidates/ablation_r2/ours_without_probes/C1/policy.py characters [0,1537) of 1537
+import json
+from pathlib import Path
+import re
+
+
+def solve(task, runtime):
+    prompt = (Path(__file__).parent / 'system.txt').read_text()
+    messages = [{'role': 'system', 'content': prompt}, {'role': 'user', 'content': [
+        {'type': 'text', 'text': 'Reconstruct this RGB image. Match its camera and framing. ' +
+         f"Image dimensions: {task['width']} x {task['height']}. Budget: {runtime.remaining()}"},
+        runtime.image(task['image'])]}]
+    while runtime.remaining()['model_calls'] > 0 and runtime.remaining()['seconds'] > 0:
+        response = runtime.ask(messages)
+        messages.append(response)
+        text = response['content'] or ''
+        blocks = re.findall(r'```python\s*\n(.*?)```', text, re.S)
+        if not blocks:
+            if text.strip().upper() == 'DONE': return
+            messages.append({'role': 'user', 'content': 'Return one complete program in a python code block, or DONE.'})
+            continue
+        if runtime.remaining()['executions'] <= 0: return
+        result = runtime.execute(blocks[-1])
+        feedback = {'type': 'text', 'text': json.dumps({k: v for k, v in result.items() if k != 'image'}) +
+                    '\nCompare the rendered camera view with the original reference. ' +
+                    f'Fix errors with a complete revised program, or finish with DONE. Remaining: {runtime.remaining()}'}
+        content = [feedback]
+        if result['image']: content.append(runtime.image(result['image']))
+        messages.append({'role': 'user', 'content': content})
+
+
+SOURCE B05 experiments/scene_rsi_pilot/candidates/ablation_r2/ours_without_probes/C2/diagnostic_observations.json characters [0,1056) of 1056
+{
+  "initial_diagnoses": [
+    {
+      "scene_id": "commons_109923183",
+      "object_id": "unknown",
+      "code_location": "unknown",
+      "observation": "No valid output; consult execution log",
+      "observation_type": "measured",
+      "hypothesis": "unknown",
+      "probe": "none",
+      "probe_result": "not_run",
+      "planned_change": "Investigate general runtime failure before visual diagnosis"
+    },
+    {
+      "scene_id": "commons_118588033",
+      "object_id": "bunks",
+      "code_location": "unknown",
+      "observation": "Reference/render disagreement; magnitude is measured by fixed visual metrics",
+      "observation_type": "measured_metric_with_unresolved_visual_cause",
+      "hypothesis": "Camera framing or object scale may contribute; this is a hypothesis, not attribution",
+      "probe": "disabled; passive evidence only",
+      "probe_result": "disabled by frozen ablation",
+      "planned_change": "Use passive visual/geometric and dependency regression evidence to choose a shared H change"
+    }
+  ],
+  "probes": []
+}
+
+
+SOURCE B05 experiments/scene_rsi_pilot/candidates/ablation_r2/ours_without_probes/C2/evidence_projection.json characters [0,201) of 201
+{
+  "original_compact_bytes": 390602,
+  "limit_bytes": 420000,
+  "changes": [],
+  "full_raw_evidence_retained_on_disk": true,
+  "selection_criterion": "size and fixed source order only, never score"
+}
+
+
+SOURCE B05 experiments/scene_rsi_pilot/candidates/ablation_r2/ours_without_probes/C2/meta.py characters [0,2819) of 2819
+"""scene_rsi_pilot M_initial: bounded intervention and dependency regression guidance."""
+def plan(packet):
+    scenes = packet['development']
+    probes = []
+    diagnoses = []
+    for scene in scenes:
+        if scene['status'] != 'complete':
+            diagnoses.append({'scene_id': scene['scene_id'], 'object_id': 'unknown', 'code_location': 'unknown', 'observation': 'No valid output; consult execution log', 'observation_type': 'measured', 'hypothesis': 'unknown', 'probe': 'none', 'probe_result': 'not_run', 'planned_change': 'Investigate general runtime failure before visual diagnosis'})
+            continue
+        target = scene.get('target_object', 'unknown')
+        # Paired one-factor interventions distinguish camera from geometry sensitivity.
+        probes = [{'scene_id': scene['scene_id'], 'kind': kind} for kind in ['camera_focal', 'object_scale']]
+        diagnoses.append({'scene_id': scene['scene_id'], 'object_id': target, 'code_location': 'unknown', 'observation': 'Reference/render disagreement; magnitude is measured by fixed visual metrics', 'observation_type': 'measured_metric_with_unresolved_visual_cause', 'hypothesis': 'Camera framing or object scale may contribute; this is a hypothesis, not attribution', 'probe': 'disabled; passive evidence only', 'probe_result': 'disabled by frozen ablation', 'planned_change': 'Use passive visual/geometric and dependency regression evidence to choose a shared H change'})
+        break
+    failures = {key: sum(not row.get('functional', {}).get(key, False) for row in scenes) for key in ['structure_pass', 'material_pass', 'composite_pass']}
+    priorities = sorted(failures, key=lambda key: (-failures[key], key))
+    return {'probes': [], 'diagnoses': diagnoses, 'regression_priorities': priorities, 'regression_guidance': True,
+            'instruction': 'Active diagnostics are disabled in this ablation. You MUST return requested_probes=[]; use existing evidence only. Improve shared H and executable M using existing visual/geometric observations and fixed functional regression evidence. Cover camera/object scale confusion, support/spatial relations, and occlusion/omission as applicable. Keep measured facts separate from visual hypotheses and historical heuristics. Link scene_id, object_id, code_location, observation, hypothesis, probe, probe_result, planned_change; unknown mappings must remain unknown. Do not assert causality from a single score delta. Use target modules/dependencies and modification risks to prioritize object structure, local material non-target preservation and composite movement checks. All final objectives and acceptance remain fixed. Modify meta.py only when an executable strategy change is justified; a memory append alone is not meta improvement. Return a reusable H, never a per-scene patched P.'}
+
+
+SOURCE B05 experiments/scene_rsi_pilot/candidates/ablation_r2/ours_without_probes/C2/meta_execution.json characters [0,2407) of 2407
+{
+  "source": "__EXPERIMENT_ROOT__/ablation_initial/ours_without_probes/meta.py",
+  "plan": {
+    "probes": [],
+    "diagnoses": [
+      {
+        "scene_id": "commons_109923183",
+        "object_id": "unknown",
+        "code_location": "unknown",
+        "observation": "No valid output; consult execution log",
+        "observation_type": "measured",
+        "hypothesis": "unknown",
+        "probe": "none",
+        "probe_result": "not_run",
+        "planned_change": "Investigate general runtime failure before visual diagnosis"
+      },
+      {
+        "scene_id": "commons_118588033",
+        "object_id": "bunks",
+        "code_location": "unknown",
+        "observation": "Reference/render disagreement; magnitude is measured by fixed visual metrics",
+        "observation_type": "measured_metric_with_unresolved_visual_cause",
+        "hypothesis": "Camera framing or object scale may contribute; this is a hypothesis, not attribution",
+        "probe": "disabled; passive evidence only",
+        "probe_result": "disabled by frozen ablation",
+        "planned_change": "Use passive visual/geometric and dependency regression evidence to choose a shared H change"
+      }
+    ],
+    "regression_priorities": [
+      "composite_pass",
+      "material_pass",
+      "structure_pass"
+    ],
+    "regression_guidance": true,
+    "instruction": "Active diagnostics are disabled in this ablation. You MUST return requested_probes=[]; use existing evidence only. Improve shared H and executable M using existing visual/geometric observations and fixed functional regression evidence. Cover camera/object scale confusion, support/spatial relations, and occlusion/omission as applicable. Keep measured facts separate from visual hypotheses and historical heuristics. Link scene_id, object_id, code_location, observation, hypothesis, probe, probe_result, planned_change; unknown mappings must remain unknown. Do not assert causality from a single score delta. Use target modules/dependencies and modification risks to prioritize object structure, local material non-target preservation and composite movement checks. All final objectives and acceptance remain fixed. Modify meta.py only when an executable strategy change is justified; a memory append alone is not meta improvement. Return a reusable H, never a per-scene patched P."
+  },
+  "actually_used_for_proposal": true,
+  "phase": "before_proposal"
+}
+
+
+SOURCE B05 experiments/scene_rsi_pilot/candidates/ablation_r2/ours_without_probes/C2/policy.py characters [0,1537) of 1537
+import json
+from pathlib import Path
+import re
+
+
+def solve(task, runtime):
+    prompt = (Path(__file__).parent / 'system.txt').read_text()
+    messages = [{'role': 'system', 'content': prompt}, {'role': 'user', 'content': [
+        {'type': 'text', 'text': 'Reconstruct this RGB image. Match its camera and framing. ' +
+         f"Image dimensions: {task['width']} x {task['height']}. Budget: {runtime.remaining()}"},
+        runtime.image(task['image'])]}]
+    while runtime.remaining()['model_calls'] > 0 and runtime.remaining()['seconds'] > 0:
+        response = runtime.ask(messages)
+        messages.append(response)
+        text = response['content'] or ''
+        blocks = re.findall(r'```python\s*\n(.*?)```', text, re.S)
+        if not blocks:
+            if text.strip().upper() == 'DONE': return
+            messages.append({'role': 'user', 'content': 'Return one complete program in a python code block, or DONE.'})
+            continue
+        if runtime.remaining()['executions'] <= 0: return
+        result = runtime.execute(blocks[-1])
+        feedback = {'type': 'text', 'text': json.dumps({k: v for k, v in result.items() if k != 'image'}) +
+                    '\nCompare the rendered camera view with the original reference. ' +
+                    f'Fix errors with a complete revised program, or finish with DONE. Remaining: {runtime.remaining()}'}
+        content = [feedback]
+        if result['image']: content.append(runtime.image(result['image']))
+        messages.append({'role': 'user', 'content': content})
+

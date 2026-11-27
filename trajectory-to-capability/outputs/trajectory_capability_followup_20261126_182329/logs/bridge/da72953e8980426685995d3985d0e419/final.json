@@ -1,0 +1,2 @@
+{"content":"","tool_calls":[{"name":"Bash","arguments":{"entries":[{"key":"command","value":"python - <<'PY'\nfrom dataclasses import dataclass\nfrom adaptix import Retort, name_mapping, DebugTrail\nfrom adaptix.struct_trail import get_trail\n@dataclass\nclass M: x:int\nr=Retort(recipe=[name_mapping(M,aliases={'x':'alt'})],debug_trail=DebugTrail.FIRST)\ntry:r.load({'alt':'bad'},M)\nexcept Exception as e: print('trail',list(get_trail(e)))\nPY\nrg -n 'generate_json_schema|JSONSchemaRequest|json_schema' tests | head -45; cat src/adaptix/_internal/name_style.py"}
+]}}]}

@@ -1,0 +1,11 @@
+## Audit finding
+
+The supplied record reports a passing functional summary, but it does not substantiate the underlying scene quality or explain how the result was reached. The user describes the selected records as complete for this audit; only one summary excerpt is present in the supplied material.
+
+**Reported result.** In archive `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/work/scene_archive/bundles/external--scene_rsi_pilot.tar.gz`, member `experiments/scene_rsi_pilot/results/external/scene_rsi_pilot/selected/external/bw_0005/functional/summary.json`, characters [0,360), the keys `structure_pass`, `material_pass`, `composite_pass`, and `functional_pass` are all `true`. The record identifies `back_left_plant` as `target_object` and says `composite_required` is `true`.
+
+**Acceptance rule and evidentiary limit.** The same member, characters [0,360), states in `interpretation` that the result concerns “Structural/edit operability only” and that an expected composite being absent counts as failure, “never N/A.” The reported `composite_pass: true` is consistent with that rule, but the excerpt supplies neither the underlying check nor its observations. It therefore reports a pass rather than independently demonstrating that the rule was correctly applied. No general candidate-acceptance decision or acceptance procedure is shown.
+
+**Scope of scene evidence.** `material_pass: true` reports a material check, but does not establish texture quality or appearance. The target and composite fields do not establish multi-object coverage. The excerpt contains no evidence about part connections, pose, camera, lighting, or render quality. In particular, `semantic_object_completeness` and `support_collision_truth` are both `null` (same member and character range); semantic completeness and physical support or contact are not established.
+
+**Process and failure classification.** No teacher problem detection, diagnostic hypothesis, proposed H/M/code update, or actual student mechanism execution appears in the supplied excerpt. No technical or quality failure is documented; nor can the reported passes rule out quality failures beyond the stated structural/edit-operability scope. These absent process stages should not be inferred from the summary.

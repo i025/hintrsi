@@ -1,0 +1,44 @@
+# Historical evidence synthesis: Scene H04, batch 1
+
+## Coverage and citation key
+
+The supplied inventory contains **27 student trajectory files**, S0327–S0353: 12 test, 3 selection and 12 development files. The reports cover the supplied chunks for this one-batch group; their occasional “only chunk” qualifications describe the individual audit excerpt, not a reason to disregard the companion report supplied here. Files and repeated scene variants are not necessarily independent trials. No teacher-role trajectory or separate teacher advice artifact is in the supplied inventory.
+
+Citations identify original JSONL sources and lines. To keep paths readable, **R** means `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v3/results/H04/`; append the path shown in the matrix. All paths end in `/trajectory.jsonl`. The evidence is the supplied model-reviewed audit reports, not independently reinspection of raw files or image pixels.
+
+## Evidence matrix
+
+| Cases and original paths under R | Executed behavior and observed outcome |
+|---|---|
+| S0327–S0328: `test/bw_0023/{1,2}` | Three builds and renders per trajectory succeeded, and step 3 was selected. H revised a purported vaulted interior, rail and spheres after comparisons; final fidelity and the phone-screen crop interpretation remain unknown. S0327 lines 11–14, 23–30; S0328 lines 11–14, 23–30. |
+| S0329–S0330: `test/bw_0056/{1,2}` | Three technically successful builds each. H revised interpreted cleanroom workers, machinery and framing; hand-to-screen contact and final appearance were not independently checked. S0329 lines 13–14, 23–30; S0330 lines 13–14, 23–30. |
+| S0331–S0332: `test/bw_0039/{1,2}` | Three successful builds each; H revised interpreted renovation-room windows and ladders. S0332’s proposed procedural wall variation is not implemented in the visible code. Final selection is recorded in both. S0331 lines 13–14, 23–30; S0332 lines 21–30. |
+| S0333–S0334: `test/bw_0011/{1,2}` | Three successful builds each. In S0333 H selected one of four camera candidates by weighted landmark error; S0334 revised wall, mural, cabinet and lighting. Neither selection establishes image fidelity. S0333 lines 21–24, 29–30; S0334 lines 23–30. |
+| S0335–S0336: `test/bw_0016/{1,2}` | S0335 timed out in the model CLI before a completed program or Blender execution. S0336 instead completed three builds for an interpreted workshop; its aggregate camera criterion improved while an individual landmark regressed. S0335 lines 2–4; S0336 lines 11–20, 23–30. |
+| S0337–S0338: `test/bw_0005/{1,2}` | Three builds each succeeded for an interpreted classroom/inset. S0338 retained a right wall despite stating an intention to omit the blocking wall; later it reduced six windows to four. The appropriate crop and final match are unknown. S0337 lines 13–14, 23–30; S0338 lines 13–14, 23–30. |
+| S0339: `selection/bw_0045/1` | Three builds succeeded for an interpreted barn; the initial code called six cows despite comments estimating five. The third render was selected, not independently evaluated. Lines 3–4, 23–24, 29–30. |
+| S0340: `selection/bw_0017/1` | Three builds succeeded. A third-step camera trial moved machine and tank projections upward, while a conveyor point remained below frame. Lines 14, 19, 24, 29–30. |
+| S0341: `selection/bw_0031/1` | Three builds succeeded for an interpreted control-room slide. Some initial comparisons mixed room-crop estimates with full-camera projections, limiting their interpretation as calibrated errors. Lines 3, 9, 13–14, 23–30. |
+| S0342–S0343: `development/{commons_104864364,commons_189918915}/1` | Three builds each succeeded. S0342’s proposed floor variation is not visibly implemented; S0343 tried +25° roll and later −25°, with residual landmark differences. S0342 lines 23–24, 29–30; S0343 lines 13–14, 19, 23–30. |
+| S0344–S0346: `development/{commons_31294395,commons_187101683,commons_92056365}/1` | Three builds each succeeded. H revised, respectively, an interpreted bedroom, sofa scene and restaurant; the reported visual defects and effectiveness of the edits remain unverified. S0344 lines 13–14, 23–30; S0345 lines 13–14, 23–30; S0346 lines 13–19, 23–30. |
+| S0347–S0348: `development/{commons_105241439,commons_113438548}/1` | Three builds each succeeded. S0347 retained its camera while changing furniture and board shading; S0348 combined camera, geometry, material and lighting changes. S0347 lines 13–14, 23–30; S0348 lines 13–14, 23–30. |
+| S0349: `development/commons_109923183/1` | First build failed on an invalid fillet radius; runner traceback and repair request preceded H’s radius change, successful second build/render and a successful selected third build. Lines 7–16, 18–21, 26–27. |
+| S0350–S0353: `development/{commons_192968130,commons_130842254,commons_96943062,commons_118588033}/1` | Three builds each succeeded. Their final programs revised, respectively, an interpreted kitchen, historic kitchen, damaged office and bunk room; no independent final-image verdict is supplied. S0350 lines 23–30; S0351 lines 23–30; S0352 lines 23–30; S0353 lines 23–30. |
+
+## Comparison of outcomes and feedback
+
+**Technical completion is common, but task success is not established.** In 26 trajectories the selected third build and render completed successfully. S0349 reached that state after an actual build-parameter failure and repair; the other interrupted trajectory, S0335, stopped at a roughly 900-second model CLI timeout, before any completed scene program or render. The latter is neither an empty patch nor evidence of Blender or geometric failure. No permission or branch stop, or empty patch, is documented in this group. Formal visual scores are unknown, not zero; absence also cannot recover old model cost.
+
+There is evidence of **partial diagnostic progress**, not independently verified partial reconstruction quality. For example, S0332’s window projection moved toward H’s estimate after a lens and aim change, while discrepancies remained (lines 13–19). In S0336 an accepted aggregate landmark improvement accompanied an individual regression (lines 13–19). S0349’s selected camera improved aggregate error while a wall point projected outside the frame (lines 21, 26). These are counterexamples to treating a successful numerical criterion as a complete visual fix.
+
+The feedback chain is observable but narrow. The original task instructions and runner made comparison and projection procedures available; in completed sequences, subsequent H requests actually contained render feedback, and H gave its own diagnoses and executed revisions. S0349 additionally received a traceback and an explicit repair request, then changed the offending radius; subsequent execution validated the build repair, not the scene’s appearance (lines 7–16). By contrast, **no separately identified teacher diagnosis, proposed update, receipt or adoption is visible** in these student trajectories. Generic runner feedback must not be relabeled teacher advice, and availability of unspecified advice would not establish receipt.
+
+Selection and `ok: true` establish operational acceptance by the runner, not an independent quality judgment. H’s comparisons are its reported observations; the audit reports do not expose the reference or render pixels for independent assessment. Asset names and child hierarchies establish emitted structure, not correct visibility, contact, pose or completeness. The final renders generally lack a recorded subsequent visual review.
+
+## Transferable constraints and limits
+
+- **Keep measurements and appearance distinct.** Estimated reference landmarks, computed projections, rendered contours and independent visual judgments answer different questions. Even a close point match does not establish occlusion, materials or connections; S0327’s final projections and selection illustrate this boundary (lines 29–30).
+- **Control comparisons and avoid unique causal attribution.** S0341 mixed coordinate frames; S0330’s small reversible aim trial did not validate its preceding large camera relocation (S0341 lines 3, 9; S0330 lines 13–14, 19). Simultaneous changes to geometry, camera, materials and lights also limit attribution.
+- **Treat scene-specific interpretations as hypotheses.** The supposed phone-screen crop in S0327 and separately depicted panel in S0341 are H’s interpretations, not verified image facts (S0327 lines 1, 3; S0341 lines 1, 3). Particular furniture, roll, lighting and object-count choices are not general rules. Likewise, a proposed change is not necessarily implemented: S0332’s wall variation and S0338’s intended wall omission provide explicit counterexamples.
+
+This is an audit-only synthesis. It establishes execution and recorded behavior where cited, while final image quality, formal correctness and causal superiority remain unverified.

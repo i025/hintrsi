@@ -1,0 +1,35 @@
+{
+  "name": "followup-bundle-B11_chunk001",
+  "completed": true,
+  "started_at": 1795689695.013193,
+  "finished_at": 1795689723.137578,
+  "characters": 4978,
+  "words": 549,
+  "response": {
+    "id": "chatcmpl-e9a569034e1e4ee8a0334cbef4996511",
+    "object": "chat.completion",
+    "created": 1795689723,
+    "model": "gpt-6.1-terra",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "## Scope and outcome\n\nThis audit uses only the supplied B11 records, not the entire archive. Archive: `/srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/work/scene_archive/bundles/history--quota_restored_20261103.tar.gz`. Member paths below are relative to `experiments/scene_rsi_pilot/quota_restored_20261103/proposal_context_before_retry/candidates/`.\n\n**The selected proposal attempts failed technically; the records do not establish candidate acceptance or an improvement in student performance.** Each supplied C2 `proposal_result.json` reports `proposal_failed`, proposer exit 1 and `M_changed: false`; the six ablation C1/C2 results report the same. The underlying stderr logs are not supplied, so the cause of exit is unknown. Existing C2 policy files can be inherited parent code, not evidence that these failed proposals produced updates. For example, `r1/scene_rsi_pilot/C2/proposal_result.json` keys `status`, `error`, `parent_source`, `M_changed` [0,324); `r2/generic_rsi/C2/proposal_result.json` [0,312).\n\n## Detection and controlled evidence\n\n- The initial teacher distinguished missing output from visual disagreement. In `r2/scene_rsi_pilot/C2/diagnostic_observations.json`, `initial_diagnoses` [0,12287), `commons_109923183` has no valid output and unknown cause; for `commons_118588033`, camera framing or scale is explicitly a hypothesis, not attribution. Its completed focal probe changed 27.5 to 30.25 with geometry unchanged: overall 0.39655 to 0.39264. Scaling the selected `bunks` group by 1.1 at fixed camera yielded 0.39504. These are scoped sensitivities, not proof of the correct camera or 3D size.\n- `r1/scene_rsi_pilot/C2/diagnostic_observations.json`, `initial_diagnoses` [0,12942), records failed execution events at steps 1 and 3, but both stderr strings are empty. Pre-execution API review is a proposed remedy, not an established failure cause. A separate missing-item explanation\u2014omission, overwrite, crop, occlusion or low contrast\u2014is hypothetical; isolation was not run.\n- In `ablation_r1/generic_same_structured_evidence/C1/diagnostic_observations.json`, `probes` [0,4078), focal 51\u219256.1 changes overall 0.39075\u21920.38753, while 1.1 scaling of `arm gold-1` gives 0.39096. Selection is a lexicographic group rule, not proof of semantic whole-object coverage. The no-probes ablation instead has `probes: []`; the no-regression-guidance ablation withholds feedback while stating that final gates remain fixed (`ablation_r1/ours_without_probes/C1/meta_execution.json` [0,2000); `ablation_r1/ours_without_regression_guidance/C1/meta_execution.json` [0,2102)).\n\n## Coverage, materials and connections\n\nThe r1 diagnostics report prescribed Blender material and move operations on `apron_-1` and `architecture`: target material replacement and non-target preservation passed; moves preserved selected part-relative matrices within tolerance, with three renders completed for each. These are **edit-operability tests**, not proof of material or texture fidelity, pose correctness, semantic completeness, physical connections or contact. `semantic_object_completeness` and `support_collision_truth` are null. The projected structure shows only 64 of 2,490 and 64 of 466 objects respectively; omitted dependencies cannot be certified and AABB relations are not contact truth (`r1/scene_rsi_pilot/C2/diagnostic_observations.json`, `initial_diagnoses[*].observation` and `probe_result` [0,12942)).\n\n## Proposed mechanism versus execution and acceptance\n\nThe executed planning record says its plan was used before proposal, and calls for inventory/ownership, actual support surfaces, camera anchors, local material preservation and composite movement checks (`r1/scene_rsi_pilot/C2/meta_execution.json`, `plan`, `actually_used_for_proposal` [0,20132)). The accompanying `policy.py` describes a pre-execution review, render-dependent feedback and selection of successful steps; `r2/generic_rsi/C2/policy.py` additionally describes procedural texture, lighting, camera and primitive-budget heuristics. These are **program instructions**, not student execution traces proving those actions occurred. No supplied record establishes a pose-specific correction or lighting-quality result. [Members: `r1/scene_rsi_pilot/C2/policy.py` [0,6998); `r2/generic_rsi/C2/policy.py` [0,8703).]\n\nThe SceneEvolve teacher specifies visual score q from clipped SSIM, LPIPS and DINO; missing project or PNG scores zero, averaged over four development scenes. It requires retaining the best Selection-eligible H including H0, while prohibiting evaluator, split and budget changes (`r2/sceneevolve_cli/C2/meta_execution.json`, `plan.instruction` [0,4492)). The r1 functional record also states an expected absent composite fails rather than becoming N/A. These statements describe rules and selected test outcomes, **not a complete acceptance decision**: no acceptance thresholds, candidate comparison or acceptance result are supplied here."
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 50909,
+      "completion_tokens": 1210,
+      "total_tokens": 52119,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      }
+    }
+  }
+}

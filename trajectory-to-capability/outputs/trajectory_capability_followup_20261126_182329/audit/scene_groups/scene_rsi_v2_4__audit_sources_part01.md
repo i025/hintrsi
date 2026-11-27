@@ -1,0 +1,42 @@
+# Scene historical evidence synthesis — batch 1 of 1
+
+## Scope and coverage
+
+The group inventory contains **21 source files, S0236–S0256**, all student trajectories. The supplied audit reports cover all 21 files; this synthesis uses their reported observations rather than re-accessing raw files. File counts include copies and repeated configurations, not necessarily independent trials. The records include repeated image identifiers across rounds or conditions, so counts must not be interpreted as independent performance estimates.
+
+For compact citations, the common original-path prefix is:
+
+`P = /srv/lab-disks/disk2/users/xymo/Documents/Codex/2026-11-02/scene-rsi-rsi-1-3d-blender/outputs/scene_rsi_v2_4/audit_sources/raw_failures/`
+
+Each path in the matrix is relative to `P` and ends in `/trajectory.jsonl`; line numbers are original JSONL lines. The audit reports say the reference photographs are not visible to this review, and none of these trajectories records a successful render. Formal scores, where absent, are **unknown**, not zero. Historical model cost cannot be recovered from its absence in these records.
+
+## Evidence matrix
+
+| Sources and original paths relative to `P` | Observed attempt and outcome |
+|---|---|
+| **S0236** `scene_rsi_v2_2/r2/fixed_h/H0/fixed_version_test/commons_104864364` | Pocket fillet constraint stopped the first execution; a smaller radius was executed, then timed out without an image. Lines 3–10. |
+| **S0237** `scene_rsi_v2_2/r2/fixed_h/H0/fixed_version_test/commons_31294395` | Fillet failure, followed by a revised execution failing on a null world. A further world/naming revision was returned but not executed. Lines 3–13. |
+| **S0238** `scene_rsi_v2_2/r2/fixed_h/H0/fixed_version_test/commons_92056365` | Nonempty diner-interpreted program; sole execution timed out with no image. Lines 3–5. |
+| **S0239** `scene_rsi_v2_2/r1/fixed_h/H0/fixed_version_test/commons_104864364` | Fillet failure; executed radius reduction reached a null-world failure. A final world fix was not executed. Lines 3–13. |
+| **S0240**, **S0243** `scene_rsi_v2_2/r1/fixed_h/H0/fixed_version_test/commons_49800017` and `commons_96943062` | Initial model sessions timed out before any visible program or scene execution; errors propagated to the scene runner. Lines 1–4. |
+| **S0241** `scene_rsi_v2_2/r1/fixed_h/H0/fixed_version_test/commons_92056365` | First build failed on a null world; an executed revision added world initialization and changed geometry, then timed out. Lines 3–10. |
+| **S0242** `scene_rsi_v2_2/r1/fixed_h/H0/fixed_version_test/commons_192968130` | Initial program failed on a null world; the subsequent student session timed out without a visible correction. Lines 3–9. |
+| **S0244**, **S0245** `scene_rsi_v2_2/r1/fixed_h/r1_C2/fixed_version_test/commons_49800017` and `commons_96943062` | Initial sessions exited with code 1 during `runtime.ask`; stderr contents were unavailable. No program or render is recorded. Lines 1–4. |
+| **S0246**, **S0247** `scene_rsi_v2_1/r2/scene_rsi_v2_1/C2/test/commons_189918915` and `commons_80372956` | Nonempty programs for student-interpreted warehouse and ceiling/chandelier scenes were each executed once and timed out, with null images. Lines 3–5. |
+| **S0248** `scene_rsi_v2_1/r2/scene_rsi_v2_1/C1/selection/commons_194983350` | Nonempty café-interpreted program; execution timed out without an image. Lines 3–5. |
+| **S0249**, **S0250**, **S0251** `scene_rsi_v2_1/r2/fixed_h0/H0/test/commons_189918915`, `test/commons_80372956`, and `selection/commons_194983350` | Nonempty warehouse, ceiling/chandelier and café-interpreted programs respectively; each sole execution timed out with no image. Lines 3–5. |
+| **S0252** `scene_rsi_v2_1/r1/scene_rsi_v2_1/C1/selection/commons_194983350` | Initial model session timed out before a visible program or execution. Lines 1–4. |
+| **S0253** `scene_rsi_v2_1/r1/scene_rsi_v2_1/C1/development/commons_187101683` | Nonempty living-room-interpreted program; execution timed out without an image. Lines 3–5. |
+| **S0254**, **S0255**, **S0256** `scene_rsi_v2_1/r1/fixed_h0/H0/test/commons_189918915`, `test/commons_80372956`, and `selection/commons_194983350` | Nonempty warehouse, ceiling/chandelier and café-interpreted programs respectively; each sole execution timed out with no image. Lines 3–5. |
+
+## Comparison and interpretation
+
+**Success, partial progress and failure.** No successful scene build, render, visual acceptance or formal success is recorded in this batch. There is narrower partial *runtime progress*: in S0239, the executed radius reduction passed the earlier pocket failure and reached a later null-world error (lines 5–10). S0237 likewise progressed from a fillet error to world setup (lines 5–10). Neither is evidence of partial visual correctness. Their final nonempty revisions were not executed (S0237 and S0239, lines 11–13). S0236 and S0241 did execute substantive revisions, but their second executions timed out (lines 6–10 in each).
+
+**Stops are not interchangeable.** Fillet-bound and null-world tracebacks are concrete program or environment-assumption failures. By contrast, the image-free execution timeouts report neither the stalled stage nor its cause; they do not establish a geometric algorithm failure. S0240, S0243 and S0252 stopped in the model call before visible construction, while S0244 and S0245 stopped with a CLI exit whose underlying stderr is unavailable. A read-only session is described in some records, but no permission denial or branch stop is reported here. Nor does an absent program establish an explicitly empty patch: the traces show no visible implementation, not a deliberate empty submission. Conversely, many timeout cases contain substantial, executed code.
+
+**Advice and adoption.** All 21 files are student trajectories, not teacher-role traces. No teacher message, diagnosis, proposed update, receipt or adoption is recorded in them. General instructions were available in requests such as S0244 line 1, but availability is not evidence of teacher feedback, receipt of a separate intervention, or execution of it. S0236, S0237, S0239 and S0241 instead show students receiving **runner tracebacks** and revising code; the cited executions demonstrate adoption of their own changes, not of teacher advice. No teacher-update validation or acceptance is visible. Absence within these trajectories does not establish that no teacher existed elsewhere.
+
+**Quality and task-specific facts.** Programs specified separate objects, materials, cameras, lights and component placements, but names and grouping do not independently verify appearance, attachment, pose, occlusion or fidelity. For example, S0246’s rack connections and rolled camera are code-level choices (lines 3–4), while S0255’s suspended chandelier and upward camera are likewise intended constructions (lines 3–4). The warehouse, café, classroom and other scene labels are student interpretations of photographs unavailable to this audit. Without a completed render and reference inspection, neither those interpretations nor visual quality can be independently established.
+
+**Transferable constraints and counterexamples.** Primitive dimensional bounds and nullable world initialization demonstrably blocked particular builds; resolving one error did not prove end-to-end success. Operational time limits can also preclude visual feedback even for nonempty programs. However, not every interruption had either of those code errors: S0238 and S0246–S0251 timed out with empty logs, and S0244–S0245 stopped before a program was visible. Dense geometry, rendering settings, a retry, or additional time are possible explanations or remedies only as unverified hypotheses; this evidence cannot attribute timeout causes or establish causal superiority of any condition. This is an audit-only synthesis, not a new solution or Test feedback.

@@ -1,0 +1,76 @@
+# Hint RSI 既有工程审计
+
+本报告审计历史记录，与本次新实验的终测成绩分开。自然语言轨迹分析通过 Codex CLI 的 `gpt-6.1-terra / low` 完成；原始历史模型、预算和失败均保留。
+
+## 版本、原目录与覆盖范围
+
+- 原交接：`/srv/lab-disks/disk2/users/xymo/hint-experiment-handoff`，来源 `cc-run` 的 `hint` 分支，提交 `3606f71e067f121354709864c51123d543f5c515`。交接包本身明确没有包含原作者全部历史 rollout/eval 日志；不能将文档截图视为完整轨迹。
+- Ofox baseline：`/srv/lab-disks/disk2/users/xymo/hint-baseline-run`。已有 `baseline_state.json` 记录模型为 `deepseek/deepseek-v4.1-flash-1017`，10次实际模型尝试，正式通过3、正式未通过3、未完成4；另有2次模型调用前的基础设施启动。12条启动记录及缺轨迹项单列在 [baseline尝试清单](audit/baseline_attempt_inventory.csv)。它与后来的 Terra 条件、轮数和运行时不同，只能作历史补充比较。
+- Codex 原实验：`/srv/lab-disks/disk2/users/xymo/hint-codex-experiments`。最新已验证源码为 `source_parallel_13`，未找到更高编号本机源码。第13版原正式九题未启动；SQLfmt 是独立接入预检。
+- 本机公开副本 `/srv/lab-disks/disk2/users/xymo/hintrsi` 和实际远端 `main` 均为 `c0132d7e381ff660354d7a4403e29ee6107354f9`。原目录第13版的37个非缓存文件与公开副本直接内容比较无差异；没有重新下载原资源，也没有新增哈希系统。见 [版本比较](audit/source_comparison.json)。
+
+历史轻量索引包含257份 `trajs.json` / `trajs.json.gz` 文件：117份学生目录轨迹、104份教师轨迹、36份其他预检轨迹。117份学生文件由108份 Codex 正式/旧批记录、8份 Ofox baseline 记录、1份第13版 SQLfmt 记录构成。文件副本、共用 H/M 首轮及从旧批导入的状态，不另当独立重复。
+
+能力提取前深审8份完整学生事件序列（397个解析事件）和 Claude Code 的4份完整教师轨迹（49个解析事件），不是全部轨迹审计。知识冻结后先补审2份Ofox学生记录（516个事件），随后补审7份Claude同题比较记录（297个事件），累计17/117份学生文件、1210个事件；另外100份只做轻量索引。9份补审记录的全部事件号均已提供给CLI，但单个长事件字段截断为1800字符，不能称通读全部原文字节；新增7份另行提供捕获提示、最终补丁和正式评价全文。教师轨迹为4/104，另100份未逐事件深入审计。其他预检36份未逐条深审；第13版的原验收报告已查阅，但没有重做其所有历史验证。[轨迹索引](trajectory_inventory.csv)、[状态清单](audit/attempt_inventory.csv) 和 [原始CLI用量索引](audit/historical_cli_usage.csv) 保留范围与缺失信息。状态清单按已记录原轨迹路径关联导入项；缺路径项目不能保证全部是独立尝试。K1/K2知识输入始终只有最初相同的D01–D08，全部补审E01–E09均没有回传学生或用于更新。
+
+索引另补齐可用的完整/压缩Hint、轮后复盘、实际系统提示、I组过程指导、父状态和原始请求/响应/用量账本链接；其中55份历史学生文件能直接关联CLI用量。空白用量表示未关联或缺失，不填零。可用归档不代表学生实际收到，轮后复盘也不是该轮输入。此项只补元数据关联，没有增加语义深审或改变知识提取证据。
+
+## 第12批的正式结果与技术中断
+
+第12批排除旧 Anko 段后，53次尝试有正式评价：1次正式成功、52次正式未解出；另3次被批次停止中断，3题尚未开始。52次“未解出”包含空补丁和提前结束，不能整体解释为算法能力失败。全局停止原因是教师调用原生 `codex.list_mcp_resources`，桥按原规则报 `Unexpected native operation: mcp_tool_call` 并停止；3次在途尝试的原 worker 状态仍可能写作 `running`，应结合父批次停止状态解释为中断。
+
+第13版针对这些实际问题禁用了决策模型原生工具入口、消除了本地只读与外部 SDK 工作区的混淆、明确空工具数组意味着结束整个 SDK 任务、准备 `main` 基线，并关闭 SDK 原生 Skill。它修复接入与工作流条件，不自动保证题目解出，也不能混入第12批结果当作同版本重复。
+
+## 代表学生案例
+
+|证据|任务与组轮|事件数|补丁字节|F2P|P2P|结论|
+|---|---|---:|---:|---:|---:|---|
+|[D01](audit/audit_D01.md)|claude-code-by-agents-recursive-delegation / B1|29|0|0/7|31/31|空补丁、提前结束|
+|[D02](audit/audit_D02.md)|claude-code-by-agents-recursive-delegation / H1|62|14265|6/7|31/31|部分正确，正式未解出|
+|[D03](audit/audit_D03.md)|claude-code-by-agents-recursive-delegation / M2|7|0|0/7|31/31|空补丁、提前结束|
+|[D04](audit/audit_D04.md)|claude-code-by-agents-recursive-delegation / I1|6|0|0/7|31/31|空补丁、提前结束|
+|[D05](audit/audit_D05.md)|claude-code-by-agents-recursive-delegation / I2|112|12223|7/7|31/31|正式成功|
+|[D06](audit/audit_D06.md)|igel-persist-feature-schema / B3|81|9909|23/24|2/2|部分正确，正式未解出|
+|[D07](audit/audit_D07.md)|igel-persist-feature-schema / H1|18|0|0/24|2/2|空补丁、提前结束|
+|[D08](audit/audit_D08.md)|sqlfmt-create-table-ddl-formatting / B1|82|9031|30/32|1271/1273|部分正确，正式未解出|
+
+所有事件号均对应各证据文件里的 `main_agent` 一基序号。每份英文逐案审计列出了原始绝对路径、操作、教师知识、验证和不确定性；本次另提供 [完整题目与教师链补充审计](audit/audit_teacher_chain_reduced.md)，避免将早期审计包未带题目描述误写成服务器没有题目。
+
+**Claude Code I2（D05）**：学生先写失败重现，再修改 provider 类型、Anthropic 适配器和 handler 三个文件，最终提交。第20次主要工具检查的教师提示要求查看“旧上下文加新文本/图像”的实际 provider 请求。事件49–51的探测暴露丢失新输入，52–57修改续接状态区分；95–100再次检查初次/续接消息并保留图像上下文。第40次检查要求比较成功、子任务错误和未知目标的回传，事件84–85实际断言反馈内容、错误标记和 tool-use ID，108–109补充循环情况检查。这些是指导后实际行动的证据，强于“学生说用了 Hint”。正式7/7、31/31，但局部已有测试仍有失败或无法转换；不能称生产全正确或获得长期能力。
+
+**同题 H1（D02）**：已有非空补丁和通过的窄 mock 重现（30–33、59–61），正式6/7、31/31。剩余新增失败涉及子任务返回空文本；摘要不能唯一证明其内部原因。类型检查遇到缺少生成文件，学生尚未完成完整验证、清理和提交便结束。教师复盘列出的参考实现差异，不等于已经验证的失败因果。
+
+**同题 B1/I1/M2（D01/D04/D03）**：B1、I1实际采用了原生 Claude API Skill 的“发现非 Anthropic 标记则停止澄清”规则，补丁为零；这是规则/完成条件问题。M2声称当前只读，却没有尝试写操作、没有真实工具权限拒绝，实际提示与元数据为外部 SDK `bypassPermissions`。只读混淆有接入修复回放支持，但不能把这条记录伪装成文件系统实际拒绝。三者均不是已经尝试某个算法后测败的证据。
+
+**Igel B3/H1（D06/D07）**：B3没有任务教师 Hint，独立重现特征选择被忽略，修改 schema 持久化/应用和 API 错误处理，并执行别名、缺失输入和评价探测。正式23/24、2/2；剩余失败在直接加载描述里保存的 schema 路径时触发 `FileNotFoundError`，反映生产者/消费者对路径含义不一致。学生自己的相对描述路径加载可运行，不代表另一消费入口正确。H1则实际查到只有 detached/master、没有 main，读完相关源码后请求确认并停止，未实现任何 schema 算法。题目确实要求从 main 新建分支，这与B3自行选择 master 应分开记录。
+
+**SQLfmt 第13版预检（D08）**：学生自主发现 CREATE TABLE 被当作 DATA token，新增 `ddl.py` 并接入 `api.py`，在原安全比较因物理行变化失效后增加词法比较；有重现、幂等性和局部回归检查，最终提交9031字节补丁。正式30/32、1271/1273，仍未解出且有回归。完整接入链通过，只表示真实实现、执行、提交、导出和评价发生，不表示正式成功。原CLI账本为24次决策、40次学生工具调用。
+
+## 冻结后的Ofox补审
+
+[E01：Claude Code原baseline](audit/audit_E01.md)覆盖245个事件。学生没有任务教师Hint，独立检查handler/provider/registry，改动三个文件并提交；临时mock测试通过不等于真实provider行为正确，正式F2P2/7、P2P31/31，正常结束。它与Terra H1/I2的模型、预算、运行时不同，不能据此估计Hint因果收益。
+
+[E02：Igel原baseline](audit/audit_E02.md)覆盖271个事件。学生没有任务教师Hint，独立设计原始schema持久化、跨入口应用与输入校验；先后发现聚类训练/评价共用准备标记、旧schema复用等风险，实际修改并验证。正式F2P24/24、P2P2/2，正常结束；从master创建分支是记录事实，不能改写为本来存在main。该例与D06的23/24可比较具体行为约束，但不能只凭成绩给轨迹学习价值排序。E01/E02的历史SDK零Token/零美元且costBasis未知，表示实际用量未知；D06的真实CLI账本另有可用Token，二者不能混淆。
+
+## 教师链、知识来源与局限
+
+初始教师确实读取开发题 Golden Diff 和基线源码，写出完整 Hint，再压缩为学生指导。H1失败后复盘仍比较参考实现和学生记录；I1后复盘针对 Skill 引起的供应商规则歧义。I2后复盘检查的是行为泄漏风险，不是长期迁移评价。完整 Hint、压缩版本、复盘和I2过程事件已保留在 [历史Hint证据目录](evidence/historical_hints)。教师链审计首次因 CLI 的1048576字符接入上限被本地拒绝，原失败保留；后一次移除了已在D05完整审计的重复在线上下文，4份教师轨迹仍完整，不能把重试当首次成功。
+
+可迁移候选经验包括：检查状态跨边界后的实际输入；对回传身份和错误语义做验证；区分原始 schema、变换后的输入与元数据契约；检查格式转换的语义安全和幂等性；把局部测试、正式成功、环境限制分开。具体 provider 协议、SQL 空格规则、Igel 文件路径和任务解法属于任务经验。上述行为尚不能证明未来迁移，本次终测才检验其有限迁移证据。
+
+SDK `total_cost_usd` 是原代理估计，不能写成真实 CLI 结算费用；真实 CLI token 以账本为准，不再加一遍 SDK 数值。例：I2学生29次实际模型请求，输入1,918,192、输出8,005、缓存输入218,752；Igel B3为17次、输入808,055、输出5,400、缓存输入82,688。缓存输入属于输入的子集。教师、压缩和学生分角色列在CLI用量表，不把共享成本重复分配成独立实验。
+
+
+## 历史比较补充：结果与停止类型
+
+批次08的 B 是有记录的**无 Hint 官方全通过**：初始提示未追加 Hint，在线事件未见教师 Hint；独立复现及后续检查见 E03 事件22–25、50–51、64–65。正式评测为新增测试7/7、保留测试31/31；同一评测标准错误中也有 Node/Vitest 堆内存溢出记录，二者如何并存并不清楚，不能臆测原因。[E03轨迹](../../../hint-codex-experiments/runs/codex_parallel_08/lanes/codex_parallel_08_lane0/codex_parallel_08_lane0_B_r1/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json)；[正式评测](../../../hint-codex-experiments/runs/codex_parallel_08/lanes/codex_parallel_08_lane0/codex_parallel_08_lane0_B_r1/eval_output/claude-code-by-agents-recursive-delegation/eval_result.json)。
+
+批次08的 H、I 则提交了实质性算法实现，却分别只通过新增测试6/7、2/7，属于**完成实现后的算法性部分失败**，不是空补丁。H 的补丁实现递归、路径环检测和父代理续接（E04事件38–51、63–66）；I 实现递归及工具结果转换，并检查续接请求和工具 ID（E05事件45–46、49–50）。两者实际收到问题求解参考；I 还收到一次在线教师问题，其后检查行为与问题方向一致，但不能据此量化教师的因果贡献。[E04轨迹](../../../hint-codex-experiments/runs/codex_parallel_08/lanes/codex_parallel_08_lane0/codex_parallel_08_lane0_H_r1/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json)；[E05轨迹](../../../hint-codex-experiments/runs/codex_parallel_08/lanes/codex_parallel_08_lane0/codex_parallel_08_lane0_I_r1/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json)。
+
+批次12的 H2 非空补丁仅含复现脚本，没有修复；实际收到参考，但只观察到探索，未见可执行方案采纳。其调用的技能要求遇到非 Anthropic 提供商标记时停下询问，最终请求许可，属指令驱动的未完成，而非完成算法失败（E06事件1–3、22–26、36–40）。B2 补丁为空，复现后按技能指引询问；B3 补丁为空，未复现或实现，停止原因未确立（E07事件33–35；E08事件27）。M3 实际收到参考，却在技能指引及提供商搜索后请求澄清，未实现（E09事件1–6）。这些均不应与已完成算法的部分失败混同；也没有共同中间状态证据，不能称 H2 破坏性回退了 H1。[E06](../../../hint-codex-experiments/runs/codex_parallel_12/lanes/codex_parallel_12_lane0/codex_parallel_12_lane0_H_r2/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json)；[E07](../../../hint-codex-experiments/runs/codex_parallel_12/lanes/codex_parallel_12_lane0/codex_parallel_12_lane0_B_r2/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json)；[E08](../../../hint-codex-experiments/runs/codex_parallel_12/lanes/codex_parallel_12_lane0/codex_parallel_12_lane0_B_r3/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json)；[E09](../../../hint-codex-experiments/runs/codex_parallel_12/lanes/codex_parallel_12_lane0/codex_parallel_12_lane0_M_r3/infer_logs/claude-code-by-agents-recursive-delegation/turn_1/trajs.json)。
+
+## 解释边界与覆盖
+
+B08 配有原生 API 技能，历史运行时和预算不同或不可比，部分历史 CLI 实际成本未知；不能作因果组间比较，也不能替代当前 B0 或可选 NoHint。其有限全通过反驳历史记录中「只有 I2 成功／教师是必要条件」的排他叙事，但不证明完整公共契约，更不证明教师无用。Hint 档案可用不等于实际收到；上述判断以捕获提示和在线事件为据。
+
+现深审学生17/117、共1210事件：知识提取队列8条轨迹397事件，加冻结后仅审计9条轨迹813事件，其中旧 E01/E02 为516、新 E03–E09 为297；仍有100份学生轨迹文件未深审。教师仍为4/104、49事件；36条 preflight 未深审。新增七份审计均在知识冻结后，未输入生成、Selection、Test 或学生。E03–E09 的每个事件 ID 均已提供，但逐事件字符串上限1800字符；另行捕获的提示、补丁和评测未受该裁剪限制，不能称为完整原始字节审计。新案例没有来源消融或迁移试验，不能排序边际轨迹学习价值；可能的经验仅为待验证假设。本补充未修复任务代码，也未更新库。

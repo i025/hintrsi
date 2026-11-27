@@ -1,0 +1,43 @@
+## Scope and evidence
+
+The capabilities below are general programming guidance inferred from the supplied task descriptions and public problem categories. They are not findings from student histories, implementations, patches, or test results; no such evidence was provided.
+
+## 1. Model stateful control flow and failure propagation
+
+**Applicable situations:** Recursive workflows, agent orchestration, callback chains, and other systems where one operation invokes another and resumes with its result.
+
+**Method:** Map the lifecycle explicitly: dispatch, execute, accumulate output, classify the outcome, construct a response, and resume the caller. Define identifiers and their ownership across boundaries. Track the active invocation path separately from a global set of previously invoked components, so repeated legitimate calls are not automatically treated as cycles. Specify which failures are reported to the stream, returned to the caller, or both; distinguish an empty successful result from a failed run.
+
+**Validation:** Use small controlled examples covering nested success, multiple output fragments, empty output, missing destinations, exceptions, and cycles. Check both the external events and the exact response presented to the resumed caller, including identifier correlation.
+
+**Limitations:** The correct event ordering and failure policy depend on the surrounding API. A generic recursion guard or catch-all exception handler can conceal legitimate behavior or lose diagnostic context.
+
+## 2. Treat persisted schemas as an inference contract
+
+**Applicable situations:** Machine-learning pipelines and other systems that transform named inputs during training and must reproduce the same transformation later.
+
+**Method:** Separate configuration validation, schema selection, persistence, and application. Define deterministic ordering and record enough information to reconstruct how raw inputs map to model inputs. Apply the same schema at every inference entry point before calling the model. Handle absent, extra, and equivalent input sources explicitly; when interchangeable sources are simultaneously present, validate their consistency rather than silently choosing one. Keep metadata and the serialized artifact consistent, and derive downstream dimensions from the appropriate persisted contract rather than assumptions.
+
+**Validation:** Exercise the pipeline end to end across supported model shapes and entry points. Compare reordered and extra-column inputs, missing inputs, alternate aliases, conflicting aliases, invalid configuration, and selections that leave no usable inputs. Check persistence across a fresh load, not just within the training process, and verify that API validation errors are translated into the documented response form.
+
+**Limitations:** Equality rules for values such as missing data, numeric tolerances, and mixed types need an explicit policy. Schema versioning and compatibility with older artifacts may also matter, but cannot be assumed from the descriptions alone.
+
+## 3. Work with syntax structure without losing source fidelity
+
+**Applicable situations:** Formatters, parsers, migration tools, and analyzers that must recognize nested language constructs while retaining meaningful original text.
+
+**Method:** Inspect the existing token and line representations before choosing an approach. Identify boundaries using syntax and nesting depth rather than splitting blindly on punctuation: commas and parentheses can have different roles at different depths. Separate structural classification from rendering and from public data models. Preserve source spacing where the contract requires faithful reconstruction, while applying normalization only to the intended tokens. Explicitly recognize unsupported forms and leave them unchanged when that is the stated behavior.
+
+**Validation:** Cover nested expressions, inline and table-level constructs, named and unnamed constraints, optional clauses, and inputs represented in different valid parsed layouts. Check formatting invariants, line-length exceptions, public-field equality, and parse results independently. Where appropriate, check that formatting an already formatted supported statement is stable.
+
+**Limitations:** Keyword-based heuristics can misclassify identifiers, quoted text, comments, or nested expressions. Full grammatical coverage may require parser support beyond a formatter’s existing representation; unsupported syntax should not be silently rewritten as though it were understood.
+
+## 4. Translate detailed contracts into observable checks
+
+**Applicable situations:** Any change with multiple deliverables, boundary cases, and interactions across layers.
+
+**Method:** Turn each requirement into an observable invariant, identify the responsible layer, and trace its inputs and outputs. Include negative requirements such as “do not emit” or “leave unchanged,” as well as successful behavior. Inspect existing conventions before extending handlers, registries, serialization, error handling, and public interfaces. Keep changes scoped while considering all documented entry points.
+
+**Validation:** Build a requirement-to-check matrix and include integration checks at boundaries, not only unit checks of helpers. Verify both successful outputs and error channels, messages, and externally visible metadata. Run relevant existing checks and inspect the final change set; where the workflow requires a branch and commit, verify those repository operations as well.
+
+**Limitations:** Passing a finite set of checks does not prove correctness for every valid input. These are proposed validation strategies, not claims that any particular implementation or test suite has been observed.
