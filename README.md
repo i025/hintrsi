@@ -1,6 +1,12 @@
-# Hint RSI：代码题实验、实现与完整记录
+# Hint RSI：代码题与三维场景实验、实现和完整记录
 
 这里整理了原始 Hint 实验交接包、Ofox 补充 baseline，以及后续通过 Codex CLI 运行的各版代码、配置、测试、实验成绩和诊断记录。上传整理时间：2026-11-24。原始实验目录保留，仓库是独立的脱敏副本。
+
+## 2026-11-27：Scene 自然重建轨迹实验
+
+新增独立 [Scene 工程](scene-rsi/README.md)：复用代码题的 Claude Agent SDK 与 Codex CLI Bridge，建立独立的 Blender 重建 Harness。办公室、卧室、厨房各独立运行三次；九次均完成可编辑场景交付和独立再生成。这里是自然轨迹分析，没有教师指导或完整 RSI，也不把技术完成度当作视觉质量成功率。
+
+[中文研究报告](scene-rsi/experiments/experiment_01_natural_trajectories/REPORT_ZH.md)包含策略相似度、重复缺陷、互补方法与实际消耗；[完整运行记录](scene-rsi/experiments/experiment_01_natural_trajectories/runs)包含原始模型/工具轨迹、代码、场景和渲染。三个完整 IDEAL-Scenes GT 及评价材料也在 `scene-rsi/` 中；上传范围见 [publication.json](scene-rsi/publication.json)。该目录的 Blender 文件直接存储在 Git 中，不适用下方历史代码题大文件压缩说明。
 
 ## 2026-11-27：Trajectory-to-Capability RSI
 

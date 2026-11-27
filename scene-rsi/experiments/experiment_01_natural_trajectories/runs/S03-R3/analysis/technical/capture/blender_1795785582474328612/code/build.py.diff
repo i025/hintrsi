@@ -1,0 +1,80 @@
+--- previous/build.py
++++ build.py
+@@ -0,0 +1,77 @@
++import bpy, math, random
++from mathutils import Vector
++random.seed(8)
++bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
++
++def mat(n,c,metal=0,rough=.5):
++ m=bpy.data.materials.new(n); m.diffuse_color=(*c,1); m.use_nodes=True; p=m.node_tree.nodes.get('Principled BSDF'); p.inputs['Base Color'].default_value=(*c,1); p.inputs['Metallic'].default_value=metal; p.inputs['Roughness'].default_value=rough; return m
++white=mat('warm white',(.84,.84,.82)); wall=mat('walls',(.88,.88,.86)); dark=mat('charcoal enamel',(.035,.065,.06),.2); black=mat('black glass',(.035,.035,.033),.1,.2); steel=mat('brushed steel',(.43,.46,.45),.7,.3); purple=mat('purple metallic controls',(.35,.19,.34),.65,.26); green=mat('sage green',(.31,.40,.27)); aqua=mat('pale aqua countertop',(.58,.77,.76)); beige=mat('pale wood',(.64,.49,.37)); floor=mat('wood floor',(.62,.57,.51)); line=mat('floor seams',(.43,.39,.34)); pink=mat('pot soil',(.34,.21,.19)); pot=mat('blue grey ceramic',(.34,.43,.46)); leaf=mat('olive leaves',(.24,.27,.09)); marble=mat('marble white',(.86,.86,.84))
++def cube(n,loc,scale,ma,bev=0):
++ bpy.ops.mesh.primitive_cube_add(size=1, location=loc); o=bpy.context.object; o.name=n; o.dimensions=scale; bpy.ops.object.transform_apply(location=False,rotation=False,scale=True); o.data.materials.append(ma)
++ if bev: mod=o.modifiers.new('soft edges','BEVEL'); mod.width=bev; mod.segments=2; o.modifiers.new('weighted normals','WEIGHTED_NORMAL')
++ return o
++def cyl(n,loc,r,depth,ma,rot=(0,0,0),vertices=48):
++ bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=r, depth=depth, location=loc, rotation=rot); o=bpy.context.object; o.name=n; o.data.materials.append(ma); return o
++def rod(n,a,b,r,ma):
++ d=Vector(b)-Vector(a); o=cyl(n,(Vector(a)+Vector(b))/2,r,d.length,ma); o.rotation_euler=d.to_track_quat('Z','Y').to_euler(); return o
++# room: back at y=5
++cube('floor',(0,2.2,-.07),(4.5,7,.14),floor)
++for i in range(20):
++ y=-1+i*.36; cube('floor board seam',(0,y,.004),(4.5,.008,.006),line)
++ for j in range(3):
++  x=-2.1+j*1.45+(i%2)*.7; cube('staggered end joint',(x,y+.18,.005),(.006,.36,.006),line)
++cube('left wall',(-2.22,2.1,1.65),(.1,7,3.3),wall); cube('back wall',(0,5.05,1.65),(4.5,.1,3.3),wall); cube('right wall',(2.22,2.1,1.65),(.1,7,3.3),wall)
++# tall dark opening in back
++cube('door opening',(-.34,4.985,1.18),(.78,.025,2.36),black)
++cube('open white door',(-.49,4.86,1.22),(.78,.045,2.44),white).rotation_euler[2]=-.1
++cyl('door knob',(-.08,4.80,1.12),.035,.05,steel,(math.pi/2,0,0))
++# right lower cabinet run
++cube('right cabinet body',(1.79,1.82,.43),(.80,4.0,.86),white)
++cube('marble counter',(1.78,1.82,.91),(.94,4.15,.10),marble,.015)
++# subtle marble veins on worktop
++for i in range(16):
++ y=random.uniform(-.1,3.7); x=random.uniform(1.36,2.14); rod('marble vein',(x,y,.966),(min(2.2,x+random.uniform(.1,.4)),y+random.uniform(.2,.8),.967),.002,white)
++# cabinet fronts visible facing left
++for j,y in enumerate([.18,.85,1.52,2.19,2.86,3.53]):
++ if j in (1,4,5):
++  for k in range(3):
++   z=.16+k*.24; ma= [black,beige,black][k] if j==1 else [green,black,black][k]; cube('drawer front',(1.375,y,z),(.025,.62,.22),ma,.006); cyl('drawer knob',(1.353,y,z),.023,.035,steel,(0,math.pi/2,0))
++ else:
++  cube('lower cabinet door',(1.37,y,.43),(.025,.63,.78),white,.006); cyl('cabinet knob',(1.35,y-.19,.54),.025,.035,white,(0,math.pi/2,0))
++# upper cabinet bank on right wall
++cube('upper cabinets',(1.94,2.72,2.35),(.54,2.65,.84),white)
++for y in [1.72,2.38,3.04,3.70]:
++ cube('upper door frame',(1.655,y,2.35),(.035,.62,.78),white,.006); cube('green inset',(1.632,y,2.35),(.015,.52,.61),green); cyl('upper knob',(1.615,y-.17,2.35),.018,.02,black,(0,math.pi/2,0))
++# left rear counter
++cube('left cabinet',(-1.77,3.15,.47),(.8,1.48,.94),mat('olive cabinet',(.25,.29,.10)),.012)
++cube('aqua worktop',(-1.77,3.15,.99),(.92,1.57,.12),aqua,.01)
++# stove left foreground
++cube('stove body',(-1.69,1.05,.46),(1.05,1.38,.92),dark,.02)
++cube('stovetop',(-1.69,1.05,.94),(1.07,1.40,.075),steel,.012)
++for x in [-1.94,-1.48]:
++ for y in [.62,1.07,1.52]: cyl('electric burner',(x,y,.983),.17,.009,dark)
++# tall control panel across back of stove
++panel=cube('raised control panel',(-1.69,1.79,1.27),(1.08,.11,.52),steel,.015); panel.rotation_euler[0]=math.radians(-12)
++for x in [-2.01,-1.38]:
++ cyl('control dial',(x,1.707,1.3),.12,.07,purple,(math.pi/2,0,0)); rod('dial marker',(x,1.665,1.31),(x+.025,1.665,1.36),.006,black)
++# oven handle on visible inner side
++rod('oven handle',(-1.13,.55,.61),(-1.13,1.48,.61),.025,purple)
++# pot and leaves near back
++bpy.ops.mesh.primitive_cone_add(vertices=48, radius1=.19, radius2=.23, depth=.31, location=(.83,4.48,.17)); bpy.context.object.name='flower pot'; bpy.context.object.data.materials.append(pot)
++cyl('soil',(.83,4.48,.328),.205,.012,pink)
++rod('plant main stem',(.83,4.48,.33),(.88,4.48,1.52),.012,leaf)
++for i in range(8):
++ z=.46+i*.11; a=i*2.4; end=(.83+math.cos(a)*(.15+(i%2)*.1),4.48+math.sin(a)*.13,z+.35); rod('leaf stalk',(.84,4.48,z),end,.006,leaf)
++ # lance leaf as two pointed triangles
++ mid=Vector((.84,4.48,z)).lerp(Vector(end),.64); side=Vector((-.035*math.sin(a),.035*math.cos(a),0)); verts=[(.84,4.48,z),tuple(mid+side),end,tuple(mid-side)]; mesh=bpy.data.meshes.new('leaf mesh'); mesh.from_pydata(verts,[],[(0,1,2,3)]); obj=bpy.data.objects.new('pointed leaf',mesh); bpy.context.collection.objects.link(obj); obj.data.materials.append(leaf)
++bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8, location=(.88,4.48,1.55)); bpy.context.object.scale=(.045,.045,.14); bpy.context.object.data.materials.append(leaf)
++# lighting
++world=bpy.context.scene.world; world.color=(.75,.75,.75)
++bpy.ops.object.light_add(type='AREA', location=(0,1.1,3.15)); bpy.context.object.data.energy=500; bpy.context.object.data.shape='DISK'; bpy.context.object.data.size=4
++bpy.ops.object.light_add(type='AREA', location=(0,4,2.8)); bpy.context.object.data.energy=230; bpy.context.object.data.size=2
++# camera
++bpy.ops.object.camera_add(location=(0,-0.85,2.05)); cam=bpy.context.object; cam.rotation_euler=(Vector((0,3.0,.95))-cam.location).to_track_quat('-Z','Y').to_euler(); cam.data.lens=20; bpy.context.scene.camera=cam
++scene=bpy.context.scene; scene.render.engine='CYCLES'; scene.cycles.samples=32; scene.cycles.use_denoising=True; scene.render.threads_mode='FIXED'; scene.render.threads=8
++scene.render.resolution_x=640; scene.render.resolution_y=360; scene.render.resolution_percentage=100
++scene.view_settings.view_transform='AgX'; scene.render.image_settings.file_format='PNG'; scene.render.filepath='/app/final.png'
++bpy.ops.wm.save_as_mainfile(filepath='/app/scene.blend'); bpy.ops.render.render(write_still=True)

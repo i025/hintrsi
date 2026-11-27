@@ -1,0 +1,77 @@
+import bpy, math, random
+from mathutils import Vector
+bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
+random.seed(3)
+def mat(n,c,rough=0.7,metal=0):
+ m=bpy.data.materials.new(n); m.diffuse_color=(*c,1); m.use_nodes=True; p=m.node_tree.nodes.get('Principled BSDF'); p.inputs['Base Color'].default_value=(*c,1); p.inputs['Roughness'].default_value=rough; p.inputs['Metallic'].default_value=metal; return m
+white=mat('painted warm white',(0.88,.88,.86)); wall=mat('pale sage ceramic tiles',(.67,.71,.66)); grout=mat('tile grout',(.47,.52,.48)); floor=mat('gray floor',(.31,.32,.31)); black=mat('dark bronze',(.055,.052,.048),.4,.5); shade=mat('ivory fabric lampshade',(.91,.89,.83)); wood=mat('light natural birch door',(.70,.54,.39)); wooddark=mat('door panel grooves',(.40,.30,.21)); mattress=mat('white linen',(.90,.88,.90)); rug=mat('warm cream rug',(.63,.53,.43)); glass=mat('cabinet glass',(.58,.65,.63),.2); dark=mat('doorway darkness',(.025,.025,.024))
+def cube(n,loc,scale,ma,bevel=0):
+ bpy.ops.mesh.primitive_cube_add(size=1,location=loc); o=bpy.context.object; o.name=n; o.dimensions=scale; bpy.ops.object.transform_apply(location=False,rotation=False,scale=True); o.data.materials.append(ma)
+ if bevel: mod=o.modifiers.new('soft edges','BEVEL'); mod.width=bevel; mod.segments=2; o.modifiers.new('weighted normals','WEIGHTED_NORMAL')
+ return o
+def cyl(n,loc,r,depth,ma,verts=32):
+ bpy.ops.mesh.primitive_cylinder_add(vertices=verts,radius=r,depth=depth,location=loc); o=bpy.context.object; o.name=n; o.data.materials.append(ma); return o
+def point(n,loc,power,color,size=.4):
+ bpy.ops.object.light_add(type='POINT',location=loc); o=bpy.context.object;o.name=n;o.data.energy=power;o.data.color=color;o.data.shadow_soft_size=size
+# room: back wall y=3.4, right wall x=3.4
+cube('floor',(0,0,-.08),(7,7,.16),floor)
+cube('back tiled wall',(0,3.47,1.65),(7,.12,3.3),wall)
+cube('right tiled wall',(3.47,0,1.65),(.12,7,3.3),wall)
+# tile grout very fine lines
+for x in [i*.4-3.2 for i in range(17)]: cube('vertical tile joint',(x,3.402,1.65),(.006,.006,3.3),grout)
+for z in [i*.4 for i in range(1,9)]: cube('horizontal tile joint',(0,3.401,z),(7,.006,.006),grout)
+for y in [i*.4-3.2 for i in range(17)]: cube('vertical right tile joint',(3.402,y,1.65),(.006,.006,3.3),grout)
+for z in [i*.4 for i in range(1,9)]: cube('horizontal right tile joint',(3.401,0,z),(.006,7,.006),grout)
+cube('back skirting',(0,3.35,.105),(7,.09,.21),white,.012); cube('right skirting',(3.35,0,.105),(.09,7,.21),white,.012)
+# shelving against back wall at left
+x=-1.55; y=2.92; w=1.65; h=1.8
+cube('shelf left upright',(x-w/2,y,h/2),(.06,.62,h),white); cube('shelf right upright',(x+w/2,y,h/2),(.06,.62,h),white)
+cube('shelf back',(x,3.22,.95),(w,.045,1.68),white)
+for z in [.15,.48,.82,1.16,1.5]: cube('open shelf',(x,y,z),(w,.62,.055),white,.008)
+cube('raised shelf back',(x,3.20,1.70),(w,.05,.36),white)
+# small glass door cabinet
+x=.04; y=3.0
+cube('cabinet body',(x,y,.66),(.82,.55,1.32),white,.012)
+for xx in [-.18,.18]:
+ cube('glass inset',(x+xx,2.706,.98),(.29,.012,.47),glass)
+ cube('cabinet divider',(x+xx,2.69,.91),(.29,.035,.035),white)
+ cube('cabinet lower door',(x+xx,2.68,.38),(.32,.04,.48),white,.008)
+for xx in [-.4,0,.4]: cube('cabinet front vertical frame',(x+xx,2.67,.98),(.045,.05,.62),white)
+for z in [.67,1.28]: cube('cabinet front horizontal frame',(x,2.67,z),(.82,.05,.045),white)
+# doorway near back right
+cube('dark doorway',(1.58,3.375,1.48),(.83,.035,2.96),dark)
+# door open into room: panel local coordinates aligned diagonal
+ang=math.radians(-42); hinge=Vector((1.98,3.32,0)); direction=Vector((-math.cos(ang),math.sin(ang),0)); normal=Vector((-direction.y,direction.x,0)); center=hinge+direction*.48
+ob=cube('open wooden door',(center.x,center.y,1.43),(.96,.065,2.86),wood,.01); ob.rotation_euler[2]=math.atan2(direction.y,direction.x)
+# inset door panels on front face, thin dark border bars transformed from local
+angle=math.atan2(direction.y,direction.x)
+def doorpart(n,u,z,sx,sz,ma,offset=.039):
+ p=hinge+direction*u-normal*offset; o=cube(n,(p.x,p.y,z),(sx,.012,sz),ma);o.rotation_euler[2]=angle
+for z,hh in [(.71,1.10),(2.12,1.05)]:
+ for u in [.13,.83]: doorpart('recessed panel vertical',u,z,.012,hh,wooddark)
+ for zz in [z-hh/2,z+hh/2]: doorpart('recessed panel horizontal',.48,zz,.71,.012,wooddark)
+# lamps with tapered shades
+def lamp(x,y):
+ cyl('lamp weighted base',(x,y,.035),.22,.06,black); cyl('lamp slim stem',(x,y,.83),.018,1.58,black)
+ bpy.ops.mesh.primitive_cone_add(vertices=48,radius1=.22,radius2=.16,depth=.38,location=(x,y,1.67));bpy.context.object.name='ivory tapered lamp shade'; bpy.context.object.data.materials.append(shade)
+ point('warm lamp light',(x,y,1.64),65,(1,.78,.54),.25)
+lamp(-2.67,1.15); lamp(.85,2.86)
+# rug under bed
+cube('beige rug',(.25,.4,.015),(2.3,2.7,.025),rug,.02)
+# bed in foreground, extends towards viewer
+cube('wood bed base',(-.15,-.75,.27),(1.65,2.65,.40),wood,.025)
+cube('mattress',(-.15,-.75,.55),(1.72,2.72,.30),mattress,.075)
+# right white tall furniture seen cut off
+cube('right foreground white side panel',(2.58,-.62,.95),(.08,2.7,1.9),white,.012)
+cube('right furniture top',(2.95,-.7,1.55),(.8,2.5,.08),white,.012)
+# left foreground wall edge
+cube('left dark wall',(-3.43,-.2,1.6),(.14,6.8,3.2),mat('dark olive wall',(.16,.19,.14)))
+# lighting
+bpy.ops.object.light_add(type='AREA',location=(0,-.8,3.8)); bpy.context.object.data.energy=430; bpy.context.object.data.shape='DISK'; bpy.context.object.data.size=4
+bpy.context.scene.world.color=(.22,.22,.22)
+# camera
+bpy.ops.object.camera_add(location=(-3.6,-5.8,3.35)); cam=bpy.context.object; target=Vector((0,2.0,.95)); cam.rotation_euler=(target-cam.location).to_track_quat('-Z','Y').to_euler(); cam.data.lens=23; bpy.context.scene.camera=cam
+sc=bpy.context.scene; sc.render.engine='CYCLES'; sc.cycles.samples=32; sc.cycles.use_denoising=True; sc.render.threads_mode='FIXED'; sc.render.threads=8
+sc.render.resolution_x=640;sc.render.resolution_y=360;sc.render.resolution_percentage=100
+sc.view_settings.view_transform='AgX'; sc.render.image_settings.file_format='PNG';sc.render.filepath='/app/final.png'
+bpy.ops.wm.save_as_mainfile(filepath='/app/scene.blend');bpy.ops.render.render(write_still=True)

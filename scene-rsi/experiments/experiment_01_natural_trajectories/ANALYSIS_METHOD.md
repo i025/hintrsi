@@ -1,0 +1,13 @@
+# Posthoc measurements
+
+Quality review begins only after every student execution has ended. Facts are linked to saved source versions, SDK tool IDs, real scene states and actual images. Any visual judgments by the experiment assistant are automated observations, not human scores.
+
+Strategy Overlap is set Jaccard: intersection/union of evidence-supported semantic technique labels. A technique requires executed-code and/or scene evidence, rather than words in a plan alone. Unknown is not absence. Mandatory delivery actions are excluded from this technique set and reported separately. Primitive assembly, helper parameterization, mesh/curve/modifier methods, material-node construction, coordinate relations, camera setting and feedback behavior can overlap because the task itself requires them; high overlap alone does not establish limited model capability.
+
+Sequential Similarity is 1 - Levenshtein distance/max(lengths) of an explicitly annotated semantic operation sequence. Source-level construction order is included only when supported by a successful execution and reachable calls in its saved program; tool-level edit/execute/image-observe cycles are reported separately. Neither metric is code-text similarity. Sequences describe observable actions and code, never hidden reasoning.
+
+State Similarity uses available semantic object/part inventories and actual Blender state properties. Where reliable semantic correspondence can be established, report a structural component-set Jaccard and concrete differences in geometry types, hierarchy, materials and modifiers. Do not compare global coordinates or absolute sizes across arbitrary coordinate systems; do not use raw GT names/mesh counts as target criteria. Final-state comparison is distinct from a state-trajectory metric. If intermediate checkpoints or correspondence are inadequate, state-trajectory similarity is unavailable, with reasons.
+
+Defect Recurrence counts repeated, visually supported defect categories on the same visible semantic object/part across the three runs of a task. Pair agreement and task-level frequencies are descriptive, not nine independent task samples. Invisible GT geometry is not labeled an error just for differing. Bounding-box proximity is not treated as mesh contact or penetration proof.
+
+Technical checks independently execute the delivered source without final scene/render files, open original and actual checkpoint blends, inspect external resources, and compare regenerated artifacts. No student modeling repair or teacher feedback is supplied. Visual, 3D structure and technical completeness are reported separately, with no unvalidated single aggregate quality score. Human evaluation form ratings remain empty.

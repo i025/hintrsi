@@ -1,0 +1,187 @@
+--- hintrsi/codex_cli_bridge.py
++++ scene-rsi/sdk/codex_cli_bridge.py
+@@ -3,6 +3,8 @@
+ 
+ import argparse
+ import asyncio
++import base64
++import copy
+ import json
+ import logging
+ import time
+@@ -14,6 +16,7 @@
+ 
+ MODEL = "gpt-6.1-terra"
+ EFFORT = "low"
++REQUEST_TIMEOUT = 235
+ DISABLED_FEATURES = (
+     "shell_tool", "view_image", "multi_agent", "plugins", "apps",
+     "skill_search", "skill_mcp_dependency_install", "remote_plugin",
+@@ -78,7 +81,58 @@
+ appropriate for a completed analysis/text task, an explicit stop, or a genuine blocker
+ established by actual observations. Respect tool_choice and the supplied role's limits.
+ Do not add task guidance, claim an operation ran, or guess its result.
++
++SDK image content is supplied as actual image attachments to this request.
++An sdk_image_attachment marker identifies its one-based attachment_index and
++original message/content position. Associate each attachment with that SDK
++message and tool result; images from earlier messages remain earlier observations.
++The marker is transport metadata, not a text description of the image.
+ """
++
++
++def image_messages(messages, directory):
++    """Keep SDK message structure and attach its image bytes to Codex exec."""
++    attachments = []
++    seen = {}
++
++    def attach(url, location, message):
++        header, encoded = url.split(',', 1)
++        media_type = header.removeprefix('data:').removesuffix(';base64')
++        extension = {'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif'}[media_type]
++        if url not in seen:
++            path = directory / ('image_' + str(len(attachments) + 1) + '.' + extension)
++            content = base64.b64decode(encoded)
++            path.write_bytes(content)
++            seen[url] = len(attachments) + 1
++            attachments.append({'attachment_index': len(attachments) + 1, 'path': str(path),
++                                'media_type': media_type, 'bytes': len(content), 'associations': []})
++        index = seen[url]
++        attachments[index - 1]['associations'].append({'location': location, 'role': message.get('role'),
++                                                      'tool_call_id': message.get('tool_call_id')})
++        return {'type': 'sdk_image_attachment', 'attachment_index': index, 'media_type': media_type,
++                'sdk_content_location': location}
++
++    def convert(value, location, message):
++        if isinstance(value, dict):
++            if value.get('type') == 'image_url':
++                return attach(value['image_url']['url'], location, message)
++            if value.get('type') == 'image' and value.get('source', {}).get('type') == 'base64':
++                source = value['source']
++                return attach('data:' + source['media_type'] + ';base64,' + source['data'], location, message)
++            return {key: convert(item, location + '.' + key, message) for key, item in value.items()}
++        if isinstance(value, list):
++            return [convert(item, location + '[' + str(i) + ']', message) for i, item in enumerate(value)]
++        # LiteLLM represents a single-image tool result as a bare data URI.
++        if isinstance(value, str) and value.startswith('data:image/'):
++            return attach(value, location, message)
++        return value
++
++    converted = []
++    for i, original in enumerate(messages):
++        message = copy.deepcopy(original)
++        message['content'] = convert(message.get('content'), 'messages[' + str(i) + '].content', message)
++        converted.append(message)
++    return converted, attachments
+ 
+ 
+ def action_schema(tools):
+@@ -189,7 +243,12 @@
+         output = directory / "final.json"
+         command = self.command + ["-c", "model_instructions_file=" + json.dumps(str(self.instructions)),
+                                   "--output-schema", str(schema), "--output-last-message", str(output), "-"]
+-        payload = {"messages": body["messages"], "tools": body.get("tools") or []}
++        messages, images = image_messages(body["messages"], directory)
++        for image in images:
++            command[-1:-1] = ["--image", image["path"]]
++        (directory / "image_attachments.json").write_text(json.dumps(images, indent=2), encoding="utf-8")
++        (directory / "command.json").write_text(json.dumps(command, indent=2), encoding="utf-8")
++        payload = {"messages": messages, "tools": body.get("tools") or []}
+         if payload["tools"]:
+             payload = {"sdk_execution_context": {
+                 "executor": "Original Claude Agent SDK in a separate task container",
+@@ -203,6 +262,7 @@
+         for name in ("tool_choice", "parallel_tool_calls"):
+             if name in body:
+                 payload[name] = body[name]
++        (directory / "model_input.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+         started = time.monotonic()
+         thread_id = None
+         usage = None
+@@ -262,7 +322,11 @@
+             finally:
+                 if process.returncode is None:
+                     process.terminate()
+-                    await process.wait()
++                    try:
++                        await asyncio.wait_for(process.wait(), timeout=5)
++                    except asyncio.TimeoutError:
++                        process.kill()
++                        await process.wait()
+                 self.processes.pop(request_id, None)
+ 
+     async def chat(self, body, headers=None, route=None):
+@@ -285,7 +349,8 @@
+                     "reasoning_effort": EFFORT, "request": body,
+                     "backend": "stateless_exec_action"})
+         try:
+-            action, usage, thread_id = await self.execute(request_id, body, directory, attribution)
++            action, usage, thread_id = await asyncio.wait_for(
++                self.execute(request_id, body, directory, attribution), timeout=REQUEST_TIMEOUT)
+             allowed = {tool["function"]["name"] for tool in body.get("tools") or []}
+             calls = []
+             for tool in action["tool_calls"]:
+@@ -327,6 +392,11 @@
+                         "thread_id": thread_id, "elapsed_seconds": time.time() - started,
+                         "response": response})
+             return response
++        except asyncio.TimeoutError as exc:
++            self.record("model_errors.jsonl", {**attribution, "request_id": request_id,
++                        "elapsed_seconds": time.time() - started, "error": "Backend response timeout",
++                        "code": "backend_timeout"})
++            raise CodexBridgeError("Model backend exceeded 235 seconds", "backend_timeout", 504) from exc
+         except asyncio.CancelledError:
+             self.record("model_errors.jsonl", {**attribution, "request_id": request_id,
+                         "elapsed_seconds": time.time() - started, "error": "Request cancelled",
+--- hintrsi/litellm_proxy/claude_code_proxy.py
++++ scene-rsi/sdk/litellm_proxy/claude_code_proxy.py
+@@ -1,7 +1,6 @@
+ import json
+ import os
+ import asyncio
+-import hashlib
+ import logging
+ import time
+ from pathlib import Path
+@@ -10,7 +9,7 @@
+ from logging_utils import setup_logging
+ import streaming_fix
+ 
+-CC_LOG_IN_CONTAINER_PATH = Path("/tmp")
++CC_LOG_IN_CONTAINER_PATH = Path(os.getenv("SCENE_PROXY_LOG_DIR", "/tmp"))
+ _WRITE_LOCK = asyncio.Lock()
+ logger = setup_logging(CC_LOG_IN_CONTAINER_PATH / "claude_code_handler.log")
+ 
+@@ -130,8 +129,8 @@
+     # resume fits. Default "0" = no clamp (preserves existing behavior).
+     MAX_TOKENS_CLAMP = int(os.getenv("PROXY_MAX_TOKENS_CLAMP", "0") or "0")
+ 
+-    # Cache of last captured system prompt hash to avoid redundant file writes
+-    _last_sys_prompt_hash: str = ""
++    # Preserve the previous system text to avoid redundant file writes.
++    _last_system_prompt: str = ""
+ 
+     @staticmethod
+     def _extract_system_prompt(kwargs) -> str:
+@@ -205,7 +204,7 @@
+         """Write the actual system prompt (from the API request) to a JSON file.
+ 
+         Called on every pre-call hook; only writes when the system prompt
+-        content changes (hash comparison) to avoid redundant I/O.
++        content changes to avoid redundant I/O.
+ 
+         Output file: /tmp/system_prompt_actual.json
+         Contains: timestamp, model, char_count, contains_system_reminder flag,
+@@ -215,10 +214,9 @@
+             sys_text = self._extract_system_prompt(kwargs)
+             if not sys_text:
+                 return
+-            h = hashlib.md5(sys_text.encode("utf-8")).hexdigest()
+-            if h == self._last_sys_prompt_hash:
++            if sys_text == self._last_system_prompt:
+                 return  # unchanged since last capture
+-            self._last_sys_prompt_hash = h
++            self._last_system_prompt = sys_text
+ 
+             record = {
+                 "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),

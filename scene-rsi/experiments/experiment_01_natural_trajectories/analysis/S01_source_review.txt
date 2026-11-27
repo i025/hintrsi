@@ -1,0 +1,281 @@
+
+FILE experiments/experiment_01_natural_trajectories/runs/S01-R1/workspace/build.py
+1: import bpy, math, random
+2: from mathutils import Vector
+3: random.seed(12)
+4: bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
+5: 
+6: def mat(n,c,rough=.7,metal=0):
+7:  m=bpy.data.materials.new(n); m.diffuse_color=(*c,1); m.use_nodes=True; p=m.node_tree.nodes.get('Principled BSDF'); p.inputs['Base Color'].default_value=(*c,1); p.inputs['Roughness'].default_value=rough; p.inputs['Metallic'].default_value=metal; return m
+8: white=mat('warm white walls',(.78,.78,.76)); trim=mat('white trim',(.91,.91,.88)); oak=mat('pale natural wood',(.68,.46,.33)); oaklight=mat('blind slats',(.78,.58,.46)); dark=mat('charcoal door',(.22,.22,.21)); inset=mat('door inset',(.255,.25,.24)); black=mat('black metal',(.025,.025,.025),.45); gray=mat('chair grey',(.42,.43,.43)); tabletop=mat('desktop charcoal',(.25,.26,.27)); floor=mat('wood floor',(.40,.35,.30)); teal=mat('turquoise planter',(.045,.25,.25),.35); soil=mat('dark potting soil',(.055,.05,.04)); leafm=[mat('grass %d'%i,c) for i,c in enumerate([(.17,.20,.045),(.23,.25,.07),(.30,.29,.08),(.11,.16,.035)])]
+9: def cube(n,loc,scale,ma,bevel=0):
+10:  bpy.ops.mesh.primitive_cube_add(size=1, location=loc); o=bpy.context.object; o.name=n; o.dimensions=scale; bpy.ops.object.transform_apply(location=False,rotation=False,scale=True); o.data.materials.append(ma)
+11:  if bevel:
+12:   mod=o.modifiers.new('soft edges','BEVEL'); mod.width=bevel; mod.segments=3; o.modifiers.new('weighted normals','WEIGHTED_NORMAL')
+13:  return o
+14: def cyl(n,loc,r,depth,ma,vertices=32):
+15:  bpy.ops.mesh.primitive_cylinder_add(vertices=vertices,radius=r,depth=depth,location=loc); o=bpy.context.object; o.name=n; o.data.materials.append(ma); return o
+16: def bar(n,a,b,r,ma):
+17:  a,b=Vector(a),Vector(b); d=b-a; o=cyl(n,(a+b)/2,r,d.length,ma,16); o.rotation_euler=d.to_track_quat('Z','Y').to_euler(); return o
+18: # room
+19: cube('floor slab',(0,0,-.09),(8,8,.18),floor)
+20: # floor plank geometry with varied tones
+21: woods=[mat('floor board %d'%i,(.35+i*.014,.31+i*.012,.27+i*.01)) for i in range(8)]
+22: for i in range(23):
+23:  x=-3.8+i*.34
+24:  for j in range(6):
+25:   y=-3.5+j*1.36+(i%2)*.68
+26:   cube('individual oak floor plank',(x,y,.006),(.335,1.35,.018),random.choice(woods))
+27: cube('back wall',(0,3.12,1.7),(8,.18,3.4),white); cube('left wall',(-3.9,0,1.7),(.18,6.3,3.4),white)
+28: cube('back baseboard',(0,2.99,.11),(8,.08,.20),trim,.01); cube('left baseboard',(-3.78,0,.11),(.08,6,.2),trim,.01)
+29: # window and wood frame on rear wall
+30: cube('blind backing',(-1.95,2.995,2.23),(2.65,.04,1.38),oaklight)
+31: for x in [-3.33,-.57]: cube('window vertical casing',(x,2.93,2.23),(.12,.13,1.65),oak,.01)
+32: for z in [1.45,3.01]: cube('window horizontal casing',(-1.95,2.93,z),(2.88,.13,.12),oak,.01)
+33: for i in range(31): cube('horizontal venetian slat',(-1.95,2.91,1.56+i*.045),(2.65,.06,.025),oaklight,.006)
+34: # door rear right
+35: cube('door casing',(1.72,2.97,1.29),(1.23,.12,2.58),trim,.015)
+36: cube('dark door leaf',(1.72,2.87,1.28),(1.12,.12,2.49),dark,.012)
+37: for x in [1.43,2.01]:
+38:  for z,h in [(.39,.55),(1.05,.46),(1.59,.46),(2.13,.47)]:
+39:   cube('raised door panel',(x,2.795,z),(.43,.025,h),inset,.008)
+40: # bookcase below window, 4 bays 2 rows
+41: cube('bookcase top',(-1.95,2.48,1.03),(2.8,.48,.12),oak,.012); cube('bookcase bottom',(-1.95,2.48,.08),(2.8,.48,.11),oak,.01)
+42: for x in [-3.31,-2.63,-1.95,-1.27,-.59]: cube('bookcase upright',(x,2.48,.55),(.075,.47,.9),oak,.008)
+43: cube('middle shelf',(-1.95,2.48,.53),(2.72,.46,.07),oak,.006)
+44: # white tall narrow cabinet
+45: cube('white cabinet',(-.23,2.64,.56),(.48,.55,1.12),trim,.018)
+46: cube('cabinet front panel',(-.23,2.345,.58),(.40,.015,.94),white,.005)
+47: # lamp at left
+48: cyl('lamp foot',(-3.42,1.72,.035),.16,.05,black); bar('lamp stem',(-3.42,1.72,.06),(-3.42,1.72,1.62),.018,black)
+49: bpy.ops.mesh.primitive_cone_add(vertices=48,radius1=.27,radius2=.18,depth=.49,location=(-3.42,1.72,1.83)); bpy.context.object.name='cream lampshade'; bpy.context.object.data.materials.append(trim)
+50: # table foreground
+51: cube('desk top',(-1.35,-1.25,.77),(2.6,1.5,.11),tabletop,.025)
+52: for x in [-2.48,-.22]:
+53:  for y in [-1.85,-.65]: cube('desk leg',(x,y,.37),(.07,.07,.74),black)
+54: # chair shell made as smooth curved strips spanning seat and back
+55: def chair(cx,cy,angle):
+56:  # local coordinates x width, y front-to-back; back at positive y
+57:  def tr(p):
+58:   x,y,z=p; return (cx+x*math.cos(angle)-y*math.sin(angle),cy+x*math.sin(angle)+y*math.cos(angle),z)
+59:  verts=[]; rows=[(-.46,.68),(-.32,.65),(.0,.66),(.26,.72),(.36,.90),(.41,1.15),(.43,1.40),(.40,1.53)]
+60:  for y,z in rows:
+61:   for x in [-.43,-.32,0,.32,.43]:
+62:    # curved edges and rounded top
+63:    zz=z+(.07 if abs(x)>.4 else 0); yy=y-(.05 if abs(x)>.4 else 0)
+64:    verts.append(tr((x,yy,zz)))
+65:  faces=[]
+66:  for j in range(len(rows)-1):
+67:   for k in range(4):
+68:    a=j*5+k; faces.append((a,a+1,a+6,a+5))
+69:  mesh=bpy.data.meshes.new('molded chair mesh'); mesh.from_pydata(verts,[],faces); mesh.update(); o=bpy.data.objects.new('curved grey office chair shell',mesh); bpy.context.collection.objects.link(o); o.data.materials.append(gray)
+70:  for p in mesh.polygons:p.use_smooth=True
+71:  sub=o.modifiers.new('smooth shell','SUBSURF'); sub.levels=2; sol=o.modifiers.new('shell thickness','SOLIDIFY'); sol.thickness=.045
+72:  cyl('chair central post',(cx,cy,.38),.045,.57,black)
+73:  for i in range(5):
+74:   a=2*math.pi*i/5; end=(cx+.48*math.cos(a),cy+.48*math.sin(a),.12); bar('five star chair base',(cx,cy,.18),end,.035,black); cyl('caster wheel',(end[0],end[1],.075),.075,.09,black,20)
+75: chair(-.85,.70,-.3); chair(1.02,-.68,-.4)
+76: # planter foreground right
+77: bpy.ops.mesh.primitive_cone_add(vertices=64,radius1=.48,radius2=.63,depth=.52,location=(3,-1.6,.27)); bpy.context.object.name='teal round planter'; bpy.context.object.data.materials.append(teal)
+78: cyl('soil in pot',(3,-1.6,.54),.60,.035,soil,64)
+79: # blades are tapered triangular grass leaves
+80: for i in range(380):
+81:  a=random.random()*math.tau; r=random.random()**.6*.40; x=3+r*math.cos(a); y=-1.6+r*math.sin(a); h=random.uniform(.5,1.35); lean=random.uniform(.12,.65); a2=a+random.uniform(-.5,.5); tip=(x+lean*math.cos(a2),y+lean*math.sin(a2),.54+h); w=random.uniform(.012,.032); side=Vector((-math.sin(a2)*w,math.cos(a2)*w,0)); base=Vector((x,y,.55)); mid=base.lerp(Vector(tip),.55)+Vector((0,0,.12)); verts=[base-side,base+side,mid+side*.6,Vector(tip),mid-side*.6]; mesh=bpy.data.meshes.new('blade'); mesh.from_pydata(verts,[],[(0,1,2,3,4)]); mesh.materials.append(random.choice(leafm)); ob=bpy.data.objects.new('ornamental grass blade',mesh); bpy.context.collection.objects.link(ob)
+82: # camera and lights
+83: world=bpy.context.scene.world or bpy.data.worlds.new('World'); bpy.context.scene.world=world; world.use_nodes=True; world.node_tree.nodes['Background'].inputs[0].default_value=(.8,.8,.8,1); world.node_tree.nodes['Background'].inputs[1].default_value=.8
+84: def area(loc,power,size,target):
+85:  bpy.ops.object.light_add(type='AREA',location=loc); o=bpy.context.object; o.data.energy=power; o.data.shape='DISK'; o.data.size=size; o.rotation_euler=(Vector(target)-o.location).to_track_quat('-Z','Y').to_euler()
+86: area((0,-1,5.8),700,5,(0,1,0)); area((-4,-2,4),400,4,(0,1,1))
+87: bpy.ops.object.camera_add(location=(4.5,-7.8,4.0)); cam=bpy.context.object; cam.rotation_euler=(Vector((-.35,1.0,1.15))-cam.location).to_track_quat('-Z','Y').to_euler(); cam.data.type='PERSP'; cam.data.lens=43; bpy.context.scene.camera=cam
+88: scene=bpy.context.scene; scene.render.engine='CYCLES'; scene.cycles.samples=32; scene.cycles.use_denoising=True; scene.render.resolution_x=640; scene.render.resolution_y=360; scene.render.resolution_percentage=100; scene.render.image_settings.file_format='PNG'; scene.render.filepath='/app/final.png'; scene.world.color=(.8,.8,.8); scene.view_settings.view_transform='AgX'; bpy.ops.wm.save_as_mainfile(filepath='/app/scene.blend'); bpy.ops.render.render(write_still=True)
+
+FILE experiments/experiment_01_natural_trajectories/runs/S01-R2/workspace/build.py
+1: import bpy, math, random
+2: from mathutils import Vector
+3: random.seed(14)
+4: bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
+5: 
+6: def mat(n,c,rough=0.6,metal=0):
+7:  m=bpy.data.materials.new(n); m.diffuse_color=(*c,1); m.use_nodes=True; p=m.node_tree.nodes.get('Principled BSDF'); p.inputs['Base Color'].default_value=(*c,1); p.inputs['Roughness'].default_value=rough; p.inputs['Metallic'].default_value=metal; return m
+8: white=mat('warm white plaster',(0.75,0.75,0.73)); trim=mat('white baseboards',(0.91,0.91,0.89)); wood=mat('light maple',(0.66,0.43,0.29)); edge=mat('pale maple trim',(0.77,0.55,0.40)); slat=mat('venetian blind slats',(0.83,0.65,0.53)); dark=mat('charcoal door',(0.19,0.19,0.18)); groove=mat('door inset shadow',(0.09,0.09,0.085)); chair=mat('chair warm grey',(0.42,0.43,0.42)); black=mat('black chair hardware',(0.035,0.038,0.037),0.4); desk=mat('dark grey desk',(0.24,0.25,0.25)); pot=mat('glazed teal planter',(0.035,0.20,0.19),0.24); soil=mat('soil',(0.055,0.047,0.038)); leafm=[mat('grass olive %02d'%i,(0.12+i*.012,0.15+i*.012,0.045+i*.005)) for i in range(7)]
+9: 
+10: def cube(n,loc,scale,ma,bevel=0):
+11:  bpy.ops.mesh.primitive_cube_add(size=1,location=loc); o=bpy.context.object; o.name=n; o.dimensions=scale; bpy.ops.object.transform_apply(location=False,rotation=False,scale=True); o.data.materials.append(ma)
+12:  if bevel:
+13:   mod=o.modifiers.new('soft edges','BEVEL'); mod.width=bevel; mod.segments=2; o.modifiers.new('weighted normals','WEIGHTED_NORMAL')
+14:  return o
+15: 
+16: def cyl(n,loc,r,depth,ma,vertices=24):
+17:  bpy.ops.mesh.primitive_cylinder_add(vertices=vertices,radius=r,depth=depth,location=loc); o=bpy.context.object; o.name=n; o.data.materials.append(ma); return o
+18: 
+19: def rod(n,a,b,r,ma):
+20:  mid=(Vector(a)+Vector(b))/2; d=Vector(b)-Vector(a); o=cyl(n,mid,r,d.length,ma,12); o.rotation_euler=d.to_track_quat('Z','Y').to_euler(); return o
+21: # room
+22: cube('floor substrate',(0,0,-.09),(10,9,.18),white)
+23: # individual wood floorboards with randomized tones
+24: floor_mats=[mat('floorboard %02d'%i,(.32+i*.013,.29+i*.011,.25+i*.009)) for i in range(12)]
+25: for ix in range(34):
+26:  x=-4.9+ix*.30
+27:  for iy in range(8):
+28:   y=-4.3+iy*1.17+(ix%2)*.58
+29:   cube('individual timber floor plank',(x,y,.008),(.294,1.16,.025),random.choice(floor_mats))
+30: cube('back wall',(0,3.0,1.7),(10,.12,3.4),white)
+31: cube('right wall',(4.35,-.3,1.7),(.12,6.65,3.4),white)
+32: cube('back skirting',(0,2.91,.105),(8.65,.09,.21),trim,.012)
+33: cube('right skirting',(4.26,-.2,.105),(.09,6.2,.21),trim,.012)
+34: # window left side back wall
+35: cube('window recess',(-1.72,2.90,2.30),(2.65,.055,1.48),slat)
+36: for x in [-3.10,-.34]: cube('window side casing',(x,2.82,2.30),(.14,.13,1.68),edge,.012)
+37: for z in [1.49,3.11]: cube('window horizontal casing',(-1.72,2.82,z),(2.89,.13,.14),edge,.012)
+38: for i in range(29):
+39:  z=1.56+i*.053
+40:  cube('horizontal blind slat %02d'%i,(-1.72,2.79,z),(2.58,.07,.025),slat,.006)
+41: # shelving under window
+42: cube('shelf top',(-1.68,2.46,1.17),(2.65,.55,.13),edge,.01)
+43: cube('shelf base',(-1.68,2.46,.15),(2.65,.55,.13),wood,.01)
+44: for x in [-2.96,-2.33,-1.70,-1.07,-.40]: cube('shelf vertical divider',(x,2.46,.66),(.10,.55,1.00),wood,.008)
+45: cube('middle shelf',(-1.68,2.46,.64),(2.59,.55,.09),wood,.008)
+46: # tall white cabinet beside shelf
+47: cube('white narrow cabinet',(.17,2.67,.67),(.48,.48,1.32),trim,.015)
+48: cube('cabinet front inset',(.17,2.414,.69),(.36,.025,1.12),white,.005)
+49: # paneled door on right wall
+50: cube('door frame',(4.25,1.60,1.42),(.16,1.30,2.83),trim,.012)
+51: cube('door dark slab',(4.14,1.60,1.40),(.10,1.18,2.73),dark,.012)
+52: # inset panel strips on visible surface of right wall
+53: for y in [1.29,1.91]:
+54:  for z in [.43,1.02,1.60,2.18]:
+55:   w=.43; h=.48 if z<1 else .42
+56:   cube('recessed door panel',(4.078,y,z),(.012,w,h),groove,.006)
+57:   cube('raised center of door panel',(4.067,y,z),(.012,w-.035,h-.035),dark,.004)
+58: # desk foreground
+59: cube('desk top',(-.55,-1.95,.78),(2.65,1.32,.09),desk,.015)
+60: for x in [-1.70,.60]:
+61:  for y in [-2.45,-1.48]: cube('desk leg',(x,y,.39),(.07,.07,.76),black)
+62: cube('second foreground tabletop',(1.25,-3.0,.76),(1.7,.85,.08),desk,.01)
+63: # chairs, shell modeled as smooth surface with seating and rising back; local facing toward negative y
+64: def makechair(x,y,angle):
+65:  # local shell width x; front negative y, back positive y
+66:  verts=[]; faces=[]
+67:  rows=[(-.48,.76,.31),(-.31,.72,.46),(0,.73,.48),(.22,.82,.45),(.32,1.01,.41),(.38,1.32,.38),(.40,1.63,.31)]
+68:  for yy,z,w in rows:
+69:   for j in range(9):
+70:    u=(j-4)/4; verts.append((u*w,yy,z+0.07*u*u))
+71:  for i in range(len(rows)-1):
+72:   for j in range(8):
+73:    a=i*9+j; faces.append((a,a+1,a+10,a+9))
+74:  me=bpy.data.meshes.new('molded shell mesh'); me.from_pydata(verts,[],faces); me.update(); ob=bpy.data.objects.new('grey molded chair shell',me); bpy.context.collection.objects.link(ob); ob.location=(x,y,0); ob.rotation_euler[2]=angle; ob.data.materials.append(chair)
+75:  for p in me.polygons:p.use_smooth=True
+76:  mod=ob.modifiers.new('shell smoothing','SUBSURF'); mod.levels=2; mod.render_levels=2
+77:  mod=ob.modifiers.new('shell thickness','SOLIDIFY'); mod.thickness=.035
+78:  cyl('chair center column',(x,y,.42),.045,.55,black)
+79:  cyl('chair hub',(x,y,.16),.11,.10,black)
+80:  for i in range(5):
+81:   a=i*math.tau/5; end=(x+.45*math.cos(a),y+.45*math.sin(a),.12); rod('chair five star spoke',(x,y,.18),end,.035,black); cyl('caster wheel',(end[0],end[1],.075),.075,.09,black,16)
+82: makechair(-.54,1.02,-.20); makechair(1.55,-.45,.45)
+83: # floor lamp near shelf
+84: cyl('lamp foot',(-3.55,1.93,.04),.16,.07,black); rod('lamp stem',(-3.55,1.93,.07),(-3.55,1.93,1.70),.018,black)
+85: bpy.ops.mesh.primitive_cone_add(vertices=48,radius1=.24,radius2=.16,depth=.43,location=(-3.55,1.93,1.86)); bpy.context.object.name='ivory tapered lampshade'; bpy.context.object.data.materials.append(trim)
+86: # planter with tapered ceramic bowl
+87: bpy.ops.mesh.primitive_cone_add(vertices=64,radius1=.43,radius2=.61,depth=.48,location=(3.36,-2.50,.25)); bpy.context.object.name='large teal plant pot'; bpy.context.object.data.materials.append(pot)
+88: cyl('dark soil',(3.36,-2.50,.50),.56,.025,soil,64)
+89: # dense long pointed grass blades radiating from the pot
+90: for i in range(340):
+91:  a=random.random()*math.tau; rad=random.random()*.34; bx=3.36+rad*math.cos(a); by=-2.50+rad*math.sin(a); h=random.uniform(.45,1.25); lean=random.uniform(.12,.60); a2=a+random.uniform(-.6,.6); dx=math.cos(a2)*lean; dy=math.sin(a2)*lean; w=random.uniform(.008,.023); perp=Vector((-math.sin(a2)*w,math.cos(a2)*w,0)); base=Vector((bx,by,.50)); middle=base+Vector((dx*.45,dy*.45,h*.62)); tip=base+Vector((dx,dy,h)); vs=[base-perp,base+perp,middle+perp*.65,tip,middle-perp*.65]; me=bpy.data.meshes.new('grass blade'); me.from_pydata(vs,[],[(0,1,2,3,4)]); ob=bpy.data.objects.new('pointed grass blade',me); bpy.context.collection.objects.link(ob); ob.data.materials.append(random.choice(leafm))
+92: # illumination
+93: world=bpy.context.scene.world or bpy.data.worlds.new('World'); bpy.context.scene.world=world; world.use_nodes=True; world.node_tree.nodes['Background'].inputs[0].default_value=(.75,.77,.78,1); world.node_tree.nodes['Background'].inputs[1].default_value=.7
+94: bpy.ops.object.light_add(type='AREA',location=(0,-2,5.5)); bpy.context.object.data.energy=700; bpy.context.object.data.shape='DISK'; bpy.context.object.data.size=5
+95: bpy.ops.object.light_add(type='AREA',location=(-3,-1,3.6)); bpy.context.object.data.energy=300; bpy.context.object.data.size=4
+96: # camera
+97: bpy.ops.object.camera_add(location=(4.0,-7.5,4.5)); cam=bpy.context.object; target=Vector((0,1.0,1.05)); cam.rotation_euler=(target-cam.location).to_track_quat('-Z','Y').to_euler(); cam.data.type='PERSP'; cam.data.lens=26; bpy.context.scene.camera=cam
+98: sc=bpy.context.scene; sc.render.engine='CYCLES'; sc.cycles.samples=32; sc.cycles.use_denoising=True; sc.render.resolution_x=640; sc.render.resolution_y=360; sc.render.resolution_percentage=100; sc.render.image_settings.file_format='PNG'; sc.render.filepath='/app/final.png'; sc.view_settings.view_transform='AgX'; sc.render.film_transparent=False
+99: bpy.ops.wm.save_as_mainfile(filepath='/app/scene.blend'); bpy.ops.render.render(write_still=True)
+
+FILE experiments/experiment_01_natural_trajectories/runs/S01-R3/workspace/build.py
+1: import bpy, math, random
+2: from mathutils import Vector
+3: random.seed(12)
+4: bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
+5: 
+6: def mat(n,c,rough=.75,metal=0):
+7:  m=bpy.data.materials.new(n); m.diffuse_color=(*c,1); m.use_nodes=True; p=m.node_tree.nodes.get('Principled BSDF'); p.inputs['Base Color'].default_value=(*c,1); p.inputs['Roughness'].default_value=rough; p.inputs['Metallic'].default_value=metal; return m
+8: white=mat('warm white walls',(.77,.77,.75)); trim=mat('white painted trim',(.91,.91,.89)); wood=mat('pale maple',(.72,.48,.34)); wood2=mat('blind slats',(.78,.58,.47)); dark=mat('door charcoal',(.18,.18,.18)); groove=mat('door panel grooves',(.095,.095,.09)); grey=mat('chair grey',(.43,.44,.44)); black=mat('black metal',(.025,.027,.027)); desk=mat('desk graphite',(.22,.23,.23)); pot=mat('teal ceramic',(.025,.19,.18),.3); soil=mat('soil',(.085,.075,.057)); leafm=[mat('grass '+str(i),c) for i,c in enumerate([(.19,.22,.055),(.27,.29,.085),(.35,.35,.12),(.12,.15,.035)])]
+9: 
+10: def cube(n,loc,scale,ma,bev=0):
+11:  bpy.ops.mesh.primitive_cube_add(size=1,location=loc); o=bpy.context.object; o.name=n; o.dimensions=scale; bpy.ops.object.transform_apply(location=False,rotation=False,scale=True); o.data.materials.append(ma)
+12:  if bev: mod=o.modifiers.new('soft edges','BEVEL'); mod.width=bev; mod.segments=2; o.modifiers.new('weighted normals','WEIGHTED_NORMAL')
+13:  return o
+14: 
+15: def cyl(n,loc,r,depth,ma,verts=24):
+16:  bpy.ops.mesh.primitive_cylinder_add(vertices=verts,radius=r,depth=depth,location=loc); o=bpy.context.object;o.name=n;o.data.materials.append(ma); return o
+17: 
+18: def rod(n,a,b,r,ma):
+19:  d=Vector(b)-Vector(a); o=cyl(n,(Vector(a)+Vector(b))/2,r,d.length,ma,12); o.rotation_euler=d.to_track_quat('Z','Y').to_euler(); return o
+20: # room floor with individual staggered boards
+21: floorbase=mat('floor grout',(.27,.25,.23)); cube('floor base',(0,0,-.07),(6,6,.14),floorbase)
+22: floors=[mat('oak floor '+str(i),(.35+i*.012,.31+i*.011,.27+i*.009)) for i in range(10)]
+23: for ix in range(24):
+24:  x=-2.88+ix*.25
+25:  for iy in range(8):
+26:   y=-2.8+iy*.8+(ix%2)*.4
+27:   cube('individual oak plank',(x,y,.008),(.245,.795,.025),random.choice(floors))
+28: # back wall y=2 and right wall x=3
+29: cube('back wall',(0,2.02,1.65),(6,.12,3.3),white); cube('right wall',(3.02,0,1.65),(.12,4,3.3),white)
+30: cube('back baseboard',(0,1.92,.09),(6,.08,.18),trim); cube('right baseboard',(2.92,0,.09),(.08,4,.18),trim)
+31: # window frame on back wall
+32: cube('window recess',(-1.25,1.93,2.20),(2.25,.06,1.35),wood2)
+33: for x in [-2.43,-.07]: cube('window vertical frame',(x,1.87,2.2),(.11,.12,1.52),wood,.012)
+34: for z in [1.48,2.92]: cube('window horizontal frame',(-1.25,1.87,z),(2.47,.12,.10),wood,.01)
+35: for i in range(29): cube('horizontal blind slat',(-1.25,1.83,1.54+i*.047),(2.25,.045,.027),wood2,.005)
+36: # low cubby shelf
+37: sx=-1.25; sy=1.55
+38: for z in [.13,.69,1.24]: cube('shelf horizontal',(sx,sy,z),(2.55,.42,.085),wood,.01)
+39: for x in [-2.48,-1.85,-1.22,-.59,-.02]: cube('shelf divider',(x,sy,.69),(.075,.42,1.12),wood,.008)
+40: cube('tall white cabinet',(.32,1.7,.58),(.43,.40,1.16),trim,.015)
+41: # door on right wall, dark recessed face and panel outlines
+42: cube('door white casing',(2.91,.76,1.28),(.10,1.22,2.56),trim,.015)
+43: cube('dark door',(2.84,.76,1.25),(.10,1.08,2.47),dark,.01)
+44: for yy in [.48,1.02]:
+45:  for zz in [.38,.92,1.46,2.00]:
+46:   for y in [yy-.21,yy+.21]: cube('panel inset vertical',(2.779,y,zz),(.012,.012,.40),groove)
+47:   for z in [zz-.20,zz+.20]: cube('panel inset horizontal',(2.779,yy,z),(.012,.43,.012),groove)
+48: # lamp at left
+49: cyl('lamp foot',(-2.72,1.38,.035),.14,.05,black); rod('lamp stem',(-2.72,1.38,.06),(-2.72,1.38,1.48),.012,black)
+50: bpy.ops.mesh.primitive_cone_add(vertices=32,radius1=.22,radius2=.15,depth=.48,location=(-2.72,1.38,1.53)); bpy.context.object.name='cream lampshade'; bpy.context.object.data.materials.append(trim)
+51: # desk foreground
+52: cube('dark desk top',(-1.25,-1.28,.74),(2.25,1.35,.10),desk,.025)
+53: for x in [-2.2,-.3]:
+54:  for y in [-1.8,-.8]: cube('desk leg',(x,y,.37),(.055,.055,.72),black)
+55: # chairs mesh shell profile, local facing toward -y
+56: def chair(name,cx,cy,angle):
+57:  def trans(x,y,z):
+58:   a=angle;return (cx+x*math.cos(a)-y*math.sin(a),cy+x*math.sin(a)+y*math.cos(a),z)
+59:  # continuous curved shell across width, seat toward -y, back toward +y
+60:  profile=[(-.42,.75),(-.32,.70),(-.05,.69),(.20,.72),(.30,.80),(.34,1.05),(.38,1.30),(.43,1.46)]
+61:  verts=[]
+62:  for y,z in profile:
+63:   for x in [-.43,-.34,0,.34,.43]: verts.append(trans(x,y,z + (.045 if abs(x)>.4 else 0)))
+64:  faces=[]
+65:  for j in range(len(profile)-1):
+66:   for i in range(4): a=j*5+i;faces.append((a,a+1,a+6,a+5))
+67:  mesh=bpy.data.meshes.new(name+' shell mesh');mesh.from_pydata(verts,[],faces);mesh.update();o=bpy.data.objects.new(name+' molded shell',mesh);bpy.context.collection.objects.link(o);o.data.materials.append(grey)
+68:  for p in mesh.polygons:p.use_smooth=True
+69:  mod=o.modifiers.new('rounded shell','SUBSURF');mod.levels=2;mod.render_levels=2
+70:  mod=o.modifiers.new('shell thickness','SOLIDIFY');mod.thickness=.035
+71:  cyl(name+' central post',(cx,cy,.40),.045,.55,black)
+72:  for i in range(5):
+73:   a=2*math.pi*i/5; end=(cx+.43*math.cos(a),cy+.43*math.sin(a),.11);rod(name+' caster arm',(cx,cy,.18),end,.035,black);cyl(name+' wheel',(end[0],end[1],.075),.075,.055,black,16)
+74: chair('left office chair',-.5,.35,-.15);chair('foreground office chair',.75,-.85,-.4)
+75: # plant pot at front right
+76: bpy.ops.mesh.primitive_cone_add(vertices=48,radius1=.34,radius2=.48,depth=.47,location=(2.36,-1.50,.25)); bpy.context.object.name='teal planter';bpy.context.object.data.materials.append(pot)
+77: cyl('exposed soil',(2.36,-1.50,.49),.455,.025,soil,48)
+78: # long tapered leaves, curved triangular strips
+79: for i in range(180):
+80:  a=random.uniform(0,math.tau); radius=random.uniform(.02,.23); length=random.uniform(.55,1.25); lean=random.uniform(.15,.75); x=2.36+radius*math.cos(a);y=-1.5+radius*math.sin(a); z=.5
+81:  side=Vector((-math.sin(a),math.cos(a),0))*random.uniform(.008,.022); start=Vector((x,y,z)); mid=Vector((x+lean*.38*math.cos(a),y+lean*.38*math.sin(a),z+length*.68)); tip=Vector((x+lean*math.cos(a),y+lean*math.sin(a),z+length));
+82:  verts=[start-side,start+side,mid+side*.6,tip,mid-side*.6]; mesh=bpy.data.meshes.new('blade');mesh.from_pydata(verts,[],[(0,1,2,3,4)]);mesh.update(); ob=bpy.data.objects.new('grass blade',mesh);bpy.context.collection.objects.link(ob);ob.data.materials.append(random.choice(leafm))
+83: # lighting and camera
+84: world=bpy.context.scene.world or bpy.data.worlds.new('World');bpy.context.scene.world=world;world.use_nodes=True;world.node_tree.nodes['Background'].inputs[0].default_value=(.8,.8,.8,1);world.node_tree.nodes['Background'].inputs[1].default_value=.8
+85: bpy.ops.object.light_add(type='AREA',location=(-2,-3,5));bpy.context.object.data.energy=650;bpy.context.object.data.shape='DISK';bpy.context.object.data.size=5
+86: bpy.ops.object.camera_add(location=(-3.4,-4.5,3.0));cam=bpy.context.object;cam.rotation_euler=(Vector((0,.35,1.35))-cam.location).to_track_quat('-Z','Y').to_euler();cam.data.type='PERSP';cam.data.lens=24;bpy.context.scene.camera=cam
+87: scene=bpy.context.scene;scene.render.engine='CYCLES';scene.cycles.samples=32;scene.cycles.use_denoising=True;scene.render.resolution_x=640;scene.render.resolution_y=360;scene.render.resolution_percentage=100;scene.render.image_settings.file_format='PNG';scene.render.filepath='/app/final.png';scene.view_settings.view_transform='AgX';scene.render.threads_mode='FIXED';scene.render.threads=8
+88: bpy.ops.wm.save_as_mainfile(filepath='/app/scene.blend');bpy.ops.render.render(write_still=True)
