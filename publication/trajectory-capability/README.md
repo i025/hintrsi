@@ -1,5 +1,7 @@
 # Trajectory-to-Capability 发布说明
 
+同步状态：北京时间 2026-11-27T15:59:52.544224+08:00 已上传至 `i025/hintrsi/main`。[数据提交 450a637](https://github.com/i025/hintrsi/commit/450a6370d1b0d0ef8a9ae7338d484c865da59101)、报告、指标、源码和冻结库已通过 GitHub 远端复查。先前登录失败作为历史记录保留在 [上传状态](upload_status.json)。
+
 本次新增 `trajectory-to-capability/outputs/`，分别保留原六小时封存实验和用户授权续做的扩展实验；没有覆盖服务器原始结果或旧仓库实验。
 
 - 源码、配置、全部能力库、Hint、学生轨迹、补丁、正式成绩、原始失败、模型调用／用量和审计保留在各自原目录结构。
