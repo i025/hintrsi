@@ -1,0 +1,959 @@
+diff --git a/README.md b/README.md
+index 22301a5..c95d9d5 100644
+--- a/README.md
++++ b/README.md
+@@ -2,6 +2,12 @@
+ 
+ 这里整理了原始 Hint 实验交接包、Ofox 补充 baseline，以及后续通过 Codex CLI 运行的各版代码、配置、测试、实验成绩和诊断记录。上传整理时间：2026-11-24。原始实验目录保留，仓库是独立的脱敏副本。
+ 
++## 2026-11-28：Scene 第六阶段候选独立配对验证审查
++
++[配对验证入口](scene-rsi/harness/run_candidate_validation.py)接受外部父库、候选、任务、重复和统一预算，复用原Student与Evaluation，保留全部计划配对、失败/未知、成本和原指标差值，输出可接入Improvement的反馈。没有新增评价标准或自动晋升。
++
++[完整审查说明](scene-rsi/docs/STAGE_06_PAIRED_VALIDATION_REVIEW.md)、[配置示例](scene-rsi/configs/validation_inputs/)、[工程模拟配对反馈](scene-rsi/experiments/candidate_validation/stage_06_code_review/preflight/paired/feedback.json)和[验收记录](scene-rsi/experiments/candidate_validation/stage_06_code_review/preflight/verification.json)。62项离线检查通过；2任务×2重复×2版为明确标记的工程模拟，没有模型调用、正式重建、Blender执行或候选收益结论。停止在代码审查阶段。
++
+ ## 2026-11-28：Scene 第五阶段通用独立评价入口审查
+ 
+ [通用Evaluation入口](scene-rsi/analysis/evaluate_student.py)接受任意已结束Student目录、评价输出和预算，复用原技术检查及独立匿名RGB评价，输出可供外部Improvement直接使用的结构化反馈。没有组名或03-A目录要求，缺失评价保持未知。
+diff --git a/scene-rsi/README.md b/scene-rsi/README.md
+index f6983b4..a86d1ee 100644
+--- a/scene-rsi/README.md
++++ b/scene-rsi/README.md
+@@ -43,3 +43,5 @@
+ 第四阶段已增加 [通用独立学生入口](harness/run_student.py)：外部指定参考图、可选能力库、预算、运行标识和新输出目录，复用原SDK、共同Prompt和能力注入方式。支持原始库、历史候选和空库；来源资料与GT不随库开放。详见 [完整审查说明](docs/STAGE_04_STUDENT_REVIEW.md)、[三份配置](configs/student_inputs/)和[真实隔离验收](experiments/student_execution/stage_04_code_review/preflight/verification.json)。36项离线检查通过；没有模型调用、正式重建、独立评价或晋升。
+ 
+ 第五阶段增加 [通用独立评价入口](analysis/evaluate_student.py)：读取任意已结束Student的实际参考图、库快照、交付和轨迹，复用原源码再生成、场景检查、图像辅助指标和匿名双图RGB评价，输出可直接接入Improvement的 `feedback.json`。详见 [完整代码审查](docs/STAGE_05_EVALUATION_REVIEW.md)、[外部配置](configs/evaluation_inputs/)和[真实工程验收](experiments/student_evaluation/stage_05_code_review/preflight/verification.json)。49项离线检查通过，一份旧交付成功再生成且RGBA像素一致；RGB只验证真实隔离输入及离线调用接口，没有模型评分。新模型调用0、新Student重建0，未启动候选改进、晋升或多轮调度。
++
++第六阶段增加 [候选独立配对验证入口](harness/run_candidate_validation.py)：外部指定父库、候选、任务、重复数和统一预算，复用Student/Evaluation，对全部计划配对保留实际交付、技术/视觉结果、成本和原指标差值，输出可供Improvement读取的反馈。详见 [代码审查](docs/STAGE_06_PAIRED_VALIDATION_REVIEW.md)、[配置示例](configs/validation_inputs/)与[工程模拟验收](experiments/candidate_validation/stage_06_code_review/preflight/verification.json)。62项离线检查通过；2任务×2重复×2版的执行结果为明确标记的工程模拟，没有候选收益结论。新模型调用0、新Student重建0、Blender执行0，停在代码审查。
+diff --git a/scene-rsi/configs/validation_inputs/historical_candidate.json b/scene-rsi/configs/validation_inputs/historical_candidate.json
+new file mode 100644
+index 0000000..863d6bd
+--- /dev/null
++++ b/scene-rsi/configs/validation_inputs/historical_candidate.json
+@@ -0,0 +1,38 @@
++{
++  "parent_library": "../../experiments/capability_improvement/stage_01_verified_review/offline_candidate/initial/library",
++  "candidate_library": "../../experiments/capability_improvement/stage_01_verified_review/offline_candidate/candidate/library",
++  "candidate_record": "../../experiments/capability_improvement/stage_01_verified_review/offline_candidate/candidate.json",
++  "output_directory": "../../experiments/candidate_validation/examples/historical-candidate",
++  "tasks": [
++    {
++      "id": "external-office",
++      "reference_image": "../../data/evaluation_gt/office/office_s1210607561/color.png"
++    },
++    {
++      "id": "external-bedroom",
++      "reference_image": "../../data/evaluation_gt/bedroom/bedroom_s1379154150/color.png"
++    }
++  ],
++  "repetitions": 2,
++  "student_budget": {
++    "seconds": 1500,
++    "calls": 120,
++    "cpus": [32, 33, 34, 35, 36, 37, 38, 39],
++    "port": 19875
++  },
++  "evaluation": {
++    "items": ["reproduction", "scene", "images", "evidence", "visual"],
++    "budget": {
++      "cpus": [32, 33],
++      "stage_seconds": 120,
++      "visual_seconds": 240,
++      "visual_calls": 12,
++      "visual_port": 19876
++    }
++  },
++  "context": {
++    "purpose": "Configuration review example only; not executed.",
++    "candidate_provenance": "Previously saved engineering candidate with ENGINEERING_PROBE.md, not a model-learned improvement.",
++    "task_role": "Development or selection, not final independent testing."
++  }
++}
+diff --git a/scene-rsi/configs/validation_inputs/next_improvement.json b/scene-rsi/configs/validation_inputs/next_improvement.json
+new file mode 100644
+index 0000000..25ec214
+--- /dev/null
++++ b/scene-rsi/configs/validation_inputs/next_improvement.json
+@@ -0,0 +1,20 @@
++{
++  "initial_library": "../../experiments/candidate_validation/examples/historical-candidate/libraries/candidate",
++  "feedback": "../../experiments/candidate_validation/examples/historical-candidate/feedback.json",
++  "evidence": [
++    "../../experiments/candidate_validation/examples/historical-candidate/libraries",
++    "../../experiments/candidate_validation/examples/historical-candidate/students",
++    "../../experiments/candidate_validation/examples/historical-candidate/evaluations"
++  ],
++  "development_gt": [],
++  "history": [],
++  "budget": {
++    "seconds": 60,
++    "calls": 2,
++    "cpus": [32, 33],
++    "port": 19877
++  },
++  "context": {
++    "purpose": "Explicit external improvement input example; not an automatic next iteration or promotion."
++  }
++}
+diff --git a/scene-rsi/docs/STAGE_06_PAIRED_VALIDATION_REVIEW.md b/scene-rsi/docs/STAGE_06_PAIRED_VALIDATION_REVIEW.md
+new file mode 100644
+index 0000000..d8e9284
+--- /dev/null
++++ b/scene-rsi/docs/STAGE_06_PAIRED_VALIDATION_REVIEW.md
+@@ -0,0 +1,186 @@
++# 第六阶段代码审查：候选能力库独立配对验证
++
++基于 `b8de748`。本次仅新增固定批次的“父库＋候选库 → 同任务独立Student → 独立Evaluation → 配对反馈”。前五阶段源码和全部评价标准保持不变。没有启动正式重建或真实模型调用。
++
++## 修改文件
++
++| 文件 | 作用 |
++|---|---|
++| [harness/run_candidate_validation.py](../harness/run_candidate_validation.py)（新增） | 外部配置、两库及参考图快照、配对Student/Evaluation配置、调用既有入口、保留全部配对及原指标差值。 |
++| [configs/validation_inputs/historical_candidate.json](../configs/validation_inputs/historical_candidate.json)（新增） | 直接使用既有Improvement的 `initial/library` 与 `candidate/library` 的完整配置。示例未执行。 |
++| [configs/validation_inputs/next_improvement.json](../configs/validation_inputs/next_improvement.json)（新增） | 将配对反馈作为外部Improvement输入；不是自动下一轮或晋升。 |
++| [tests/test_candidate_validation.py](../tests/test_candidate_validation.py)（新增） | 13项离线检查，覆盖版本、任务、预算、重复、配对差值、失败/未知保留、反馈接入和原件保护。 |
++| [tests/preflight_candidate_validation.py](../tests/preflight_candidate_validation.py)（新增） | 真实输入准备、模拟执行及配对收集，并实际调用旧Improvement.prepare。 |
++| README、本说明、[工程验收记录](../experiments/candidate_validation/stage_06_code_review/) | 实际差异、完整输入、配对反馈样例、验证结果和本地索引。 |
++
++源码、配置及文档的实际差异见 [implementation.diff](../experiments/candidate_validation/stage_06_code_review/implementation.diff)。没有修改 Student、Evaluation、Improvement、教师Hint、多轨迹提取、GT学习、能力库准入、SDK、Bridge、视觉Prompt、现有指标及旧实验记录。源码逐文件对照见 [preserved_sources.json](../experiments/candidate_validation/stage_06_code_review/preserved_sources.json)，采用直接内容比较，没有新增哈希系统。
++
++## 外部配置
++
++所有路径相对**配置文件所在目录**解析，也可使用绝对路径。任务ID完全来自外部；内部仅按任务序号和重复编号生成输出名，不解析A组或历史场景命名。
++
++```json
++{
++  "parent_library": "/absolute/attempt/initial/library",
++  "candidate_library": "/absolute/attempt/candidate/library",
++  "candidate_record": "/absolute/attempt/candidate.json",
++  "output_directory": "/absolute/new-validation",
++  "tasks": [
++    {"id": "any-external-task", "reference_image": "/absolute/reference.png"}
++  ],
++  "repetitions": 2,
++  "student_budget": {
++    "seconds": 1500, "calls": 120,
++    "cpus": [32, 33, 34, 35, 36, 37, 38, 39], "port": 19875
++  },
++  "evaluation": {
++    "items": ["reproduction", "scene", "images", "evidence", "visual"],
++    "budget": {
++      "cpus": [32, 33], "stage_seconds": 120,
++      "visual_seconds": 240, "visual_calls": 12, "visual_port": 19876
++    }
++  }
++}
++```
++
++`candidate_record` 可省略；若明确提供，原记录及可获取状态会保留在宿主，不进入Student或RGB评价上下文。它可以包含Agent的未修改、证据不足、失败、成本和决策等已有记录；这些是来源记录，不作为已验证收益。`context` 为可选原样保存的说明，例如明确标记工程模拟，不进入学生Prompt。
++
++两版库可以是原始库、既有候选或其他符合原Student结构的目录。外部来源先复制到本批 `libraries/parent` 和 `libraries/candidate`；Student再通过原入口复制到每次运行的只读实际库，Prompt仍使用原SKILL注入。准备之后外部库的修改不影响本批副本。
++
++库缺失或候选未生成时记录 `unavailable`，保留对应计划侧，不把它替换成无库学生。目录存在但不符合原Student输入时保留 `preparation_failed` 及原异常，不新增准入判定或人工修库。两库内容直接比较后记录 `changed`、`unchanged` 或 `unknown` 和增删改文件；文件有变化不证明能力有改进。Agent报告证据不足但仍有实际保存库时，可以按外部配置比较该库，报告仍保留原样。
++
++示例中的历史候选是此前真实保存、带 `ENGINEERING_PROBE.md` 的工程候选，**不是模型自主学习成果**。它用于接口审查，不能据此宣称Agent能力更新有效。示例场景也是历史开发图像，不能再作为最终留出测试。
++
++## 任务公平性和调用关系
++
++每个任务、每次重复有两个独立空白Student工作区和新SDK会话，使用同一冻结PNG、共同基础Prompt、模型、工具、学生预算及评价配置。差别是各自注入及只读挂载的能力库。没有共享代码、场景、对话、教师反馈或执行结果，也不强制使用能力。
++
++模型保持 `gpt-6.1-terra / low`，执行由既有Claude Agent SDK负责，经原Codex CLI Bridge调用底层模型。没有替换为Codex原生Agent。
++
++批次按预先生成的列表串行执行，父版先/候选先按配对交替。每一侧顺序执行Student及Evaluation，再进入下一侧；两侧资源设置相同，端口串行复用。顺序不依赖结果，没有自动重试或补采样，也没有新的并行调度机制。相同预算不代表实际消耗相同；实际停止、调用和成本分别保留。
++
++```text
++run_candidate_validation.prepare(input_file)
++  → 冻结两版库、参考图、可选候选来源记录
++  → 每个任务 × 重复 × 两版生成 Student/Evaluation JSON
++  → run_student.prepare：原共同Prompt、SKILL注入、SDK配置及独立工作区
++  → validation.json：全部计划侧、配对、顺序与准备状态
++
++run_candidate_validation.run(directory)
++  → 对每个已准备侧调用 run_student.run
++      → 原 run_sdk_session.execute → Claude Agent SDK → Bridge
++      → Student原始交付、工具/Blender记录、状态和成本
++  → evaluate_student.prepare（只在Student执行结束后）
++  → evaluate_student.technical
++      → 原 reproduce / scene inspection / compare_images / evidence index
++  → evaluate_student.visual（仅已选择且图像齐全时）
++      → 原VISUAL_PROMPT、匿名双图、原Read/Write及SDK执行
++  → evaluate_student.collect：该侧原始 feedback.json
++  → 保存该侧状态和实际异常；继续其他计划侧
++  → finally: run_candidate_validation.collect
++      → 全部任务/重复/两侧记录及原指标的 candidate - parent
++      → comparison.json、feedback.json
++
++外部后续输入
++  → run_capability_improvement.prepare(
++       initial_library=外部指定起点,
++       feedback=本批feedback.json,
++       evidence=显式选择的原始资料)
++```
++
++`Evaluation` 的实际输入仍来自该Student保存的参考图、库副本、交付和轨迹。盲RGB评价只使用原Prompt及该次真实的参考/重建图，不传父版/候选身份、另一侧图片、能力库、旧分数或GT。技术再生成仍沿用原不挂载外部能力库/GT的标准。技术阶段的 `stage_seconds` 继续是每个Blender子进程上限，而不是整批总时限；不改变原评价语义。
++
++## 使用命令和输出
++
++使用已有分析环境，不安装或下载依赖：
++
++```bash
++/srv/lab-disks/disk2/users/xymo/miniforge3/envs/scenemosaic/bin/python -B harness/run_candidate_validation.py prepare \
++  --input configs/validation_inputs/historical_candidate.json
++
++# 真实执行命令；本阶段没有执行未模拟的run
++/srv/lab-disks/disk2/users/xymo/miniforge3/envs/scenemosaic/bin/python -B harness/run_candidate_validation.py run \
++  --directory experiments/candidate_validation/examples/historical-candidate
++```
++
++`prepare` 仅复制及生成配置，不调用模型或Blender。`run` 是一个固定验证批次，将实际调用Student及已选择的RGB评价。`collect --directory ...` 可单独收集现有状态，包括未尝试的计划侧；收集不证明执行完成，不自动补跑。已有输出、比较记录和尝试不覆盖或重跑；中断时在finally保留部分记录与其余未尝试侧。
++
++```text
++validation/
++  input.json、candidate_source_record.json（可选）
++  libraries/parent/、libraries/candidate/（实际可用时）
++  references/T001.png、T002.png...
++  configs/T001-R01-V1-student.json、...-evaluation.json...
++  students/T001-R01-V1/、T001-R01-V2/...
++    # 原Student目录：library、inputs、workspace、capture、bridge、状态及成本
++  evaluations/T001-R01-V1/、T001-R01-V2/...
++    # 原Evaluation目录：技术记录、盲RGB、feedback与costs
++  validation.json                 # 所有计划侧、预算、顺序、进度与错误
++  comparison.json                 # 全部配对及原始证据/成本/差值
++  feedback.json                   # 可直接作为外部Improvement.feedback
++```
++
++`V1` 固定对应父版，`V2` 对应候选；任务外部ID与内部序号、重复编号均保留在配对记录。两边实际用库分别由批次来源、批次快照和Student `run.json.runtime_library` 追溯。
++
++## 配对反馈及未知处理
++
++完整样例：[工程模拟 feedback.json](../experiments/candidate_validation/stage_06_code_review/preflight/paired/feedback.json)。样例顶层 `context.kind=offline_engineering_test`、`simulated_execution=true`、`not_research=true`；Student/评审状态同样标记模拟，不能作为研究结果或候选收益。
++
++```text
++feedback.json
++  kind=paired_candidate_validation_feedback
++  context, libraries, library_comparison, candidate_source_record
++  student_budget, evaluation, model, reasoning_effort
++  coverage: planned_pairs, planned_attempts, attempt_status_counts
++  pairs[]
++    pair_id, task, repeat, execution_order
++    parent / candidate
++      attempt: 配置、路径、准备/执行状态、原异常
++      library: 外部来源、批次副本、文件清单
++      actual_student_record, student_result, supervisor_state
++      evaluation_feedback: 该侧原Evaluation完整JSON，缺失则null
++      metrics: 原有可获取指标
++      costs: 原Student/Evaluation成本，缺失仍保留未知
++      evidence: 实际库、轨迹、Blender捕获、模型记录、评价目录
++    metric_differences
++      auxiliary_ssim / mae_rgb / model_visual_estimate_0_100
++        parent, candidate, candidate_minus_parent
++  execution_error, data_policy, promotion_status=not_performed, limits
++```
++
++三个数值字段分别原样来自既有参考图Gaussian SSIM、RGB MAE、原RGB评价可选粗略估计。差值只是双方真实有限数字的候选减父版；任一缺失、未知或非数字时差值为null，真实0仍是0。不同指标方向不一，没有自动“获胜”判定、综合分数、平均成功案例分数或统计显著性声明。完整技术结果（包括源码独立可移植性及检查状态）仍保留在各侧原始评价反馈，没有改造为新的质量指标。
++
++所有任务/重复都保留两个计划侧，不因无库、失败、无交付、无视觉或缺失评价而过滤配对。`finished` 只表示该侧调用链结束；SDK成功、完整/部分/无交付、技术复现、视觉判断和能力收益分别读取原记录。执行异常后若仍可评价已有文件，会调用原评价入口；不能评价时保留异常、原Student结果、成本及null评价。
++
++原始轨迹及源码事实仍区分SKILL在上下文、实际Read、静态调用、捕获执行与收益，没有自动认定某组件导致失败。自动RGB判断不作为人工评分；本阶段模拟不写视觉报告，所有视觉结果未知。
++
++可将本批 `feedback.json` 直接填入现有Improvement外部配置。原证据访问仍由 `evidence`、`history`、`development_gt` 显式决定，反馈中的路径不自动赋予权限。验证任务标记为开发/选择集；用于改进或版本选择后，未来独立测试须用新留出任务。本入口不会启动改进Agent、修复库、选择候选或改写候选晋升状态。
++
++## 工程验收
++
++[单元日志](../experiments/candidate_validation/stage_06_code_review/unit_tests.log)：62项通过，含原49项及本阶段13项。
++
++[预检 verification.json](../experiments/candidate_validation/stage_06_code_review/preflight/verification.json) 使用真实保存的父库/历史工程候选、两个现有真实参考PNG，生成2任务 × 2重复 × 2版共8份Student配置及8份Evaluation配置。实际使用既有Student准备/收集和Evaluation准备/图像辅助指标/证据提取/收集；仅替换执行后端为测试mock，没有模型或Blender执行。
++
++- 实际用库逐文件匹配指定两版；原库、候选、参考图和历史交付内容保持不变。
++- 同任务参考图、基础Prompt、工具、预算和重复编号正确对应；每侧独立工作区。全部既有评价项目的配置透传由单元测试覆盖。
++- 模拟后端8次，模拟视觉后端4次；复制历史交付建立测试用例，保留完整2、部分4、无交付2，包括两次模拟执行异常。没有将这些状态冒充新Student行为。
++- 图像指标是对实际测试副本计算的已有指标，仅用于工程检查。无重建质量或候选收益结论。
++- 原盲评Prompt、Read/Write、双图和SDK挂载配置检查通过；没有写入假视觉报告或评分。缺失评价、非数字、0和中断未尝试侧另有单元测试。
++- 配对反馈被原Improvement.prepare逐字节接收，显式证据及候选起点正确，空GT不挂载。只准备输入，没有启动Agent或生成下一候选。
++
++预检约0.90秒。**新模型调用0，新Student重建0，Blender执行0。** 所有运行/评价结果均为明确标记的工程模拟；没有测量候选收益、模型驱动工具往返或正式配对效果。
++
++复查命令：
++
++```bash
++PYTHONDONTWRITEBYTECODE=1 /srv/lab-disks/disk2/users/xymo/miniforge3/envs/scenemosaic/bin/python -B -m unittest discover -s tests -v
++
++PYTHONDONTWRITEBYTECODE=1 /srv/lab-disks/disk2/users/xymo/miniforge3/envs/scenemosaic/bin/python -B tests/preflight_candidate_validation.py \
++  --output experiments/candidate_validation/new_offline_check \
++  --candidate-output experiments/capability_improvement/new_paired_feedback/prepared_only
++```
++
++两个输出均须为新目录。完整副本、重复SDK、场景和系统归档保存在本机，见 [local_file_index.json](../experiments/candidate_validation/stage_06_code_review/local_file_index.json)。GitHub保存新增源码、配置、实际生成的配对JSON、调用记录、证据索引和验收记录。
++
++本阶段停在代码审查，没有自动晋升、候选排名、多轮RSI调度、Harness自修改或新增建模方法。
+diff --git a/scene-rsi/harness/run_candidate_validation.py b/scene-rsi/harness/run_candidate_validation.py
+new file mode 100644
+index 0000000..2e6ccd8
+--- /dev/null
++++ b/scene-rsi/harness/run_candidate_validation.py
+@@ -0,0 +1,253 @@
++"""Compare two external libraries through the existing Student and Evaluation entries."""
++import argparse
++from collections import Counter
++import datetime
++import json
++import math
++from pathlib import Path
++import shutil
++import sys
++
++from isolation import ROOT
++from run_capability_acquisition import copy_tree, write
++import run_student as student
++
++sys.path.insert(0, str(ROOT / 'analysis'))
++import evaluate_student as evaluation
++
++VERSIONS = ['parent', 'candidate']
++
++
++def read(path, default=None):
++    return json.loads(path.read_text()) if path.is_file() else default
++
++
++def prepare(input_file):
++    input_file = Path(input_file).resolve()
++    configuration = read(input_file)
++
++    def resolve(value):
++        return (input_file.parent / value).resolve()
++
++    directory = resolve(configuration['output_directory'])
++    sources = {name: resolve(configuration[name + '_library']) if configuration.get(name + '_library') else None
++               for name in VERSIONS}
++    if any(path and (directory == path or path in directory.parents) for path in sources.values()):
++        raise ValueError('Use a new output directory outside both input libraries.')
++    if configuration['repetitions'] < 1 or not configuration['tasks']:
++        raise ValueError('Provide tasks and at least one repetition.')
++    if set(configuration['evaluation']['items']) - set(evaluation.ITEMS):
++        raise ValueError('Use the existing Evaluation item names.')
++    directory.mkdir(parents=True)
++    shutil.copy2(input_file, directory / 'input.json')
++    libraries = {}
++    for name, source in sources.items():
++        snapshot = directory / 'libraries' / name
++        available = source is not None and source.is_dir()
++        if available:
++            copy_tree(source, snapshot)
++        libraries[name] = {'source': str(source) if source else None,
++                           'snapshot': str(snapshot) if available else None,
++                           'status': 'available' if available else 'unavailable',
++                           'files': [{'path': str(path.relative_to(snapshot)), 'bytes': path.stat().st_size}
++                                     for path in sorted(snapshot.rglob('*')) if path.is_file()]}
++    changes, change_status = [], 'unknown'
++    if all(row['status'] == 'available' for row in libraries.values()):
++        parent, candidate = [Path(libraries[name]['snapshot']) for name in VERSIONS]
++        names = {str(path.relative_to(parent)) for path in parent.rglob('*') if path.is_file()}
++        names |= {str(path.relative_to(candidate)) for path in candidate.rglob('*') if path.is_file()}
++        for name in sorted(names):
++            a, b = parent / name, candidate / name
++            if (a.read_bytes() if a.is_file() else None) != (b.read_bytes() if b.is_file() else None):
++                changes.append({'path': name, 'kind': 'added' if not a.is_file() else 'removed' if not b.is_file() else 'modified'})
++        change_status = 'changed' if changes else 'unchanged'
++    provenance = configuration.get('candidate_record')
++    candidate_record = None
++    if provenance:
++        source = resolve(provenance)
++        candidate_record = {'source': str(source), 'record': read(source), 'available': source.is_file()}
++        if source.is_file():
++            shutil.copy2(source, directory / 'candidate_source_record.json')
++    tasks = []
++    jobs = []
++    for index, task in enumerate(configuration['tasks'], 1):
++        image = resolve(task['reference_image'])
++        reference = directory / 'references' / ('T' + str(index).zfill(3) + '.png')
++        reference.parent.mkdir(exist_ok=True)
++        shutil.copy2(image, reference)
++        tasks.append({'task_index': index, 'task_id': task['id'], 'reference_source': str(image),
++                      'reference_snapshot': str(reference)})
++        for repeat in range(1, configuration['repetitions'] + 1):
++            pair_id = 'T' + str(index).zfill(3) + '-R' + str(repeat).zfill(2)
++            # Balance first/second order in advance; never select order from results.
++            order = VERSIONS if len(jobs) // 2 % 2 == 0 else list(reversed(VERSIONS))
++            for version in order:
++                job_id = pair_id + '-V' + str(VERSIONS.index(version) + 1)
++                run = directory / 'students' / job_id
++                output = directory / 'evaluations' / job_id
++                student_input = directory / 'configs' / (job_id + '-student.json')
++                evaluation_input = directory / 'configs' / (job_id + '-evaluation.json')
++                write(student_input, {'run_id': job_id, 'output_directory': str(run),
++                    'reference_image': str(reference), 'capability_library': str(directory / 'libraries' / version),
++                    'budget': configuration['student_budget']})
++                write(evaluation_input, {'student_run': str(run), 'output_directory': str(output),
++                    'items': configuration['evaluation']['items'], 'budget': configuration['evaluation']['budget']})
++                job = {'job_id': job_id, 'pair_id': pair_id, 'task_index': index, 'task_id': task['id'],
++                       'repeat': repeat, 'version': version, 'student_input': str(student_input),
++                       'evaluation_input': str(evaluation_input), 'student_run': str(run),
++                       'evaluation_directory': str(output), 'errors': []}
++                if libraries[version]['status'] != 'available':
++                    job['status'] = 'library_unavailable'
++                else:
++                    try:
++                        student.prepare(student_input)
++                        job['status'] = 'prepared'
++                    except Exception as error:
++                        job['status'] = 'preparation_failed'
++                        job['errors'].append({'stage': 'student_prepare', 'type': type(error).__name__, 'message': str(error)})
++                jobs.append(job)
++    record = {'status': 'prepared', 'prepared_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
++              'libraries': libraries, 'library_comparison': {'status': change_status, 'file_changes': changes},
++              'candidate_source_record': candidate_record, 'tasks': tasks,
++              'context': configuration.get('context', {}),
++              'repetitions': configuration['repetitions'], 'student_budget': configuration['student_budget'],
++              'evaluation': configuration['evaluation'], 'model': 'gpt-6.1-terra', 'reasoning_effort': 'low',
++              'execution_order': 'Sequential; alternate parent-first and candidate-first by planned pair.',
++              'jobs': jobs, 'promotion_status': 'not_performed',
++              'data_policy': 'Development/selection tasks, never final independent tests after use for improvement or selection.'}
++    write(directory / 'validation.json', record)
++    return directory
++
++
++def metrics(feedback):
++    technical = (feedback or {}).get('technical', {})
++    image_result = technical.get('images', {}).get('result') or {}
++    reference = image_result.get('reference_comparison') or {}
++    visual = (feedback or {}).get('visual', {}).get('result') or {}
++    return {'auxiliary_ssim': reference.get('ssim_rgb_gaussian_auxiliary'),
++            'mae_rgb': reference.get('mae_rgb'),
++            'model_visual_estimate_0_100': visual.get('overall_fidelity_estimate_0_100')}
++
++
++def observed_side(job, library):
++    run, output = Path(job['student_run']), Path(job['evaluation_directory'])
++    result = read(run / 'result.json')
++    feedback = read(output / 'feedback.json')
++    record = read(run / 'run.json')
++    return {'attempt': job, 'library': library, 'actual_student_record': record,
++            'student_result': result, 'supervisor_state': read(run / 'status.json'),
++            'evaluation_feedback': feedback, 'metrics': metrics(feedback),
++            'costs': feedback['costs'] if feedback else {'student_saved_record': read(run / 'costs.json'),
++                                                       'evaluation': None},
++            'evidence': {'student': str(run), 'student_input': job['student_input'],
++                         'runtime_library': record.get('runtime_library') if record else None,
++                         'trajectory': str(run / 'capture/trajs.json'), 'blender_captures': str(run / 'capture'),
++                         'model_logs': str(run / 'bridge'), 'evaluation': str(output),
++                         'evaluation_feedback': str(output / 'feedback.json')}}
++
++
++def collect(directory):
++    directory = Path(directory).resolve()
++    if (directory / 'comparison.json').exists() or (directory / 'feedback.json').exists():
++        raise FileExistsError('Existing paired results are not overwritten.')
++    record = read(directory / 'validation.json')
++    pairs = []
++    for task in record['tasks']:
++        for repeat in range(1, record['repetitions'] + 1):
++            selected = [job for job in record['jobs'] if job['task_index'] == task['task_index'] and job['repeat'] == repeat]
++            sides = {job['version']: observed_side(job, record['libraries'][job['version']]) for job in selected}
++            differences = {}
++            for name in sides['parent']['metrics']:
++                a, b = [sides[version]['metrics'][name] for version in VERSIONS]
++                numeric = all(isinstance(value, (int, float)) and not isinstance(value, bool)
++                              and math.isfinite(value) for value in [a, b])
++                differences[name] = {'parent': a, 'candidate': b, 'candidate_minus_parent': b - a if numeric else None}
++            pairs.append({'pair_id': selected[0]['pair_id'], 'task': task, 'repeat': repeat,
++                          'execution_order': [job['version'] for job in selected],
++                          'parent': sides['parent'], 'candidate': sides['candidate'], 'metric_differences': differences})
++    comparison = {'schema_version': 1, 'kind': 'paired_candidate_validation',
++        'validation_directory': str(directory), 'libraries': record['libraries'],
++        'library_comparison': record['library_comparison'], 'candidate_source_record': record['candidate_source_record'],
++        'context': record['context'],
++        'student_budget': record['student_budget'], 'evaluation': record['evaluation'],
++        'model': record['model'], 'reasoning_effort': record['reasoning_effort'],
++        'coverage': {'planned_pairs': len(record['tasks']) * record['repetitions'],
++                     'planned_attempts': len(record['jobs']),
++                     'attempt_status_counts': dict(Counter(job['status'] for job in record['jobs']))},
++        'pairs': pairs, 'execution_error': record.get('execution_error'),
++        'data_policy': record['data_policy'], 'promotion_status': 'not_performed',
++        'limits': ['All planned pairs and sides are retained, including unavailable libraries, unattempted runs, failures and missing evaluations.',
++                   'Differences are candidate minus parent for existing observed metrics; missing or nonnumeric values have null differences. No composite score, ranking or significance claim.',
++                   'SDK completion, file delivery, technical checks, automated RGB judgment and capability benefit are separate evidence.',
++                   'Library byte changes do not prove a substantive improvement. Candidate reports are recorded claims, not validation results.',
++                   'Original student/evaluator evidence is linked. Feedback paths grant no additional Improvement access without explicit evidence configuration.',
++                   'No candidate repair, automatic promotion or next iteration is performed.']}
++    write(directory / 'comparison.json', comparison)
++    write(directory / 'feedback.json', dict(comparison, kind='paired_candidate_validation_feedback',
++                                          comparison_record=str(directory / 'comparison.json')))
++    record.update(status='collected', collected_at_utc=datetime.datetime.now(datetime.timezone.utc).isoformat())
++    write(directory / 'validation.json', record)
++    return comparison
++
++
++def run(directory):
++    directory = Path(directory).resolve()
++    record = read(directory / 'validation.json')
++    if record['status'] != 'prepared' or (directory / 'feedback.json').exists():
++        raise FileExistsError('Use a new prepared validation; existing attempts are not rerun.')
++    record['status'] = 'started'
++    write(directory / 'validation.json', record)
++    try:
++        for job in record['jobs']:
++            if job['status'] != 'prepared':
++                continue
++            job['status'] = 'started'
++            write(directory / 'validation.json', record)
++            try:
++                student.run(job['student_run'])
++            except Exception as error:
++                job['errors'].append({'stage': 'student', 'type': type(error).__name__, 'message': str(error)})
++            try:
++                output = evaluation.prepare(job['evaluation_input'])
++                try:
++                    evaluation.technical(output)
++                    if read(output / 'evaluation.json')['visual']['status'] == 'prepared':
++                        evaluation.visual(output)
++                finally:
++                    evaluation.collect(output)
++            except Exception as error:
++                job['errors'].append({'stage': 'evaluation', 'type': type(error).__name__, 'message': str(error)})
++            job['status'] = 'finished_with_errors' if job['errors'] else 'finished'
++            write(directory / 'validation.json', record)
++    except BaseException as error:
++        record['execution_error'] = {'type': type(error).__name__, 'message': str(error)}
++        for job in record['jobs']:
++            if job['status'] == 'started':
++                job['status'] = 'interrupted'
++        raise
++    finally:
++        write(directory / 'validation.json', record)
++        collect(directory)
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('stage', choices=['prepare', 'run', 'collect'])
++    parser.add_argument('--input', type=Path)
++    parser.add_argument('--directory', type=Path)
++    args = parser.parse_args()
++    if args.stage == 'prepare':
++        if not args.input:
++            parser.error('--input is required for prepare')
++        print(prepare(args.input))
++    else:
++        if not args.directory:
++            parser.error('--directory is required for run/collect')
++        if args.stage == 'run':
++            run(args.directory)
++        else:
++            collect(args.directory)
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scene-rsi/tests/preflight_candidate_validation.py b/scene-rsi/tests/preflight_candidate_validation.py
+new file mode 100644
+index 0000000..5fb94db
+--- /dev/null
++++ b/scene-rsi/tests/preflight_candidate_validation.py
+@@ -0,0 +1,135 @@
++"""Exercise real library/task preparation and paired collection with simulated execution only."""
++import argparse
++from collections import Counter
++import datetime
++import json
++from pathlib import Path
++import shutil
++import sys
++import time
++from unittest.mock import patch
++
++ROOT = Path(__file__).resolve().parents[1]
++sys.path[:0] = [str(ROOT / 'harness'), str(ROOT / 'analysis')]
++import run_candidate_validation as validation
++import run_capability_improvement as improvement
++from run_capability_acquisition import write
++
++
++def contents(directory):
++    return {str(path.relative_to(directory)): path.read_bytes() for path in directory.rglob('*') if path.is_file()}
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('--output', type=Path, required=True)
++    parser.add_argument('--candidate-output', type=Path, required=True)
++    args = parser.parse_args()
++    output = args.output.resolve()
++    output.mkdir(parents=True)
++    started = time.monotonic()
++    previous = ROOT / 'experiments/capability_improvement/stage_01_verified_review/offline_candidate'
++    parent, candidate = previous / 'initial/library', previous / 'candidate/library'
++    historical = ROOT / 'experiments/experiment_03a_capability_acquisition/runs/A-T01-A3'
++    scenes = validation.read(ROOT / 'configs/scenes.json')['scenes'][:2]
++    before = {str(path): contents(path) for path in [parent, candidate, historical]}
++    reference_before = {row['reference']: Path(row['reference']).read_bytes() for row in scenes}
++    input_file = output / 'input.json'
++    write(input_file, {'parent_library': str(parent), 'candidate_library': str(candidate),
++        'candidate_record': str(previous / 'candidate.json'), 'output_directory': str(output / 'paired'),
++        'tasks': [{'id': 'external-' + str(index), 'reference_image': row['reference']}
++                  for index, row in enumerate(scenes, 1)], 'repetitions': 2,
++        'student_budget': {'seconds': 60, 'calls': 2, 'cpus': [32, 33], 'port': 19875},
++        'evaluation': {'items': ['images', 'evidence', 'visual'], 'budget': {'cpus': [32, 33],
++            'stage_seconds': 30, 'visual_seconds': 40, 'visual_calls': 2, 'visual_port': 19876}},
++        'context': {'kind': 'offline_engineering_test', 'simulated_execution': True, 'not_research': True,
++                    'candidate_provenance': 'A real saved engineering candidate containing ENGINEERING_PROBE.md, not a model-learned improvement.',
++                    'artifact_provenance': str(historical / 'workspace'),
++                    'artifacts_are_copied_not_generated': True, 'new_model_calls': 0,
++                    'new_student_reconstructions': 0, 'blender_executions': 0}})
++    directory = validation.prepare(input_file)
++    dispatches = []
++
++    def fake_student(**invocation):
++        run = Path(invocation['directory'])
++        identifier = run.name
++        names = ['build.py', 'scene.blend', 'final.png']
++        if '-R01-V2' in identifier:
++            names = ['build.py', 'final.png']
++        if '-R02-V1' in identifier:
++            names = []
++        if '-R02-V2' in identifier:
++            names = ['build.py']
++        for name in names:
++            shutil.copy2(historical / 'workspace' / name, run / 'workspace' / name)
++        write(run / 'status.json', {'status': 'offline_engineering_simulation',
++              'sdk_status': 'incomplete' if '-R02-' in identifier else 'completed',
++              'model_agent_started': False, 'model_calls': 0, 'artifacts_copied_not_generated': True})
++        dispatches.append({'kind': 'simulated_student_backend', 'directory': str(run),
++            'seconds': invocation['seconds'], 'calls': invocation['calls'], 'cpus': invocation['cpus'],
++            'tools': invocation['session']['tools'], 'copied_historical_files': names,
++            'new_model_calls': 0, 'new_blender_executions': 0})
++        if '-R02-V2' in identifier:
++            raise RuntimeError('Offline engineering interruption fixture, not a research observation.')
++
++    def fake_visual(**invocation):
++        run = Path(invocation['directory'])
++        assert invocation['prompt'] == validation.evaluation.VISUAL_PROMPT
++        assert invocation['session']['tools'] == ['Read', 'Write']
++        assert sorted(path.name for path in (run / 'workspace').iterdir()) == ['final.png', 'reference.png']
++        assert [row['label'] for row in invocation['session']['initial_images']] == ['Reference image', 'Candidate reconstruction']
++        assert [row['target'] for row in invocation['session']['readonly_mounts']] == ['/sdk']
++        write(run / 'status.json', {'status': 'offline_engineering_simulation', 'model_agent_started': False, 'model_calls': 0})
++        dispatches.append({'kind': 'simulated_visual_backend_without_report', 'directory': str(run),
++            'seconds': invocation['seconds'], 'calls': invocation['calls'], 'cpus': invocation['cpus'],
++            'anonymous_image_count': 2, 'new_model_calls': 0})
++
++    with patch.object(validation.student, 'execute', side_effect=fake_student) as student_calls, \
++         patch.object(validation.evaluation, 'execute', side_effect=fake_visual) as visual_calls:
++        validation.run(directory)
++    result = validation.read(directory / 'feedback.json')
++    assert result['coverage']['planned_pairs'] == 4 and result['coverage']['planned_attempts'] == 8
++    deliveries = []
++    for pair in result['pairs']:
++        for name in validation.VERSIONS:
++            side = pair[name]
++            deliveries.append(side['evaluation_feedback']['student']['delivery']['kind'])
++            assert side['evaluation_feedback']['visual']['result'] is None
++            assert contents(Path(side['evidence']['runtime_library'])) == before[str(parent if name == 'parent' else candidate)]
++        assert pair['metric_differences']['model_visual_estimate_0_100']['candidate_minus_parent'] is None
++    assert deliveries.count('complete_files_unvalidated') == 2 and deliveries.count('partial') == 4 and deliveries.count('none') == 2
++    assert student_calls.call_count == 8 and visual_calls.call_count == 4
++    next_input = output / 'improvement_input.json'
++    write(next_input, {'initial_library': str(directory / 'libraries/candidate'), 'feedback': str(directory / 'feedback.json'),
++        'evidence': [str(directory / 'libraries'), str(directory / 'students/T001-R01-V1/capture'),
++                     str(directory / 'evaluations/T001-R01-V1/technical')],
++        'development_gt': [], 'history': [],
++        'context': {'kind': 'offline_engineering_test', 'simulated_execution': True, 'not_research': True},
++        'budget': {'seconds': 60, 'calls': 2, 'cpus': [32, 33], 'port': 19877}})
++    prepared = args.candidate_output.resolve()
++    improvement.prepare(prepared, next_input)
++    assert (prepared / 'inputs/recorded_feedback.json').read_bytes() == (directory / 'feedback.json').read_bytes()
++    assert not (prepared / 'session').exists() and not (prepared / 'candidate').exists()
++    assert not validation.read(prepared / 'inputs/feedback.json')['allowed_development_gt']
++    assert all(contents(Path(path)) == original for path, original in before.items())
++    assert all(Path(path).read_bytes() == image for path, image in reference_before.items())
++    write(output / 'dispatches.json', dispatches)
++    write(output / 'verification.json', {'kind': 'offline_engineering_simulation_not_research',
++        'finished_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
++        'seconds': time.monotonic() - started, 'paired_feedback': str(directory / 'feedback.json'),
++        'planned_pairs_retained': 4, 'planned_attempts_retained': 8,
++        'simulated_student_backend_calls': student_calls.call_count,
++        'simulated_visual_backend_calls_without_report': visual_calls.call_count,
++        'simulated_delivery_counts': dict(Counter(deliveries)),
++        'original_libraries_historical_run_and_references_unchanged': True,
++        'prepared_runtime_libraries_match_selected_sources': True,
++        'blind_rgb_prompt_tools_and_images_checked': True,
++        'improvement_prepared_only': str(prepared), 'feedback_copied_unchanged': True,
++        'new_model_calls': 0, 'new_student_reconstructions': 0, 'blender_executions': 0,
++        'limits': 'Copied historical files and simulated statuses test engineering contracts only. Image metrics describe these copied fixtures. No candidate benefit, visual judgment, SDK model roundtrip, source regeneration, ranking, promotion or iteration has been measured.'})
++    print(json.dumps({'verification': str(output / 'verification.json'), 'new_model_calls': 0,
++                      'new_student_reconstructions': 0, 'seconds': time.monotonic() - started}))
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scene-rsi/tests/test_candidate_validation.py b/scene-rsi/tests/test_candidate_validation.py
+new file mode 100644
+index 0000000..1145f80
+--- /dev/null
++++ b/scene-rsi/tests/test_candidate_validation.py
+@@ -0,0 +1,264 @@
++"""Paired entry contracts using real input files and explicitly simulated execution."""
++import importlib.util
++import json
++from pathlib import Path
++import shutil
++import sys
++import tempfile
++import unittest
++from unittest.mock import patch
++
++ROOT = Path(__file__).resolve().parents[1]
++sys.path[:0] = [str(ROOT / 'harness'), str(ROOT / 'analysis')]
++AVAILABLE = importlib.util.find_spec('numpy') is not None
++if AVAILABLE:
++    import run_candidate_validation as validation
++    import run_capability_improvement as improvement
++
++OLD = ROOT / 'experiments/experiment_03a_capability_acquisition/runs/A-T01-A3'
++LIBRARY = ROOT / 'experiments/experiment_03a_capability_acquisition/libraries/A3'
++PREVIOUS = ROOT / 'experiments/capability_improvement/stage_01_verified_review/offline_candidate'
++
++
++def write(path, value):
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(json.dumps(value, indent=2))
++
++
++def contents(directory):
++    return {str(path.relative_to(directory)): path.read_bytes() for path in directory.rglob('*') if path.is_file()}
++
++
++@unittest.skipUnless(AVAILABLE, 'Use the existing scenemosaic analysis environment.')
++class CandidateValidation(unittest.TestCase):
++    def setUp(self):
++        temporary = tempfile.TemporaryDirectory(prefix='scene-paired-validation-')
++        self.addCleanup(temporary.cleanup)
++        self.root = Path(temporary.name)
++        shutil.copytree(LIBRARY, self.root / 'parent')
++        shutil.copytree(PREVIOUS / 'candidate/library', self.root / 'candidate')
++        shutil.copy2(OLD / 'workspace/reference.png', self.root / 'reference.png')
++        self.configuration = {'parent_library': 'parent', 'candidate_library': 'candidate',
++            'candidate_record': str(PREVIOUS / 'candidate.json'), 'output_directory': 'validation',
++            'tasks': [{'id': 'arbitrary.task', 'reference_image': 'reference.png'}], 'repetitions': 2,
++            'student_budget': {'seconds': 60, 'calls': 2, 'cpus': [32, 33], 'port': 19875},
++            'evaluation': {'items': ['images', 'evidence', 'visual'],
++                           'budget': {'cpus': [32, 33], 'stage_seconds': 30, 'visual_seconds': 40,
++                                      'visual_calls': 2, 'visual_port': 19876}},
++            'context': {'kind': 'offline_engineering_test', 'simulated_execution': True, 'not_research': True}}
++
++    def prepare(self):
++        path = self.root / 'input.json'
++        write(path, self.configuration)
++        return validation.prepare(path)
++
++    def fake_student(self, **invocation):
++        run = Path(invocation['directory'])
++        identifier = run.name
++        # These are copied historical artifacts, never newly generated scenes.
++        names = ['build.py', 'scene.blend', 'final.png']
++        if '-R01-V2' in identifier:
++            names.remove('scene.blend')
++        if '-R02-V1' in identifier:
++            names = []
++        if '-R02-V2' in identifier:
++            names = ['build.py']
++        for name in names:
++            shutil.copy2(OLD / 'workspace' / name, run / 'workspace' / name)
++        write(run / 'status.json', {'status': 'offline_engineering_test',
++              'sdk_status': 'incomplete' if '-R02-' in identifier else 'completed',
++              'model_agent_started': False, 'model_calls': 0, 'simulated_execution': True})
++        if '-R02-V2' in identifier:
++            raise RuntimeError('Simulated engineering interruption, not a student observation.')
++
++    def fake_visual(self, **invocation):
++        run = Path(invocation['directory'])
++        write(run / 'status.json', {'status': 'offline_engineering_test', 'model_agent_started': False,
++                                    'model_calls': 0, 'simulated_execution': True})
++        # No model report or score is fabricated.
++
++    def test_original_parent_and_saved_candidate_are_frozen_independently(self):
++        before = {name: contents(self.root / name) for name in ['parent', 'candidate']}
++        directory = self.prepare()
++        record = validation.read(directory / 'validation.json')
++        self.assertEqual(record['library_comparison']['status'], 'changed')
++        self.assertEqual(record['library_comparison']['file_changes'], [{'path': 'ENGINEERING_PROBE.md', 'kind': 'added'}])
++        self.assertEqual(record['candidate_source_record']['record']['agent_decision'], None)
++        for name in ['parent', 'candidate']:
++            self.assertEqual(contents(directory / 'libraries' / name), before[name])
++            self.assertEqual(contents(self.root / name), before[name])
++
++    def test_same_task_budgets_prompt_tools_and_repeat_mapping(self):
++        self.configuration['tasks'].append({'id': 'second external ID', 'reference_image': 'reference.png'})
++        self.configuration['evaluation']['items'] = validation.evaluation.ITEMS
++        directory = self.prepare()
++        record = validation.read(directory / 'validation.json')
++        self.assertEqual(len(record['jobs']), 8)
++        self.assertEqual([job['version'] for job in record['jobs']], ['parent', 'candidate', 'candidate', 'parent'] * 2)
++        references = set()
++        for job in record['jobs']:
++            run = Path(job['student_run'])
++            invocation = validation.read(run / 'inputs/invocation.json')
++            configuration = validation.read(Path(job['evaluation_input']))
++            self.assertEqual(validation.read(Path(job['student_input']))['budget'], self.configuration['student_budget'])
++            self.assertEqual(configuration['budget'], self.configuration['evaluation']['budget'])
++            self.assertEqual(configuration['items'], self.configuration['evaluation']['items'])
++            self.assertEqual(invocation['session']['tools'], validation.student.TOOLS)
++            self.assertFalse(invocation['session']['hint_enabled'])
++            self.assertFalse(invocation['session']['online_teacher_enabled'])
++            self.assertEqual((run / 'inputs/base_prompt.txt').read_bytes(), (ROOT / 'configs/formal_prompt.txt').read_bytes())
++            self.assertEqual(contents(run / 'library'), contents(directory / 'libraries' / job['version']))
++            self.assertEqual([row['target'] for row in invocation['session']['readonly_mounts']], ['/sdk', '/capabilities'])
++            references.add((run / 'inputs/reference.png').read_bytes())
++            self.assertEqual(job['task_id'], self.configuration['tasks'][job['task_index'] - 1]['id'])
++        self.assertEqual(references, {(self.root / 'reference.png').read_bytes()})
++        self.assertFalse((directory / 'evaluations').exists())  # Prepare must not execute or evaluate.
++
++    def test_external_changes_do_not_change_prepared_snapshots(self):
++        directory = self.prepare()
++        before = contents(directory / 'libraries/candidate')
++        (self.root / 'candidate/SKILL.md').write_text('Changed outside the prepared validation.\n')
++        self.assertEqual(contents(directory / 'libraries/candidate'), before)
++        for job in validation.read(directory / 'validation.json')['jobs']:
++            if job['version'] == 'candidate':
++                self.assertEqual(contents(Path(job['student_run']) / 'library'), before)
++
++    def test_unchanged_and_insufficient_evidence_are_not_fabricated_updates(self):
++        self.configuration['candidate_library'] = 'parent'
++        report = self.root / 'candidate_record.json'
++        write(report, {'agent_decision': 'insufficient_evidence', 'promotion_status': 'not_promoted'})
++        self.configuration['candidate_record'] = str(report)
++        directory = self.prepare()
++        result = validation.collect(directory)
++        self.assertEqual(result['library_comparison'], {'status': 'unchanged', 'file_changes': []})
++        self.assertEqual(result['candidate_source_record']['record']['agent_decision'], 'insufficient_evidence')
++        self.assertEqual(result['promotion_status'], 'not_performed')
++
++    def test_missing_candidate_is_retained_and_never_treated_as_an_empty_library_student(self):
++        self.configuration['candidate_library'] = 'not-generated/library'
++        directory = self.prepare()
++        with patch.object(validation.student, 'execute', side_effect=self.fake_student) as execute, \
++             patch.object(validation.evaluation, 'execute', side_effect=self.fake_visual):
++            validation.run(directory)
++        self.assertEqual(execute.call_count, 2)
++        self.assertTrue(all(call.kwargs['directory'].endswith('-V1') for call in execute.call_args_list))
++        result = validation.read(directory / 'comparison.json')
++        self.assertEqual(result['library_comparison']['status'], 'unknown')
++        for pair in result['pairs']:
++            candidate = pair['candidate']
++            self.assertEqual(candidate['attempt']['status'], 'library_unavailable')
++            self.assertIsNone(candidate['actual_student_record'])
++            self.assertIsNone(candidate['evaluation_feedback'])
++            self.assertFalse(Path(candidate['attempt']['student_run']).exists())
++            configuration = validation.read(Path(candidate['attempt']['student_input']))
++            self.assertIsNotNone(configuration['capability_library'])
++            self.assertFalse(Path(configuration['capability_library']).exists())
++            self.assertTrue(all(row['candidate_minus_parent'] is None for row in pair['metric_differences'].values()))
++
++    def test_incompatible_library_prepare_failure_does_not_drop_planned_pairs(self):
++        (self.root / 'candidate/SKILL.md').unlink()
++        directory = self.prepare()
++        result = validation.collect(directory)
++        self.assertEqual(len(result['pairs']), 2)
++        for pair in result['pairs']:
++            self.assertEqual(pair['candidate']['attempt']['status'], 'preparation_failed')
++            self.assertEqual(pair['candidate']['attempt']['errors'][0]['stage'], 'student_prepare')
++
++    def test_run_delegates_to_existing_entries_and_retains_all_outcomes(self):
++        directory = self.prepare()
++        with patch.object(validation.student, 'execute', side_effect=self.fake_student) as students, \
++             patch.object(validation.evaluation, 'execute', side_effect=self.fake_visual) as reviews:
++            validation.run(directory)
++        self.assertEqual(students.call_count, 4)
++        self.assertEqual(reviews.call_count, 2)
++        result = validation.read(directory / 'feedback.json')
++        self.assertEqual(result['coverage']['planned_attempts'], 4)
++        self.assertEqual(result['coverage']['planned_pairs'], 2)
++        first, second = result['pairs']
++        self.assertEqual(first['parent']['evaluation_feedback']['student']['delivery']['kind'], 'complete_files_unvalidated')
++        self.assertEqual(first['candidate']['evaluation_feedback']['student']['delivery']['kind'], 'partial')
++        self.assertEqual(second['parent']['evaluation_feedback']['student']['delivery']['kind'], 'none')
++        self.assertEqual(second['candidate']['attempt']['status'], 'finished_with_errors')
++        self.assertEqual(second['candidate']['evaluation_feedback']['student']['delivery']['kind'], 'partial')
++        self.assertEqual(first['parent']['evaluation_feedback']['visual']['status'], 'missing_or_invalid_report')
++        self.assertIsNone(first['metric_differences']['model_visual_estimate_0_100']['candidate_minus_parent'])
++        self.assertEqual(first['metric_differences']['mae_rgb']['candidate_minus_parent'], 0)
++        self.assertIsNone(second['metric_differences']['mae_rgb']['candidate_minus_parent'])
++        self.assertEqual(result['context']['kind'], 'offline_engineering_test')
++        self.assertIsNone(first['parent']['costs']['visual']['record']['actual_billing_usd'])
++
++    def test_numeric_differences_keep_zero_and_missing_separate(self):
++        directory = self.prepare()
++        jobs = validation.read(directory / 'validation.json')['jobs']
++        for job, value in zip(jobs[:2], [0, 12]):
++            write(Path(job['evaluation_directory']) / 'feedback.json', {'costs': {}, 'visual': {
++                'result': {'overall_fidelity_estimate_0_100': value, 'engineering_fixture_only': True}}})
++        result = validation.collect(directory)
++        first, second = result['pairs']
++        self.assertEqual(first['metric_differences']['model_visual_estimate_0_100']['candidate_minus_parent'], 12)
++        self.assertIsNone(second['metric_differences']['model_visual_estimate_0_100']['candidate_minus_parent'])
++
++    def test_nonnumeric_visual_value_does_not_become_a_numeric_score(self):
++        directory = self.prepare()
++        jobs = validation.read(directory / 'validation.json')['jobs']
++        for job, value in zip(jobs[:2], [False, 'unknown']):
++            write(Path(job['evaluation_directory']) / 'feedback.json', {'costs': {}, 'visual': {
++                'result': {'overall_fidelity_estimate_0_100': value, 'engineering_fixture_only': True}}})
++        self.assertIsNone(validation.collect(directory)['pairs'][0]['metric_differences']['model_visual_estimate_0_100']['candidate_minus_parent'])
++
++    def test_evaluation_exception_keeps_student_records_and_other_attempts(self):
++        directory = self.prepare()
++        with patch.object(validation.student, 'execute', side_effect=self.fake_student), \
++             patch.object(validation.evaluation, 'prepare', side_effect=OSError('Simulated engineering evaluation failure')):
++            validation.run(directory)
++        result = validation.read(directory / 'comparison.json')
++        for pair in result['pairs']:
++            for name in validation.VERSIONS:
++                side = pair[name]
++                self.assertIsNotNone(side['student_result'])
++                self.assertIsNone(side['evaluation_feedback'])
++                self.assertEqual(side['attempt']['errors'][-1]['stage'], 'evaluation')
++
++    def test_interruption_preserves_attempted_and_unattempted_sides_without_retry(self):
++        directory = self.prepare()
++        with patch.object(validation.student, 'execute', side_effect=KeyboardInterrupt):
++            with self.assertRaises(KeyboardInterrupt):
++                validation.run(directory)
++        record = validation.read(directory / 'comparison.json')
++        self.assertEqual(record['coverage']['attempt_status_counts'], {'interrupted': 1, 'prepared': 3})
++        self.assertEqual(len(record['pairs']), 2)
++
++    def test_existing_sources_outputs_and_results_are_preserved(self):
++        originals = {name: contents(self.root / name) for name in ['parent', 'candidate']}
++        directory = self.prepare()
++        with self.assertRaises(FileExistsError):
++            self.prepare()
++        validation.collect(directory)
++        with self.assertRaises(FileExistsError):
++            validation.collect(directory)
++        with patch.object(validation.student, 'run') as run:
++            with self.assertRaises(FileExistsError):
++                validation.run(directory)
++            run.assert_not_called()
++        self.assertEqual({name: contents(self.root / name) for name in originals}, originals)
++
++    def test_paired_feedback_is_accepted_by_existing_improvement_prepare(self):
++        directory = self.prepare()
++        validation.collect(directory)
++        for folder in ['sdk', 'harness', 'analysis', 'configs']:
++            shutil.copytree(ROOT / folder, self.root / 'system' / folder)
++        configuration = self.root / 'improvement.json'
++        write(configuration, {'initial_library': str(directory / 'libraries/candidate'),
++            'feedback': str(directory / 'feedback.json'), 'evidence': [str(directory / 'libraries')],
++            'development_gt': [], 'history': [],
++            'budget': {'seconds': 60, 'calls': 2, 'cpus': [32, 33], 'port': 19877}})
++        candidate = self.root / 'system/experiments/capability_improvement/paired_feedback'
++        with patch.object(improvement, 'ROOT', self.root / 'system'):
++            improvement.prepare(candidate, configuration)
++        self.assertEqual((candidate / 'inputs/recorded_feedback.json').read_bytes(), (directory / 'feedback.json').read_bytes())
++        self.assertEqual(validation.read(candidate / 'inputs/feedback.json')['allowed_development_gt'], [])
++        self.assertFalse((candidate / 'session').exists())
++
++
++if __name__ == '__main__':
++    unittest.main()
