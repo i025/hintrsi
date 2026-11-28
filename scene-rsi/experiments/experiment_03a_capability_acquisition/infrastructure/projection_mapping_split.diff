@@ -1,0 +1,29 @@
+--- v2_preflight/measure_acquisition_projection.py
++++ formal/measure_acquisition_projection.py
+@@ -25,7 +25,7 @@
+     for index, mapping in enumerate(mappings):
+         review = review_by_index.get(index)
+         row = {**mapping, 'mapping_index': index,
+-               'correspondence_source': 'SDK technical identity proposal plus planned SDK knowledge-comparison eligibility review; not human verified.',
++               'correspondence_source': 'SDK technical identity proposal plus independent SDK identity-eligibility review; not human verified.',
+                'projection_correspondence_review': review}
+         reason = []
+         gt_ids, names = row.get('gt_instance_ids', []), row.get('student_object_names', [])
+@@ -155,7 +155,7 @@
+     result = {'run_id': run.name, 'scene_id': scene['id'], 'annotation': str(annotation_path), 'completed': True,
+               'source_scene_exists': (workspace / 'scene.blend').exists(),
+               'protocol_version': 'v2_explicit_identity_eligibility_review',
+-              'correspondence_basis': 'Frozen original SDK technical proposals and planned knowledge-comparison eligibility judgments, not human verified.',
++              'correspondence_basis': 'Frozen original SDK technical proposals and independent SDK identity-eligibility judgments, not human verified.',
+               'eligibility_review_source': str(args.comparison),
+               'eligibility_review_source_available': args.comparison.exists(),
+               'reviewer_identity_matches': identity_matches,
+@@ -185,7 +185,7 @@
+     parser.add_argument('--comparison', type=Path)
+     args = parser.parse_args()
+     args.experiment = args.experiment.resolve()
+-    args.comparison = args.comparison or args.experiment / 'acquisition_reviews/knowledge-comparison/COMPARISON/workspace/knowledge_comparison.json'
++    args.comparison = args.comparison or args.experiment / 'analysis/projection_identity_review.json'
+     comparison = json.loads(args.comparison.read_text()) if args.comparison.exists() else {}
+     args.projection_reviews = {row['run_id']: row['mappings']
+                                for row in comparison.get('projection_correspondence_review', [])}

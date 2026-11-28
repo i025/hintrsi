@@ -1,0 +1,63 @@
+--- before/harness/isolation.py
++++ after/harness/isolation.py
+@@ -21,10 +21,13 @@
+     shutil.copyfile(image, directory / 'workspace/reference.png')
+     (directory / 'inputs/prompt.txt').write_text(prompt)
+     (directory / 'inputs/session.json').write_text(json.dumps(session or {}, indent=2))
+-    images = [{'path': '/app/reference.png', 'label': 'Reference image'}]
+-    if checkpoint:
+-        images.append({'path': '/app/final.png', 'label': 'Current reconstruction image'})
+-    images += (session or {}).get('additional_images', [])
++    if 'initial_images' in (session or {}):
++        images = session['initial_images']
++    else:
++        images = [{'path': '/app/reference.png', 'label': 'Reference image'}]
++        if checkpoint:
++            images.append({'path': '/app/final.png', 'label': 'Current reconstruction image'})
++        images += (session or {}).get('additional_images', [])
+     (directory / 'inputs/images.json').write_text(json.dumps(images, indent=2))
+     return directory
+ 
+@@ -45,6 +48,9 @@
+             '--ro-bind', str(ENVIRONMENT), '/opt/venv',
+             '--dir', '/runtime/bin', '--ro-bind', str(ROOT / 'harness/blender.py'), '/runtime/bin/blender',
+             '--dir', '/model', '--ro-bind', str(proxy_socket), '/model/proxy.sock', '--chdir', '/app']
++    session = json.loads((directory / 'inputs/session.json').read_text())
++    for mount in session.get('readonly_mounts', []):
++        args += ['--ro-bind', str(Path(mount['source']).resolve()), mount['target']]
+     env = {'HOME': '/home/student', 'USER': 'student', 'PATH': '/runtime/bin:/opt/python/bin:/usr/bin:/bin',
+            'PYTHONPATH': '/sdk:/sdk/litellm_proxy:/opt/venv/lib/python3.12/site-packages',
+            'PYTHONDONTWRITEBYTECODE': '1', 'LANG': 'C.UTF-8', 'TERM': 'dumb',
+--- before/harness/sdk_student.py
++++ after/harness/sdk_student.py
+@@ -39,7 +39,7 @@
+     options.max_buffer_size = 64 * 1024 * 1024
+     # The outer mount/PID/network namespace enforces access independently of prompts.
+     options.sandbox = {'enabled': False}
+-    options.add_dirs = ['/capture']
++    options.add_dirs = ['/capture'] + [mount['target'] for mount in session.get('readonly_mounts', [])]
+     metadata = {}
+     trajectories = {'main_agent': '', 'sub_agent': []}
+     start = time.monotonic()
+@@ -56,7 +56,8 @@
+         metadata.update(wall_seconds=time.monotonic() - start,
+                         hint_enabled=session.get('hint_enabled', False),
+                         role=session.get('role', 'student'), condition=session.get('condition'),
+-                        persistent_capability_enabled=False, online_teacher_enabled=False)
++                        persistent_capability_enabled=session.get('persistent_capability_enabled', False),
++                        online_teacher_enabled=False)
+         Path('/capture/trajs.json').write_text(json.dumps({'trajectories': trajectories, 'metadata': metadata}, ensure_ascii=False, indent=2))
+ 
+ 
+--- before/harness/run_sdk_session.py
++++ after/harness/run_sdk_session.py
+@@ -75,7 +75,8 @@
+              'agent_loop': 'Claude Agent SDK', 'started_at': started,
+              'seconds_limit': seconds, 'model_call_limit': calls, 'cpu_affinity': cpus,
+              'hint_enabled': session.get('hint_enabled', False),
+-             'persistent_capability_enabled': False, 'teacher_enabled': session.get('role') == 'teacher',
++             'persistent_capability_enabled': session.get('persistent_capability_enabled', False),
++             'teacher_enabled': session.get('role') == 'teacher',
+              'role': session.get('role', 'student'), 'condition': session.get('condition'),
+              'checkpoint': str(checkpoint) if checkpoint else None}
+ 

@@ -1,0 +1,107 @@
+{
+  "annotation_kind": "automated_model",
+  "human_rating": null,
+  "scope": "Posthoc comparison of five frozen libraries and 24 planned student runs. Method sets and Jaccards reproduce the partial pre-test audit's semantic granularity, not exhaustive claims of absence. Visual estimates are automated, not human labels.",
+  "canonical_semantic_vocabulary": {
+    "camera_projection": "Project world landmarks into camera image coordinates and report depth.",
+    "landmark_residual": "Calculate a numerical discrepancy between projected and target landmarks.",
+    "camera_aim": "Aim a camera at a target with optional lens setting.",
+    "hinge_transform": "Apply or diagnose a declared hinge-based pose; implementations and parenting assumptions differ.",
+    "hinge_edge_candidates": "Calculate candidate free-edge positions from a hinge, width and angles, without posing an assembly.",
+    "sampled_vertical_support": "Sample downward rays to screen vertical support gaps; not a contact proof.",
+    "aabb_support_screen": "Screen vertical and horizontal support relationships using axis-aligned bounds.",
+    "aabb_separation": "Measure or classify separation using axis-aligned bounding boxes.",
+    "world_aabb": "Expose world-space axis-aligned bounds as a standalone method.",
+    "scene_graph_relations": "Report parent relationships or components, not physical connectivity.",
+    "directional_noise_material": "Construct a mapped directional procedural noise material. Coordinate systems and parameters differ."
+  },
+  "libraries": [
+    {"condition":"A1","source_policy":"Teacher prior and common development inputs; no historical trajectories or complete GT.","methods":["camera_projection","landmark_residual","directional_noise_material","aabb_support_screen","scene_graph_relations"],"implementation_examples":["projected_landmarks","landmark_loss","world_bounds","support_diagnostic","assembly_links","make_directional_material"],"evidence":"/reviews/library_audit.json","provenance_note":"Prior and common inputs are permitted sources, not proof of the precise intellectual origin of each method."},
+    {"condition":"A2","source_policy":"Six strategy-guided development trajectories plus common inputs; no complete GT.","methods":["camera_projection","landmark_residual","camera_aim","hinge_transform","sampled_vertical_support","aabb_separation","directional_noise_material"],"implementation_examples":["project_points","landmark_errors","point_camera","hinge_pose","hinge_report","support_probe","aabb_relation","mapped_stone"],"evidence":"/evidence/A2/learning/research_evidence.json","provenance_note":"Research report links diagnostics to historical checks and trials, but exact original guidance wording was unavailable; no independent transfer established. The SKILL generation-workspace path differs from the mounted path; effect on behavior is unknown."},
+    {"condition":"A3","source_policy":"Six exploration-guided development trajectories plus common inputs; no complete GT.","methods":["camera_projection","hinge_edge_candidates","sampled_vertical_support","world_aabb","directional_noise_material"],"implementation_examples":["spatial.project_points","spatial.hinge_positions","support.world_bounds","support.sample_support","appearance.directional_stone"],"evidence":["/evidence/A3/learning/research_evidence.json","/evidence/A3/public_library/spatial.py:7-29"],"provenance_note":"The report describes historical comparisons and selections, not proven transfer. Hinge candidates compute positions, not assembly transformations. An attempted historical contact sheet failed because Pillow was unavailable."},
+    {"condition":"A4","source_policy":"Three complete development GT scenes and common inputs; no historical student trajectories.","methods":["camera_projection","landmark_residual","camera_aim","hinge_transform","aabb_support_screen","scene_graph_relations","directional_noise_material"],"implementation_examples":["project_points","landmark_error","aim_camera","hinge_pose","make_directional_material","support_bounds","assembly_components"],"evidence":["/evidence/A4/learning/research_evidence.json","/evidence/A4/public_library/reconstruction.py:8-118"],"provenance_note":"Reported direct GT queries contextualize methods alongside general geometry and shader knowledge; stored GT observations are not student outcomes. Synthetic tests do not establish image improvement. Validation observed displacement of parented components, so pivot preservation is not proof of a coherent assembly."},
+    {"condition":"A5","source_policy":"The same three complete development GT scenes as A4 plus the same six exploration trajectories as A3.","methods":["camera_projection","landmark_residual","hinge_transform","sampled_vertical_support","aabb_separation","directional_noise_material"],"implementation_examples":["landmarks","landmark_error","hinge_pose","hinge_error","support_samples","world_bounds","bounds_separation","directional_material"],"evidence":["/evidence/A5/learning/research_evidence.json","/evidence/A5/public_library/methods.py:7-115"],"provenance_note":"Reported GT and exploration evidence motivated units but do not establish unique causal origin or transfer. An initial learning projection assertion failed before later units were reached; a corrected rerun and separate synthetic validation are recorded in the audit."}
+  ],
+  "semantic_jaccard": {
+    "definition":"Intersection size divided by union size of the listed method-label sets; the audit counts A3's standalone world_aabb but does not separately count bounds used as subroutines in other libraries. This asymmetric exposure rule and semantic granularity affect results.",
+    "pairs":[
+      {"pair":"A1-A2","intersection":3,"union":9,"jaccard":0.3333333333},
+      {"pair":"A1-A3","intersection":2,"union":8,"jaccard":0.25},
+      {"pair":"A1-A4","intersection":5,"union":7,"jaccard":0.7142857143},
+      {"pair":"A1-A5","intersection":3,"union":8,"jaccard":0.375},
+      {"pair":"A2-A3","intersection":3,"union":9,"jaccard":0.3333333333},
+      {"pair":"A2-A4","intersection":5,"union":9,"jaccard":0.5555555556},
+      {"pair":"A2-A5","intersection":6,"union":7,"jaccard":0.8571428571},
+      {"pair":"A3-A4","intersection":2,"union":10,"jaccard":0.2},
+      {"pair":"A3-A5","intersection":3,"union":8,"jaccard":0.375},
+      {"pair":"A4-A5","intersection":4,"union":9,"jaccard":0.4444444444}
+    ]
+  },
+  "complementary_and_redundant_cases": [
+    {"kind":"redundant_at_label_level","case":"All five include camera projection and directional noise material; shared labels do not imply identical implementation, use, or outcome."},
+    {"kind":"redundant_at_label_level","case":"A2 and A5 share six of seven audited labels, but A2 alone includes camera aim in these sets and common labels do not establish common provenance."},
+    {"kind":"complementary","case":"A3 computes hinge-edge candidates while A4 applies a declared hinge transform; these differ in operation and can be complementary rather than interchangeable."},
+    {"kind":"complementary","case":"A4 uses broad-phase AABB support screening and parent-graph components; A5 samples vertical support rays and reports AABB separation. Neither approach proves physical support or connectivity."}
+  ],
+  "student_outcomes": {
+    "fields":"Rows are [run, complete_delivery, model_visual_estimate_0_100, auxiliary_ssim]; human_rating is null for every row. Missing visual scores are null, not zero.",
+    "rows":[
+      ["A-T01-A0",true,66,0.5547454400471065],["A-T01-A1",true,65,0.6557540656595434],["A-T01-A2",false,null,null],["A-T01-A3",true,60,0.6406310665516658],["A-T01-A4",true,65,0.6445616775685177],["A-T01-A5",true,65,0.6550112227708281],
+      ["A-T02-A0",true,65,0.5268143004489526],["A-T02-A1",true,58,0.587663659001021],["A-T02-A2",true,62,0.6313999645004615],["A-T02-A3",true,69,0.6259081235244922],["A-T02-A4",true,65,0.6327665468368155],["A-T02-A5",true,68,0.6192195627163015],
+      ["A-T03-A0",true,49,0.4380574536363031],["A-T03-A1",true,55,0.41938065336872504],["A-T03-A2",true,62,0.38935708181437945],["A-T03-A3",true,56,0.38924010627500755],["A-T03-A4",true,55,0.4235183272122262],["A-T03-A5",true,48,0.45980570938327764],
+      ["A-T04-A0",true,61,0.712435993410142],["A-T04-A1",true,70,0.6500412494677716],["A-T04-A2",false,null,null],["A-T04-A3",true,72,0.7008171032753157],["A-T04-A4",true,65,0.7247935452599832],["A-T04-A5",true,71,0.7036080654887504]
+    ],
+    "delivery_summary":"22 of 24 delivered all three artifacts. A2 delivered 2/4; each other condition delivered 4/4. Both missing A2 runs had zero recorded Blender executions; SDK completion is not delivery.",
+    "reproduction":"All 22 delivered runs were recorded as source-only portable and pixel-identical on regeneration. This is reproducibility, not reconstruction quality.",
+    "evidence":"/reviews/observed_results.json"
+  },
+  "prespecified_task_contrasts": {
+    "scene_order":["A-T01","A-T02","A-T03","A-T04"],
+    "interpretation":"Within-scene arithmetic first condition minus second; no imputation, significance claim, or isolated causal tool-versus-text interpretation.",
+    "contrasts":[
+      {"contrast":"A1-A0","model_visual_estimate_differences":[-1,-7,6,9],"auxiliary_ssim_differences":[0.10100862561243695,0.06084935855206841,-0.018676800267578064,-0.06239474394237032]},
+      {"contrast":"A3-A2","model_visual_estimate_differences":[null,7,-6,null],"auxiliary_ssim_differences":[null,-0.005491840975969331,-0.00011697553937189964,null]},
+      {"contrast":"A4-A1","model_visual_estimate_differences":[0,7,0,-5],"auxiliary_ssim_differences":[-0.01119238809102574,0.045102887835794525,0.004137673843501166,0.07475229579221154]},
+      {"contrast":"A5-A3","model_visual_estimate_differences":[5,-1,-8,-1],"auxiliary_ssim_differences":[0.014380156219162332,-0.006688560808190691,0.07056560310827009,0.002790962213434778]},
+      {"contrast":"A5-A4","model_visual_estimate_differences":[0,3,-7,6],"auxiliary_ssim_differences":[0.01044954520231045,-0.013546984120514027,0.03628738217105143,-0.02118547977123275]}
+    ],
+    "evidence":"/reviews/paired_observed_differences.json"
+  },
+  "exposure_and_adoption": {
+    "initial_context":"Audits report verbatim SKILL text and explicit capabilities mount notice for all A1-A5 sessions, not A0; Bash and Write tool definitions were present in all 24 serialized inputs.",
+    "interpretation":"Initial text exposure is distinct from later file reading, import, reached callable invocation, and explicitly attributed reimplementation. Compact run annotations often find no later documented helper use; this does not rule out cognitive influence. Generic procedural similarity alone is not transfer evidence: A-T03-A0 also constructed a mapped procedural noise floor without a library.",
+    "evidence":["/reviews/student_initial_condition_audit.json","/reviews/serialized_backend_context_audit.json","/reviews/compact_comparison_evidence.json"]
+  },
+  "unsupported_claims":[
+    "The observed results establish a general visual improvement from GT, exploration, a library, or executable tools over text.",
+    "A missing A2 delivery implies zero visual quality or was caused by the library path discrepancy.",
+    "Initial SKILL exposure proves a helper was called, or absence of a documented call proves no influence.",
+    "An AABB overlap, sampled near-zero gap, parent link, or attractive image proves physical contact, collision-free articulation, or structural correctness.",
+    "A synthetic unit probe or historical candidate selection validates independent-scene transfer.",
+    "Historical door candidate G was retained, or a relocated hinge was independently verified as a coherent structural repair.",
+    "A semantic label match proves copied code, common method provenance, or equal implementation behavior."
+  ],
+  "limitations":[
+    "Four matched scenes, one student sample per scene and condition, and one frozen library per condition do not support population-level conclusions or isolate library content from condition-specific effects.",
+    "Visual judgments are automated and all human ratings are null; SSIM is auxiliary and can disagree in direction with model visual estimates.",
+    "Two A2 visual outcomes are missing. Complete-case contrasts have only two observed pairs and cannot represent missing scenes.",
+    "The pre-test method inventory is partial and depends on the audit's label granularity and standalone-exposure rule; unlisted methods are not necessarily absent.",
+    "Development research reports describe source access, observations and proposed motivations; direct raw GT query outputs and historical trajectories were not independently rechecked here.",
+    "Single-image scale, hidden geometry, materials and illumination are not uniquely identifiable. Projected bounding boxes and proposed correspondences are not validated segmentation masks.",
+    "There is no content-matched text-versus-tools ablation. Source-only regeneration and synthetic tests are not quality or causal validations.",
+    "Projection mapping eligibility was reviewed in separate bounded per-scene sessions and was not independently repeated here."
+  ],
+  "evidence_index": {
+    "run_and_library_index":"/app/input_index.json",
+    "partial_pretest_method_audit":"/reviews/library_audit.json",
+    "run_technical_synthesis":"/reviews/compact_comparison_evidence.json",
+    "observations":"/reviews/observed_results.json",
+    "arithmetic_contrasts":"/reviews/paired_observed_differences.json",
+    "library_path_inventory":"/reviews/library_path_mentions.json",
+    "initial_context":"/reviews/student_initial_condition_audit.json",
+    "serialized_context":"/reviews/serialized_backend_context_audit.json",
+    "learning_reports":["/evidence/A2/learning/research_evidence.json","/evidence/A3/learning/research_evidence.json","/evidence/A4/learning/research_evidence.json","/evidence/A5/learning/research_evidence.json"],
+    "directly_inspected_source_examples":["/evidence/A3/public_library/spatial.py","/evidence/A4/public_library/reconstruction.py","/evidence/A5/public_library/methods.py"],
+    "run_specific_original_evidence":"/technical_evidence/<run>/index.json; replace /evidence/ in indexed paths with /technical_evidence/<run>/"
+  }
+}

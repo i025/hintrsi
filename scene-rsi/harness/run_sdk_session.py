@@ -75,7 +75,8 @@ def execute(directory, image, prompt, seconds=1500, calls=120, cpus=None, port=1
              'agent_loop': 'Claude Agent SDK', 'started_at': started,
              'seconds_limit': seconds, 'model_call_limit': calls, 'cpu_affinity': cpus,
              'hint_enabled': session.get('hint_enabled', False),
-             'persistent_capability_enabled': False, 'teacher_enabled': session.get('role') == 'teacher',
+             'persistent_capability_enabled': session.get('persistent_capability_enabled', False),
+             'teacher_enabled': session.get('role') == 'teacher',
              'role': session.get('role', 'student'), 'condition': session.get('condition'),
              'checkpoint': str(checkpoint) if checkpoint else None}
 

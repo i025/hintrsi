@@ -1,0 +1,35 @@
+--- before/sdk/codex_cli_bridge.py
++++ after/sdk/codex_cli_bridge.py
+@@ -313,6 +313,10 @@
+                         error = "Unexpected native operation: " + item["type"]
+                         self.stop(error)
+                 code = await process.wait()
++                if code != 0:
++                    stderr_text = (directory / "stderr.log").read_text(encoding="utf-8", errors="replace")
++                    if '"input_too_large"' in stderr_text:
++                        context_error = stderr_text.strip()
+                 if (failed or code != 0) and context_error is not None and not self.stopped:
+                     raise CodexBridgeError("prompt is too long: " + context_error,
+                                            "context_length_exceeded", 400)
+--- before/harness/sdk_student.py
++++ after/harness/sdk_student.py
+@@ -30,6 +30,8 @@
+     run_cc_sdk.SYSTEM_PROMPT_CONFIG_LOG_PATH = Path('/capture/system_prompt_config.json')
+     options = run_cc_sdk.create_agent_options('/app')
+     session = json.loads(Path('/inputs/session.json').read_text())
++    if 'auto_compact_window' in session:
++        options.env['CLAUDE_CODE_AUTO_COMPACT_WINDOW'] = str(session['auto_compact_window'])
+     options.tools = session.get('tools', ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep'])
+     options.setting_sources = []
+     options.skills = []
+--- before/analysis/review_capability_acquisition.py
++++ after/analysis/review_capability_acquisition.py
+@@ -143,6 +143,8 @@
+                                   {'path':'/app/final.png','label':'Candidate reconstruction'}] if stage in ('visual','technical') else [],
+                 'readonly_mounts':mounts or [],'hint_enabled':False,'persistent_capability_enabled':False,
+                 'online_teacher_enabled':False})
++    if stage in ('knowledge-comparison','report'):
++        config=json.loads(path.read_text());config['auto_compact_window']=60000;write(path,config)
+     return path
+ 
+ 

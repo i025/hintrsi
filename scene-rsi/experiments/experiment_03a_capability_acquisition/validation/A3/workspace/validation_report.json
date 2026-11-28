@@ -1,0 +1,20 @@
+{
+  "tested_units": {
+    "spatial.project_points": "Blender synthetic camera: point in front had depth 10 and inside_frame true; point behind had depth -1 and inside_frame false.",
+    "spatial.hinge_positions": "Known 2-unit arm at (1,2,0) returned (3,2,0) at zero and approximately (1,4,0) at pi/2; zero width raised ValueError. Also exercised in a parented selection-inspired door.",
+    "support.sample_support": "Four bottom vertices sampled against a box floor yielded positive gaps approximately 0.2, zero samples, possible penetration approximately -0.1, and unknown with four misses after lateral displacement.",
+    "support.world_bounds": "Returned evaluated world bounds for translated leg and broad-phase bounds for tabletop and door.",
+    "appearance.directional_stone": "Material created and bound to leg; actual links traced Object coordinates through vector multiply, noise and ramp into Principled Base Color and Principled BSDF into Material Output Surface. No image texture nodes/resources present. No render-based appearance verification was performed."
+  },
+  "actual_commands": [
+    "command -v blender; blender --version | python3 -c 'import sys; print(next(sys.stdin, \"not available\"))'",
+    "blender -b -t 2 --python /app/validation_probe.py > /app/validation_probe.log 2>&1; printf 'exit=%s\\n' \"$?\"; python3 -I -c \"print(open('/app/validation_probe.log').read())\""
+  ],
+  "actual_outputs": ["Blender 5.2.2 LTS; probe exited 0 and printed PROBE_COMPLETE. Full recorded numeric outputs and material links: /app/validation_probe.log.", "Saved editable /app/selection_probe.blend; source /app/validation_probe.py."],
+  "selection_probe": "Limited selection-inspired table, floor, and parented pivot/door/detail; no reference plane and no claim of full reconstruction. At 0 and pi/4, pivot remained (3,0,0), leaf and child detail moved together; hinge helper generated free-edge candidates. Leg bottom samples were near zero. There is no modeled wall opening, no render comparison, no swept collision test, and no proof of physical support or hinge-to-jamb alignment.",
+  "failed_or_rejected_candidates": ["Zero-width hinge raised expected ValueError; negative support gaps are only possible penetration, and misses remain unknown.", "No new full spatial or appearance repair candidate was established. Historical S02 R1 door placement remains rejected as a transferable repair because hinge/opening coherence was not verified; see /app/research_evidence.json.", "AABB outputs were not interpreted as confirmed intersections."],
+  "changes": ["Updated /app/library/SKILL.md to state the limited synthetic validation and identify unvalidated image and lighting comparisons. No code unit was removed or altered."],
+  "remaining_unvalidated_methods": ["Rendered material appearance, image texture and alternate-light comparisons, mapping behavior on scaled objects and edges", "Full reference-aligned camera/layout optimization and actual wall-opening/jamb alignment", "Continuous swept-volume collision, exact contact, stability, assembly connectivity, and dense or non-horizontal support cases", "Independent selection-scene reconstruction and any final-test performance"],
+  "applicability_and_side_effects": ["Projection is geometric and does not account for occlusion; hinge helper assumes a vertical axis. Parented detail followed the pivot in the simplified probe, but an opening and nearby obstacles were not modeled.", "Support rays are vertex samples against supplied surfaces; unknown is not absence of support and near zero is not proof of contact. Broad-phase bounds are not confirmed intersection tests.", "Procedural material creates a new Blender material and requires explicit binding; links and object coordinates were inspected, but the material was not rendered. It has no image resources to pack or inspect."],
+  "final_library_files": ["/app/library/SKILL.md", "/app/library/capabilities.json", "/app/library/spatial.py", "/app/library/appearance.py", "/app/library/support.py"]
+}

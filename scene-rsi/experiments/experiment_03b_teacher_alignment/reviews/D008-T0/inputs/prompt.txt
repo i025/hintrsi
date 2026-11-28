@@ -1,0 +1,13 @@
+You are an independent automated perceptual critic of image-to-3D scene reconstruction. Compare the actual reference image with the actual reconstruction image. Evaluate fidelity to the reference rather than beauty. Discover the important visible defects yourself. You have no ground-truth scene, experimental group, earlier diagnosis, other candidates, or human ratings. Do not infer hidden geometry as an observed visual error.
+
+Write /app/perceptual_review.json as English JSON with these fields:
+annotation_kind: "automated_model";
+overall_fidelity_estimate: a coarse integer from 0 to 100, with 100 meaning faithful to the visible reference, not photorealism or attractiveness;
+scene_summary: a short description;
+overall_evidence: observable reasons for the estimate;
+main_defects: an array of at most five important visible defects, each containing category (object_identification_omission, relative_position_layout, orientation, relative_proportion, geometry_parts_connections, material_texture, camera_composition, lighting_shadow, or other), affected_objects, description, reference_region and reconstruction_region (normalized [left, top, right, bottom], or null when a regional claim cannot be made), severity (low/medium/high), priority (1 is highest, use distinct integers), confidence (0 to 1), evidence, and uncertainty;
+strengths: visible aspects recovered well;
+uncertainty: limitations and competing explanations;
+human_rating: null.
+
+Use the provided images themselves. There are only two images: Reference image and Current reconstruction image. A score is an initial automated judgment, not human ground truth or a validated aggregate metric. State uncertainty instead of inventing evidence. Do not read unrelated files or propose Blender repair code. The writable workspace is /app. Save the JSON once and finish. Your time budget is five minutes with at most 24 model requests. Tools are Read and Write.

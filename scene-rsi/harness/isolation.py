@@ -21,10 +21,13 @@ def prepare(directory, image, prompt, checkpoint=None, session=None):
     shutil.copyfile(image, directory / 'workspace/reference.png')
     (directory / 'inputs/prompt.txt').write_text(prompt)
     (directory / 'inputs/session.json').write_text(json.dumps(session or {}, indent=2))
-    images = [{'path': '/app/reference.png', 'label': 'Reference image'}]
-    if checkpoint:
-        images.append({'path': '/app/final.png', 'label': 'Current reconstruction image'})
-    images += (session or {}).get('additional_images', [])
+    if 'initial_images' in (session or {}):
+        images = session['initial_images']
+    else:
+        images = [{'path': '/app/reference.png', 'label': 'Reference image'}]
+        if checkpoint:
+            images.append({'path': '/app/final.png', 'label': 'Current reconstruction image'})
+        images += (session or {}).get('additional_images', [])
     (directory / 'inputs/images.json').write_text(json.dumps(images, indent=2))
     return directory
 
@@ -40,11 +43,16 @@ def command(directory, proxy_socket, model_calls=120):
             '--bind', str(directory / 'capture'), '/capture',
             '--bind', str(directory / 'tmp'), '/tmp',
             '--ro-bind', str(directory / 'inputs'), '/inputs',
-            '--ro-bind', str(ROOT / 'sdk'), '/sdk', '--ro-bind', str(ROOT / 'harness'), '/harness',
+            '--ro-bind', str(ROOT / 'sdk'), '/sdk', '--dir', '/harness',
+            '--ro-bind', str(ROOT / 'harness/sdk_student.py'), '/harness/sdk_student.py',
+            '--ro-bind', str(ROOT / 'harness/socket_tunnel.py'), '/harness/socket_tunnel.py',
             '--ro-bind', str(BLENDER), '/opt/blender', '--ro-bind', str(PYTHON), '/opt/python',
             '--ro-bind', str(ENVIRONMENT), '/opt/venv',
             '--dir', '/runtime/bin', '--ro-bind', str(ROOT / 'harness/blender.py'), '/runtime/bin/blender',
             '--dir', '/model', '--ro-bind', str(proxy_socket), '/model/proxy.sock', '--chdir', '/app']
+    session = json.loads((directory / 'inputs/session.json').read_text())
+    for mount in session.get('readonly_mounts', []):
+        args += ['--ro-bind', str(Path(mount['source']).resolve()), mount['target']]
     env = {'HOME': '/home/student', 'USER': 'student', 'PATH': '/runtime/bin:/opt/python/bin:/usr/bin:/bin',
            'PYTHONPATH': '/sdk:/sdk/litellm_proxy:/opt/venv/lib/python3.12/site-packages',
            'PYTHONDONTWRITEBYTECODE': '1', 'LANG': 'C.UTF-8', 'TERM': 'dumb',

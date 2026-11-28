@@ -1,0 +1,20 @@
+{
+  "scope": "Teacher prior only: development task descriptions, three supplied reference RGB images and capability goals. No historical student execution or development GT was supplied or inspected.",
+  "sources": [
+    {"source": "/app/source_policy.txt:1", "observation": "Prior is limited to task descriptions, reference RGB images and fixed capability goals."},
+    {"source": "/app/development_tasks.json:3-30", "observation": "Three editable single-image Blender reconstruction tasks share spatial, appearance and geometry verification goals."},
+    {"source": "S01 supplied reference RGB", "observations": ["An office-like room contains two wheeled chairs, a table, shelving, a floor lamp and a paneled door.", "The floor has repeated plank-like markings; furniture occludes parts of the room."]},
+    {"source": "S02 supplied reference RGB", "observations": ["A small room shows a bed, shelving, a cabinet, two floor lamps and an open door.", "Wall grid lines and the open door contribute perspective and occlusion cues."]},
+    {"source": "S03 supplied reference RGB", "observations": ["A narrow kitchen-like room has an appliance on the left, cabinetry on the right and a plant near the rear opening.", "Floor markings, counters and cabinet faces provide directional and perspective cues."]}
+  ],
+  "unit_origins": {
+    "Joint camera, layout and semantic orientation": "General perspective knowledge, user capability goals and visible cues in the three RGB images; joint optimization and hinge checks are technical hypotheses, not tested development improvements.",
+    "Directional appearance and illumination separation": "General shader and lighting knowledge and the appearance goal; procedural noise is a generic editable candidate, not a recovered material.",
+    "Support and assembly diagnostics": "User-specified interpretation boundaries and general AABB and Blender assembly knowledge."
+  },
+  "executed_tests": [
+    {"command": "blender -b --factory-startup --python-exit-code 1 --python /app/synthetic_check.py", "result": "Passed in Blender 5.2.2 LTS with SYNTHETIC_CHECK_PASS; use_nodes deprecation warning for Blender 6.0.", "coverage": "Synthetic boxes exercise positive gap, near-zero, possible penetration and unknown support; one parent link; shader node link count; centered camera projection and zero landmark loss. No rendered appearance, surface contact or scene reconstruction was validated."}
+  ],
+  "rejected_candidates": [],
+  "unknowns": ["Hidden geometry and absolute scale are not identifiable from a single image.", "No Blender ground truth, historical student code, student candidate comparisons, or trajectories were available.", "Material-light separation, scene-specific fit, hinge coherence in a built scene, and independent cross-scene improvement were not tested."]
+}

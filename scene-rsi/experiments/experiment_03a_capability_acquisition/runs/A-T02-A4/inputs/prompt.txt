@@ -1,0 +1,58 @@
+Given the reference image, reconstruct the depicted scene as an editable 3D scene in Blender.
+
+You may write and execute Blender Python code, inspect the generated scene, render images, and revise your implementation.
+
+Your objective is to reconstruct the reference scene as faithfully as possible, including visible objects, geometry, spatial relationships, materials, lighting, and camera viewpoint.
+
+Choose your own reconstruction strategy and workflow.
+
+Use the provided reference image and the available Blender environment. Do not retrieve an existing reconstruction or access external reference scene data.
+
+Deliver:
+
+- Executable Blender Python source code.
+- The reconstructed .blend scene.
+- A final rendered image.
+
+Workspace and resources:
+Your writable task workspace is /app. The reference image is also available at /app/reference.png. Blender 5.2.2 is available as blender. Rendering uses CPU only with eight threads. The student time budget is 25 minutes, with at most 120 model requests. Save the executable source entry point as /app/build.py, the editable final scene as /app/scene.blend, and the final rendered image as /app/final.png at 640 x 360 pixels. Keep any other required local source or material resources in /app so the delivered source can reproduce the scene.
+
+Frozen general capability knowledge:
+# Editable single-image reconstruction capability library
+
+Start with major image silhouettes and semantic relations, not support-gap optimization. Work at an arbitrary consistent scale: monocular absolute scale and hidden geometry are not identifiable. Keep an uncertainty list for off-frame and occluded parts. The helpers in `reconstruction.py` run inside Blender; import by adding this directory to `sys.path`. `capabilities.json` indexes callable entry points. Render candidate revisions and explicitly compare to the reference; numerical projections are supplementary, not an image-similarity oracle.
+
+## Capability Name: Joint camera, layout and occlusion
+**Applicable Conditions:** Interior views with identifiable room edges, object corners or repeated parallel directions.  
+**Problem and Technical Hypotheses:** Perspective, camera pose and layout interact: moving a chair or changing focal length can both change its projected position. Establish semantic fronts (chair opening, shelf face, cabinet doors) before polishing. Image-space occlusions constrain depth order but not unique distances.  
+**Executable Method:** `aim_camera(camera, location, target, lens)` sets a perspective camera pose; `project_points(scene,camera,points)` maps world coordinates to normalized top-left image coordinates; `landmark_error(scene,camera,landmarks)` scores manually matched visible 3D points and image points. After dependency graph updates, alternate adjusting room envelope, camera lens/pose, then object footprints and heights. Match wall intersections, floor boundaries and large silhouettes first; separately check oriented fronts and which object covers which. Use several viewpoints in the viewport to prevent absurd hidden intersections. Preserve separate editable objects. Camera should not be parented during direct aiming unless transforms are handled by caller.  
+**Verification Method:** Compare projected keypoints and rendered image overlay; inspect silhouettes and semantic orientation, and record occlusion order. Low landmark error does not guarantee correct camera or depth. Hold out some landmarks from tuning.  
+**Failure Conditions and Side Effects:** Behind-camera landmarks raise an error; cropping, camera shift, distortion and occlusion need manual handling. Helpers mutate camera; camera/object joint solution is ambiguous.  
+**Evidence and Knowledge Origin:** General projective geometry and teacher inference from reference images; direct GT inspection shows perspective cameras and transformed assemblies, not a unique solution. Transfer is untested.
+
+## Capability Name: Coherent hinged panels
+**Applicable Conditions:** An open door or panel with an identifiable jamb and pivot.  
+**Problem and Technical Hypotheses:** Placing a door only to match silhouette can detach the hinge or block an opening. A world-space pivot is a stronger structural constraint.  
+**Executable Method:** `hinge_pose(door, hinge_world, angle_radians, local_hinge)` applies an incremental rotation about a world vertical axis and checks that the local hinge is already at the pivot. Make an actual wall opening and frame separately; choose plausible opening direction, then rotate the complete panel assembly, not just an ornament. For multi-object doors parent parts to one root first, preserving each child's world matrix while parenting and updating the dependency graph; otherwise parts may jump. Verify each part's world position before and after parenting and after rotation. Camera and wall must be checked after mutation.  
+**Verification Method:** Project panel corners, compare visible outline; query hinge position before and after, inspect clearance from wall and frame in top view and render.  
+**Failure Conditions and Side Effects:** Doesn't cut openings, detect collisions or infer hinge; wrong pivot raises error. Parent and constraint setups can change resulting transforms.  
+**Evidence and Knowledge Origin:** General kinematics; GT door assets parented to door objects. This is not evidence of a particular repair being visually better.
+
+## Capability Name: Directional material and lighting separation
+**Applicable Conditions:** Wood, brushed or directional surfaces with visible grain; a controllable light setup.  
+**Problem and Technical Hypotheses:** Grain direction and scale depend on coordinates, transforms and mapping; shading gradients can be illumination rather than albedo. Avoid baking a lamp's glow into a surface color.  
+**Executable Method:** `make_directional_material(name,color_a,color_b,axis_scale,noise_scale,roughness)` creates editable object-coordinate mapping, noise, ramp and Principled material and returns it; caller binds it to desired mesh faces. Colors are linear RGBA. Lower mapping scale along the intended grain direction stretches the pattern; choose coordinates relative to local axes, inspect rotated meshes and apply object scale or compensate mapping. For tile use separate parameterized planar coordinates and grid geometry or nodes; this helper is not a tile generator. First tune neutral base color and large lights, then roughness and subtle grain, evaluating under the final view transform.  
+**Verification Method:** Render a test swatch under neutral illumination and an oblique view, then in scene; compare orientation, frequency, contrast and broad illumination separately. Temporarily disable pattern or change lighting to disambiguate shading.  
+**Failure Conditions and Side Effects:** Stretched noise is not literal wood or metal and may streak incorrectly on different faces; object transforms affect mapping. New material increases datablocks; caller owns assignment and cleanup.  
+**Evidence and Knowledge Origin:** General shader knowledge; direct scene inspection found object-coordinate mapping and procedural networks in development scenes, including a tile network, and varying UV availability. It does not establish this simplified material's visual superiority.
+
+## Capability Name: Support screening and assembly audit
+**Applicable Conditions:** Suspected support pairs and multi-part editable objects.  
+**Problem and Technical Hypotheses:** A floating-looking object may be supported by an unseen element. Bounds overlap does not demonstrate contact; parenting is logical connectivity, not structural support.  
+**Executable Method:** `support_bounds(upper,lower,tolerance)` evaluates world AABBs, tests horizontal overlap, then reports signed vertical bound separation as positive gap, near-zero, possible penetration, or unknown support. `assembly_components(objects)` returns components connected by parent links only. Caller selects plausible pairs and tolerance in scene units; audit intended assembly hierarchy separately. For repair, edit only after visual/semantic inspection; re-evaluate all moved parts and render again.  
+**Verification Method:** Inspect mesh surfaces or ray casts at multiple appropriate contact points, check support normals and projected footprint, then visually inspect alternate views and re-run the screen. Record unsupported unknowns rather than forcing contact.  
+**Failure Conditions and Side Effects:** Rotated, hollow, concave and disconnected meshes can produce misleading bounds; AABB overlap and near-zero do not prove contact or support; negative gap is only possible penetration. Parent components do not detect loose mesh islands or constraints. Methods are read-only.  
+**Evidence and Knowledge Origin:** General bounding-volume and scene-graph knowledge; direct Blender query found parent-child assemblies and mesh transforms. No claim of measured support improvement.
+
+
+A frozen general capability library is available read-only at /capabilities. Its entry point is /capabilities/SKILL.md. You may inspect and use its documented methods when applicable, or choose your own methods. It contains no task-specific teacher feedback or reference scene assets. Keep any dependency needed to reproduce your final source with the delivered workspace.

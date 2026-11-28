@@ -313,6 +313,10 @@ class CodexBridge:
                         error = "Unexpected native operation: " + item["type"]
                         self.stop(error)
                 code = await process.wait()
+                if code != 0:
+                    stderr_text = (directory / "stderr.log").read_text(encoding="utf-8", errors="replace")
+                    if '"input_too_large"' in stderr_text:
+                        context_error = stderr_text.strip()
                 if (failed or code != 0) and context_error is not None and not self.stopped:
                     raise CodexBridgeError("prompt is too long: " + context_error,
                                            "context_length_exceeded", 400)

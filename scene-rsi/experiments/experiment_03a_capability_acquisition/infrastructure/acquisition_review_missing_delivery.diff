@@ -1,0 +1,131 @@
+--- before_missing_delivery/review_capability_acquisition.py
++++ after_missing_delivery/review_capability_acquisition.py
+@@ -43,7 +43,7 @@
+ Write /app/visual_evaluation.json as English JSON with annotation_kind=automated_model, overall_fidelity_estimate_0_100 (a coarse optional estimate or null), scene_description, visible_objects, spatial_relations_and_orientation, proportions_and_occlusion, materials_and_texture, visible_geometry, camera_and_composition, lighting_and_shadows, objects_regions (each with object, region, observation, evidence_image, severity, priority, confidence), most_important_visible_defects, uncertainty, limitations, and human_rating=null. Dimension entries must contain observations and image evidence; a scalar score is not the sole conclusion. Do not infer learning, condition effects or hidden model reasoning from the images. Finish after writing the file.
+ '''
+ 
+-TECHNICAL_PROMPT='''You are an automated posthoc technical and capability-adoption annotator. All students have finished and their libraries were frozen before testing. Read /app/input_index.json, then inspect the indexed evidence read-only under /evidence. Do not modify a reconstruction, library or evaluation, and do not send feedback to a student. The reference and delivered candidate are actual image inputs.
++TECHNICAL_PROMPT='''You are an automated posthoc technical and capability-adoption annotator. All students have finished and their libraries were frozen before testing. Read /app/input_index.json, then inspect the indexed evidence read-only under /evidence. Do not modify a reconstruction, library or evaluation, and do not send feedback to a student. The reference is an actual image input; an actually delivered final image is included only when it exists. If final.png is missing, you receive only the real reference, never a substitute candidate. Inspect delivery_status and the actual failed/ended trace. Missing build.py, scene.blend or final.png is a recorded student task outcome, not a reason to exclude the run. Annotate observable stopping, actual nonuse and unknown quality without inventing a visual score or repair. If no student scene exists, semantic_correspondence must be an empty array; do not map GT objects to nonexistent student objects. Distinguish task non-completion from actual SDK/Bridge errors using the recorded evidence.
+ 
+ The evidence contains real SDK events, original tool calls/results, executed Blender source captures and stdout/stderr, final delivered source, independently extracted scene states and reproduction records, the actually available public capability library (or explicit none for the base student), and GT semantic/instance data and actual GT scene state. Use the index to select relevant files instead of attempting to read every large state at once. Start with original_object_inventory and gt_visible_instances to locate real names/IDs, then inspect full state only for details. Each object_inventory.jsonl entry is an actual object record, not a semantic judgment. Its projected bounds and projected bbox center use bottom-up image coordinates and an unclipped bounding box; they are not visible-mask centroids, instance masks or aligned 3D errors. Preserve the distinction between student observations and evaluator products: posthoc state extraction, independent regeneration, mask measurements, auxiliary views and geometry checks are evaluator actions unless the student's actual SDK trace demonstrates its own corresponding action.
+ 
+@@ -62,7 +62,7 @@
+ 
+ Compare the five libraries by substantive technical methods, applicability, verification, failure boundaries, and actual knowledge origins. Separate prior knowledge concretized by implementation from development-GT-derived implementation facts, ordinary strategy-trajectory evidence, active-exploration execution experience, and new validation discoveries. Source labels alone do not prove origin, novelty or causal necessity. Return canonical_semantic_vocabulary and, for each condition, canonical_semantic_methods: {canonical_label, definition, status: implemented/validated/unknown, module_functions_and_lines, actual_validation_evidence, origin_evidence, uncertainty}. Unify genuine synonyms across all libraries using the same canonical label; keep materially different techniques separate. Unknown is not absence. These actual semantic labels support ten pairwise library Jaccard comparisons, not code-text similarity. Retain links to the pre-test auditor's labels and explain any evidence-supported relabeling. Identify overlap and redundancy with evidence-supported semantic method comparisons rather than code-text similarity, number of functions or library length.
+ 
+-For the completed paired tasks, assess actual use/nonuse, execution versus mere mention/import, observable outcomes and side effects. All library conditions had the full SKILL text in their initial prompt; knowledge presence is different from library Read, import, an actual reached function call, explicitly cited hand reimplementation, or semantic similarity with unknown origin. Do not label the latter as proven learned-library adoption. Compare A1 vs A0, A3 vs A2, A4 vs A1, A5 vs A3 and A5 vs A4. Preserve mixed and negative results. Distinguish independent visual judgments, measured technical facts, semantic correspondence uncertainty and interpretation. A better scalar image score does not prove improved 3D structure. Never treat evaluator-generated checks as a student capability. Input amounts, hint/library lengths and actual model costs may differ; note confounds. One capability-acquisition round on a few tasks does not establish persistent recursive improvement, statistical significance, or long-term capability growth. Automated judges share the fixed base model and can have correlated errors. Human ratings are unavailable.
++For the completed paired tasks, assess actual use/nonuse, execution versus mere mention/import, observable outcomes and side effects. All library conditions had the full SKILL text in their initial prompt; knowledge presence is different from library Read, import, an actual reached function call, explicitly cited hand reimplementation, or semantic similarity with unknown origin. Do not label the latter as proven learned-library adoption. Retain all 24 planned task/group outcomes, including missing deliverables. Show the planned denominator and observed delivery failures separately from quality among real renders; never silently complete-case-exclude a run or assign a fabricated zero visual score. Compare A1 vs A0, A3 vs A2, A4 vs A1, A5 vs A3 and A5 vs A4. Preserve mixed and negative results. Distinguish independent visual judgments, measured technical facts, semantic correspondence uncertainty and interpretation. A better scalar image score does not prove improved 3D structure. Never treat evaluator-generated checks as a student capability. Input amounts, hint/library lengths and actual model costs may differ; note confounds. One capability-acquisition round on a few tasks does not establish persistent recursive improvement, statistical significance, or long-term capability growth. Automated judges share the fixed base model and can have correlated errors. Human ratings are unavailable.
+ 
+ There is exactly one generated library per knowledge source and one student sample per task/group (four test tasks by six groups). Knowledge-generation variance and within-task student-sampling variance cannot be estimated. Four matched tasks do not establish statistical significance. The design has no content-matched text-only versus executable-tool ablation: report observed calls and verification, but do not causally claim tools outperform text. The common prespecified learning prompt already required assembly/hinge consistency, interpreting near-zero gap separately from proven contact, and inspecting output-connected material nodes. These are shared interpretation boundaries, not unique discoveries of a trajectory source; source-specific contributions need additional actual evidence.
+ 
+@@ -78,7 +78,7 @@
+ 
+ Describe the data split, GT permissions, common budgets, fixed model/effort, SDK ownership of tools, frozen optional public libraries, exact sources, technical completion/reproduction, actual engineering fixes and affected attempts, and remaining information-access limits. Summarize actual calls, reported input/output tokens, cached/reasoning subsets, wall time and observed CPU/memory resources; missing returned usage is unknown, Codex dollar billing is unknown, and Ofox calls are zero only if the recorded usage confirms that. Reporter cost is not yet available during its own generation and will be included in the final separate observed-usage file afterward; state that boundary.
+ 
+-This is one capability-acquisition and independent transfer round with an external knowledge/tool library. It does not show weight changes, model internalization, long-term retention, statistically significant gains, continuing recursive improvement or completed RSI. The small number of tasks, unmatched knowledge-input sizes, stochastic trajectories, same-model teacher/student/judges, automatic semantic correspondence and absent human labels limit interpretation. Do not assume the GT+exploration group is best.
++This is one capability-acquisition and independent transfer round with an external knowledge/tool library. It does not show weight changes, model internalization, long-term retention, statistically significant gains, continuing recursive improvement or completed RSI. The small number of tasks, unmatched knowledge-input sizes, stochastic trajectories, same-model teacher/student/judges, automatic semantic correspondence and absent human labels limit interpretation. Retain every planned task/group in the denominator, including missing deliverables. Report delivery failures separately from conditional visual quality among actual renders; do not silently exclude failures or impute visual score zero. Do not assume the GT+exploration group is best.
+ 
+ There is exactly one generated library per knowledge source and one student sample per task/group (four test tasks by six groups). Knowledge-generation variance and within-task student-sampling variance cannot be estimated. Four matched tasks do not establish statistical significance. The design has no content-matched text-only versus executable-tool ablation: report observed calls and verification, but do not causally claim tools outperform text. The common prespecified learning prompt already required assembly/hinge consistency, interpreting near-zero gap separately from proven contact, and inspecting output-connected material nodes. These are shared interpretation boundaries, not unique discoveries of a trajectory source; source-specific contributions need additional actual evidence.
+ 
+@@ -203,7 +203,7 @@
+     scenes={row['id']:row for row in json.loads((EXP/'configs/data_split.json').read_text())['test']}
+     for job in test_jobs():
+         run=EXP/'runs'/job['id'];workspace=run/'workspace'
+-        if not (workspace/'final.png').exists():continue
++        delivery={name:(workspace/name).is_file() for name in ('build.py','scene.blend','final.png')}
+         summarize(run)
+         task=run.name.rsplit('-',1)[0];condition=run.name.rsplit('-',1)[1];scene=scenes[task]
+         bundle=EXP/'acquisition_review_inputs/technical_evidence'/run.name;provenance=[]
+@@ -228,6 +228,8 @@
+         if condition!='A0':text_tree(EXP/'libraries'/condition,bundle/'available_library',provenance)
+         index={'run':run.name,'scene_id':task,'condition':condition,'student_events':'/evidence/sdk_events.json',
+                'student_evidence_index':'/evidence/evidence_index.json','student_initial_context':'/evidence/student_initial_prompt.txt',
++               'delivery_status':{'artifacts':delivery,'missing_artifacts':[name for name,available in delivery.items() if not available],
++                                  'outcome':'complete_deliverables' if all(delivery.values()) else 'missing_deliverables'},
+                'actual_initial_model_request':'/evidence/initial_model_input.json','delivered_source':'/evidence/final_source',
+                'actual_student_executions':'/evidence/executions','independent_evaluation':'/evidence/independent_evaluation',
+                'original_object_inventory':'/evidence/independent_evaluation/original_inspection/capture/original/object_inventory.jsonl',
+@@ -238,11 +240,15 @@
+                'provenance':'/evidence/provenance.json'}
+         write(bundle/'index.json',index);write(bundle/'provenance.json',provenance)
+         seed=EXP/'acquisition_review_inputs/technical'/run.name;seed.mkdir(parents=True,exist_ok=True)
+-        for name in ('reference.png','final.png'):shutil.copy2(workspace/name,seed/name)
++        for name in ('reference.png','final.png'):
++            if (workspace/name).exists():shutil.copy2(workspace/name,seed/name)
+         write(seed/'input_index.json',index)
+         config=EXP/'configs'/('acquisition_review_technical_'+run.name+'.json')
+         common=session_file('technical',[{'source':str(bundle),'target':'/evidence'}])
+-        shutil.copy2(common,config)
++        session=json.loads(common.read_text())
++        if not delivery['final.png']:
++            session['initial_images']=[{'path':'/app/reference.png','label':'Reference image'}]
++        write(config,session)
+         jobs.append({'id':run.name,'checkpoint':str(seed),'image':str(seed/'reference.png'),
+                      'prompt':str(prompt_file('technical')),'session':str(config)})
+     return jobs
+@@ -257,7 +263,10 @@
+     libraries,index=library_bundle();reviews=EXP/'acquisition_review_inputs/comparison_reviews';provenance=[];results=[]
+     order={row['run']:row['anonymous_id'] for row in freeze_blind_order()}
+     for job in test_jobs():
+-        run=job['id'];anonymous=order[run];record={'run':run,'anonymous_id':anonymous}
++        run=job['id'];anonymous=order[run]
++        delivery={name:(EXP/'runs'/run/'workspace'/name).is_file() for name in ('build.py','scene.blend','final.png')}
++        record={'run':run,'anonymous_id':anonymous,'delivery_status':delivery,
++                'missing_artifacts':[name for name,available in delivery.items() if not available]}
+         for stage,name,output in [('visual',anonymous,'visual_evaluation.json'),('technical',run,'technical_annotation.json')]:
+             source=EXP/'acquisition_reviews'/stage/name/'workspace'/output
+             copied(source,reviews/run/output,provenance)
+@@ -268,7 +277,7 @@
+     write(reviews/'provenance.json',provenance)
+     seed=EXP/'acquisition_review_inputs/knowledge_comparison';seed.mkdir(parents=True,exist_ok=True)
+     write(seed/'input_index.json',{'libraries':index,'library_prefix_note':'Library evidence uses /evidence as in the pre-test audit.',
+-          'runs':results,'pre_test_audit':'/reviews/library_audit.json',
++          'planned_run_count':len(test_jobs()),'runs':results,'pre_test_audit':'/reviews/library_audit.json',
+           'actual_technical_evidence':'/technical_evidence/<run>/index.json',
+           'technical_prefix_note':'Within each run index, replace /evidence/ with /technical_evidence/<run>/ when following its paths.'})
+     mounts=[{'source':str(libraries),'target':'/evidence'},{'source':str(reviews),'target':'/reviews'},
+@@ -349,6 +358,8 @@
+            'technical_summary':'/report_evidence/analysis/technical_summary.json',
+            'library_evidence':'/evidence/index.json','actual_student_technical_evidence':'/technical_evidence/<run>/index.json',
+            'technical_prefix_note':'Replace /evidence/ in a technical run index with /technical_evidence/<run>/ when following its paths.',
++           'planned_run_count':len(test_jobs()),
++           'delivery_outcomes':[{'run':job['id'],'artifacts':{name:(EXP/'runs'/job['id']/'workspace'/name).is_file() for name in ('build.py','scene.blend','final.png')}} for job in test_jobs()],
+            'output':'/app/REPORT_ZH.md','provenance':'/report_evidence/provenance.json'}
+     write(seed/'input_index.json',index)
+     mounts=[{'source':str(bundle),'target':'/report_evidence'},
+@@ -490,7 +501,7 @@
+         EXP=directory/'experiment_fixture'
+         try:
+             fixture_jobs=[{'id':'FIXTURE-A'+str(condition)} for condition in range(6)]
+-            write(EXP/'configs/data_split.json',{'test':[{'id':'FIXTURE'}]})
++            write(EXP/'configs/data_split.json',{'test':[{'id':'FIXTURE','directory':str(EXP/'gt_fixture')}]})
+             write(EXP/'configs/frozen_libraries.json',{'libraries':[]})
+             write(EXP/'configs/frozen_test_order.json',{'jobs':fixture_jobs})
+             for job in fixture_jobs:
+@@ -505,6 +516,17 @@
+                 assert config['readonly_mounts']==[] and len(config['initial_images'])==2
+                 assert config['tools']==['Read','Write'] and config['persistent_capability_enabled'] is False
+                 assert sorted(path.name for path in Path(job['checkpoint']).iterdir())==['final.png','reference.png']
++            (EXP/'runs/FIXTURE-A0/workspace/final.png').unlink()
++            technical=technical_jobs()
++            assert len(technical)==6
++            failed=next(job for job in technical if job['id']=='FIXTURE-A0')
++            failed_session=json.loads(Path(failed['session']).read_text())
++            failed_index=json.loads((Path(failed['checkpoint'])/'input_index.json').read_text())
++            assert failed_session['initial_images']==[{'path':'/app/reference.png','label':'Reference image'}]
++            assert not (Path(failed['checkpoint'])/'final.png').exists()
++            assert failed_index['delivery_status']['missing_artifacts']==['build.py','scene.blend','final.png']
++            complete=next(job for job in technical if job['id']=='FIXTURE-A1')
++            assert len(json.loads(Path(complete['session']).read_text())['initial_images'])==2
+             write(EXP/'runs/FIXTURE-A0/status.json',{'status':'running'})
+             try:
+                 require_students_ended()
+@@ -515,7 +537,7 @@
+             EXP=actual_exp
+     report={'recorded_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'real_model_calls':0,
+             'scope':'Synthetic image-byte transport fixture and prompt/context boundaries, not visual understanding or a research evaluation.',
+-            'two_ordered_valid_png_attachments':True,'generic_fidelity_prompt_without_target_defects':True,
++            'two_ordered_valid_png_attachments':True,'missing_final_technical_run_retained_with_reference_only':True,'generic_fidelity_prompt_without_target_defects':True,
+             'no_condition_library_or_gt_inputs_for_visual':True,'posthoc_stages_require_all_student_supervisors_finished':True,
+             'shared_sdk_and_bridge_modified':False}
+     write(EXP/'infrastructure/acquisition_review_offline_check.json',report)

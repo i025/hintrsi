@@ -1,0 +1,100 @@
+--- before/report.py
++++ after/report.py
+@@ -1,5 +1,6 @@
+ """Audit frozen libraries and review completed acquisition runs through the shared SDK."""
+ import argparse
++import csv
+ import datetime
+ import json
+ from itertools import combinations
+@@ -88,6 +89,8 @@
+ '''
+ REPORT_PROMPT='''You are a research reporter operating through the same fixed Claude Agent SDK and model backend as the experiment. All students, independent evaluations, semantic projection comparisons and earlier research reviews have ended. This is reporting only: do not change students, capability libraries, mappings, frozen predictions or measurements. Read /app/input_index.json and select evidence files from the read-only indexed bundles. Do not paste all raw trajectories into a single argument or invent results missing from the index.
+ 
++Start with /report_evidence/report_digest.json and /report_evidence/projection_pairs.tsv. These contain mechanically copied observed fields and arithmetic, not new research judgments. Use the saved knowledge comparison, library audit and selected original evidence to interpret them. Do not bulk-read full provenance, usage-session lists, technical_summary or projection_summary: these are large raw records. For additional source details, use Grep to locate a specific record and Read with limit at most 120 lines per call. Preserve your draft in /app/REPORT_ZH.md as you work; a short complete evidence-based report is preferable to repeatedly loading every recording. All full original evidence remains available for targeted checks.
++
+ Write the final report in Chinese to /app/REPORT_ZH.md. For user-facing file citations, use the original source paths in provenance.json, preferably relative to this experiment; guest-only /report_evidence, /evidence and /technical_evidence paths are reading locations and do not resolve outside the reviewer namespace. Code, function names, IDs and evidence paths may retain their actual spelling. Lead with what actually completed, the observed paired results and their limits. Separate deterministic observations, automated visual judgments, automated technical/source interpretations and hypotheses. Human ratings are unavailable and must remain null; never describe model judges as human evaluators. Cite exact files, actual images, code lines, tool events and recorded measurements. Read analysis/paired_projection_differences.json: compare only two-sided measured masks for the same scene and exact GT-instance-ID set. Do not interpret means over different covered entity sets as a group quality difference. Model-proposed semantic correspondences are not human-verified. Unknown correspondence, unmatched instances, symmetry, hidden geometry and unaligned coordinate frames do not justify fabricated 3D error.
+ 
+ Answer all ten questions explicitly with actual evidence: (1) What technical knowledge was actually found by direct development-GT inspection? (2) What substantive differences exist among A1-A5 libraries? (3) What knowledge redundancy exists, including all ten canonical-semantic-method Jaccard pairs and their evidence/unknown coverage? (4) Did students actually use the new tools or methods? (5) Did relative positions, orientations and spatial relationships improve? (6) Did materials, texture mapping and appearance improve? (7) Did active-exploration trajectories transfer better than ordinary strategy guidance? (8) What additional value, if any, did GT provide? (9) Are GT and exploration complementary? (10) What regressions or side effects occurred?
+@@ -150,13 +153,13 @@
+ def session_file(stage,mounts=None,visual=False):
+     path=EXP/'configs'/('acquisition_review_'+stage+'.json')
+     write(path,{'role':'visual_evaluator' if visual else ('research_reporter' if stage=='report' else ('projection_identity_reviewer' if stage in ('projection-review','projection-followup') else 'posthoc_annotator')),
+-                'tools':['Read','Write'] if visual or stage=='report' else TOOLS,
++                'tools':['Read','Grep','Write'] if stage=='report' else (['Read','Write'] if visual else TOOLS),
+                 'initial_images':[{'path':'/app/reference.png','label':'Reference image'},
+                                   {'path':'/app/final.png','label':'Candidate reconstruction'}] if stage in ('visual','technical') else [],
+                 'readonly_mounts':mounts or [],'hint_enabled':False,'persistent_capability_enabled':False,
+                 'online_teacher_enabled':False})
+     if stage in ('knowledge-comparison','report'):
+-        config=json.loads(path.read_text());config['auto_compact_window']=60000;write(path,config)
++        config=json.loads(path.read_text());config['auto_compact_window']=120000 if stage=='report' else 60000;write(path,config)
+     return path
+ 
+ 
+@@ -529,6 +532,54 @@
+     return result
+ 
+ 
++def report_digest(bundle):
++    observations=json.loads((EXP/'analysis/observed_results.json').read_text())
++    paired=json.loads((EXP/'analysis/paired_projection_differences.json').read_text())
++    coverage=[{key:row[key] for key in ('run_id','proposals','status_counts','source_scene_exists','source')}
++              for row in paired['coverage']]
++    usage=json.loads((EXP/'analysis/acquisition_review_research_usage.json').read_text())
++    identity=json.loads((EXP/'analysis/projection_identity_review.json').read_text())
++    with (bundle/'projection_pairs.tsv').open('w',newline='') as output:
++        writer=csv.writer(output,delimiter='\t')
++        writer.writerow(['scene','first','second','GT_ids','label_first','label_second','IoU_first','IoU_second',
++                         'centroid_distance_first','centroid_distance_second','delta_IoU','delta_centroid_distance',
++                         'first_actual_image_directory','second_actual_image_directory'])
++        for pair in paired['paired_contrasts']:
++            for item in pair['shared_measured_entities']:
++                first,second=item['first'],item['second']
++                writer.writerow([pair['scene_id'],*pair['conditions'],','.join(map(str,item['gt_instance_ids'])),
++                                 first['label'],second['label'],first['metrics']['iou'],second['metrics']['iou'],
++                                 first['metrics']['centroid_l2_normalized'],second['metrics']['centroid_l2_normalized'],
++                                 item['first_minus_second']['iou'],item['first_minus_second']['centroid_l2_normalized'],
++                                 first['evidence'],second['evidence']])
++    digest={'kind':'Mechanical copies of recorded facts and previously computed arithmetic; no controller research judgment.',
++            'original_experiment_root':str(EXP),'runtime_versions':json.loads((EXP/'runtime_versions.json').read_text()),
++            'posthoc_report_controls':{'auto_compact_window':120000,'tools':['Read','Grep','Write'],
++                                      'scope':'Only this report retry. Original students/learning/validation/critics retain their captured settings; separate comparison used60000. No interpretation of SDK alias-cost/context metadata as provider billing or verified backend limits.'},
++            'data_split':json.loads((EXP/'configs/data_split.json').read_text()),
++            'frozen_libraries':json.loads((EXP/'configs/frozen_libraries.json').read_text()),
++            'observed_runs':observations['runs'],
++            'paired_observed_differences':json.loads((EXP/'analysis/paired_observed_differences.json').read_text()),
++            'method_overlap':'/report_evidence/analysis/acquisition_review_library_overlap.json',
++            'model_knowledge_comparison':'/report_evidence/reviews/knowledge-comparison/COMPARISON/knowledge_comparison.json',
++            'projection_coverage':coverage,'projection_pairs':'/report_evidence/projection_pairs.tsv',
++            'identity_coverage':{key:identity[key] for key in ('complete','expected_run_count','reviewed_run_count','expected_mapping_count','reviewed_mapping_count','remaining_unreviewed')},
++            'projection_limits':paired['limits'],
++            'usage_before_this_report':usage['scopes'],
++            'cost_scope':'Includes preserved prior attempts; new report cost will be added after it ends. Missing usage unknown; cached/reasoning subsets; dollars unknown.',
++            'source_paths':{'observations':str(EXP/'analysis/observed_results.json'),
++                            'projection_pairs':str(EXP/'analysis/paired_projection_differences.json'),
++                            'identity_reviews':str(EXP/'analysis/projection_identity_review.json'),
++                            'usage':str(EXP/'analysis/acquisition_review_research_usage.json')},
++            'available_evidence':{'libraries':'/evidence/index.json','technical':'/technical_evidence/<run>/index.json',
++                                  'masks':'/projection_evidence/<run>/mapping_XXX/',
++                                  'actual_run_annotations':'/report_evidence/reviews/technical/<run>/technical_annotation.json',
++                                  'pre_test_audit':'/report_evidence/reviews/library-audit/AUDIT/library_audit.json',
++                                  'engineering_log':'/report_evidence/ENGINEERING_LOG.md',
++                                  'full_provenance':'/report_evidence/provenance.json; query specific paths with Grep rather than reading the entire inventory.'}}
++    write(bundle/'report_digest.json',digest)
++
++
+ def report_jobs():
+     require_students_ended()
+     projection=json.loads((EXP/'analysis/projection_summary.json').read_text())
+@@ -563,8 +614,9 @@
+         for name in ('reference.png','final.png'):
+             copied(run/'workspace'/name,target/name,provenance)
+     write(bundle/'provenance.json',provenance)
++    report_digest(bundle)
+     seed=EXP/'acquisition_review_inputs/report';seed.mkdir(parents=True,exist_ok=True)
+-    index={'report_evidence':'/report_evidence','files':[str(Path('/report_evidence')/Path(row['bundle_path']).relative_to(bundle)) for row in provenance],
++    index={'report_evidence':'/report_evidence','report_digest':'/report_evidence/report_digest.json',
+            'usage_before_report':'/report_evidence/analysis/acquisition_review_research_usage.json',
+            'phase_usage':'/report_evidence/analysis/acquisition_review_usage.json',
+            'library_method_overlap':'/report_evidence/analysis/acquisition_review_library_overlap.json',

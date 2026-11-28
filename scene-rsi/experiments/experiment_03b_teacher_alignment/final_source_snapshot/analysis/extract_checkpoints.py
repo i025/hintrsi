@@ -1,0 +1,16 @@
+"""Inspect only states actually saved by a student or independent regeneration."""
+import json
+from pathlib import Path
+import runpy
+import sys
+
+states = json.loads(Path('/inputs/states.json').read_text())
+results = []
+for state in states:
+    sys.argv = ['inspect_scene.py', '--', '--input', state['input'], '--output', state['output']]
+    try:
+        runpy.run_path('/analysis/inspect_scene.py', run_name='__main__')
+        results.append({**state, 'opened': True})
+    except Exception as error:
+        results.append({**state, 'opened': False, 'error': str(error)})
+Path('/capture/state_open_results.json').write_text(json.dumps(results, indent=2))

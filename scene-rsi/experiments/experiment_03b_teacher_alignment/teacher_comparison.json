@@ -1,0 +1,42 @@
+{
+  "annotation_kind": "automated_research_analysis",
+  "what_T0_already_detected": [
+    "D001 T0 main_defects priority 2 identifies relative_proportion of the door and priority 3 material_texture; D007 priority 1 identifies orientation of the door; I001 priority 3 identifies relative_position_layout of desks and chairs. These are autonomous broad-category observations, not established agreement with a human on any case.",
+    "D002 T0 priority 2 identifies a door not visibly recognizable, while its uncertainty explicitly allows occlusion or an edge-on door. D009 priority 2 describes a narrow visible door and priority 4 a different right-hand structure. I003 T0 priority 1 describes an exterior cutaway versus an interior view. These are model reports, not verified pixel-level or 3D facts."
+  ],
+  "T1_changes": [
+    "D006 main_defects moves geometry_parts_connections for the cabinet from priority 4 to 2, relative_proportion to priority 3, and material_texture from 2 to 4; overall_fidelity_estimate 66 to 65.",
+    "D008 moves lighting_shadow from priority 2 to 5 and introduces orientation at priority 2; T0 and T1 camera_composition descriptions disagree about whether the bed occupies more or less of the frame. Scores 67 to 66.",
+    "D007 changes first category orientation to camera_composition, and its T1 top five no longer contain the T0 first-ranked door-orientation diagnosis. I004 changes first category camera_composition to object_identification_omission; scores 64 to 62. I002 keeps all five categories in the same order while score changes 55 to 57.",
+    "In development, top-three category counts change for geometry_parts_connections 3 to 7, material_texture 12 to 10, lighting_shadow 5 to 0, orientation 1 to 3; these are recorded category counts, not fixed weights. First category changes in 1/12 development and 1/4 independent cases. One session per condition cannot separate prompt effect from session variability."
+  ],
+  "shared_or_conflicting_diagnoses": [
+    "D009 both rank camera_composition first, describe the narrow door second and material_texture third, but categorize the door as geometry_parts_connections in T0 and orientation in T1; both scores 55.",
+    "D003 both score 65 and rank camera_composition first, but T0 ranks doorway relative_proportion second and T1 ranks material_texture second and door geometry_parts_connections third.",
+    "D008 T0 says the bed occupies more of the lower-right image, whereas T1 says it is smaller in the frame; this is a substantive descriptive conflict, not a resolved visual fact.",
+    "I004 both describe the foreground door as not visible, but both note it may be outside the field of view; their first two priorities reverse. I003 both rank camera and material first and second, but T0 priority 3 is lighting_shadow and T1 priority 3 is relative_proportion."
+  ],
+  "development_observations": "12 cases from S01, S02, S03; mean automated score 64.0 to 64.1667. Repeated versions share reference scenes and are correlated. D001 66 to 66 and D009 55 to 55 show unchanged scores despite reprioritization; D010 65 to 68 and D005 64 to 62 show changes in opposite directions. Old scenes are development only.",
+  "independent_observations": "Four cases across two new references, two reconstructions each; automated means 52.25 to 52.5. I001 48 to 48; I002 55 to 57; I003 42 to 43; I004 64 to 62. I002 keeps category order exactly. These are four reconstructions, not four independent scenes.",
+  "examples_requiring_human_adjudication": [
+    "D008: conflicting apparent bed size and relative priority of door orientation versus lighting; inspect images without showing predictions first.",
+    "D007: whether visible door orientation or framing matters more, and whether T1's omission of the former matters.",
+    "I004: relative importance of invisible door versus framing, without inferring whether a door exists outside frame.",
+    "I003: whether apparent window proportion or lighting is more salient given the very different viewpoint.",
+    "D012: T0 priority 2 concerns the right-hand furnishing while T1 priority 3 concerns the cabinet; the cropped furnishing's identity is uncertain."
+  ],
+  "conclusions_supported_now": [
+    "The generic critic spontaneously names position/layout, orientation, proportions, and material/texture in recorded cases, overlapping the broad kinds in the provisional principle, without per-case human agreement being known.",
+    "The additional principle is associated with changed priorities and sometimes category or severity, often without changing the first category or score. Shared diagnoses, reversals, and conflicts all occur."
+  ],
+  "conclusions_not_supported": [
+    "Improved human alignment, validated universal weights, actual reconstruction improvement from a higher automated score, semantic or 3D correctness, or population-level preference.",
+    "Causal attribution of every difference to the principle rather than session stochasticity, or independent statistical inference from correlated versions and only two new scenes.",
+    "Human labels, T2/T3 training or execution, technical diagnosis, exploration guidance, or student capability learning in this batch."
+  ],
+  "next_steps_after_genuine_human_feedback": [
+    "Obtain separate genuine offline development and independent exports; preserve the frozen T0/T1 predictions and inspect human scores, prioritized defects, pair preferences and disagreements without treating the model as a rater.",
+    "Use development labels only for future T2 examples and, after real disagreements and a separate future selection split, T3 process evolution. Keep independent scenes held out from all adjustment; evaluate after freezing the new teacher.",
+    "Report agreement and disagreements by scene and rater with uncertainty, without claiming general human preferences from one rater; consider additional independently sampled scenes and repeated model sessions."
+  ]
+}

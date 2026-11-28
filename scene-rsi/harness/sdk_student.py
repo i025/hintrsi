@@ -30,6 +30,8 @@ async def main():
     run_cc_sdk.SYSTEM_PROMPT_CONFIG_LOG_PATH = Path('/capture/system_prompt_config.json')
     options = run_cc_sdk.create_agent_options('/app')
     session = json.loads(Path('/inputs/session.json').read_text())
+    if 'auto_compact_window' in session:
+        options.env['CLAUDE_CODE_AUTO_COMPACT_WINDOW'] = str(session['auto_compact_window'])
     options.tools = session.get('tools', ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep'])
     options.setting_sources = []
     options.skills = []
@@ -39,7 +41,7 @@ async def main():
     options.max_buffer_size = 64 * 1024 * 1024
     # The outer mount/PID/network namespace enforces access independently of prompts.
     options.sandbox = {'enabled': False}
-    options.add_dirs = ['/capture']
+    options.add_dirs = ['/capture'] + [mount['target'] for mount in session.get('readonly_mounts', [])]
     metadata = {}
     trajectories = {'main_agent': '', 'sub_agent': []}
     start = time.monotonic()
@@ -56,7 +58,8 @@ async def main():
         metadata.update(wall_seconds=time.monotonic() - start,
                         hint_enabled=session.get('hint_enabled', False),
                         role=session.get('role', 'student'), condition=session.get('condition'),
-                        persistent_capability_enabled=False, online_teacher_enabled=False)
+                        persistent_capability_enabled=session.get('persistent_capability_enabled', False),
+                        online_teacher_enabled=False)
         Path('/capture/trajs.json').write_text(json.dumps({'trajectories': trajectories, 'metadata': metadata}, ensure_ascii=False, indent=2))
 
 

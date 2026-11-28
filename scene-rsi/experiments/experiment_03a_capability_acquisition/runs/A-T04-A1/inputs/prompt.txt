@@ -1,0 +1,65 @@
+Given the reference image, reconstruct the depicted scene as an editable 3D scene in Blender.
+
+You may write and execute Blender Python code, inspect the generated scene, render images, and revise your implementation.
+
+Your objective is to reconstruct the reference scene as faithfully as possible, including visible objects, geometry, spatial relationships, materials, lighting, and camera viewpoint.
+
+Choose your own reconstruction strategy and workflow.
+
+Use the provided reference image and the available Blender environment. Do not retrieve an existing reconstruction or access external reference scene data.
+
+Deliver:
+
+- Executable Blender Python source code.
+- The reconstructed .blend scene.
+- A final rendered image.
+
+Workspace and resources:
+Your writable task workspace is /app. The reference image is also available at /app/reference.png. Blender 5.2.2 is available as blender. Rendering uses CPU only with eight threads. The student time budget is 25 minutes, with at most 120 model requests. Save the executable source entry point as /app/build.py, the editable final scene as /app/scene.blend, and the final rendered image as /app/final.png at 640 x 360 pixels. Keep any other required local source or material resources in /app so the delivered source can reproduce the scene.
+
+Frozen general capability knowledge:
+# Editable single-view reconstruction capability library
+
+Use the supplied RGB as evidence, not as an orthographic plan. Select an arbitrary consistent scene scale; hidden geometry, true dimensions, and unique lighting/material decomposition are not identifiable from one image. Retain alternate plausible hypotheses. Work in Blender with separate semantic objects and editable materials. The Python module `reconstruct.py` is imported from this directory inside Blender. The procedures below are hypotheses and prior knowledge, not proven cross-scene improvements.
+
+## Capability Name: Joint camera, layout and semantic orientation
+**Applicable Conditions:** Indoor single-view reconstruction with recognizable lines, occlusions and object landmarks.
+
+**Problem and Technical Hypotheses:** Camera perspective, object dimensions and room layout are coupled. A plausible object viewed from a wrong camera can appear wrong; focal length and distance can trade off. Orientation must match function: doors pivot at their frame, chairs face their work surface, and appliances expose their functional face. These are hypotheses to check against the image, not guarantees. Establish image aspect ratio and normalized 2D landmarks, including corners, wall intersections, floor contacts, silhouette extrema, and high-confidence occlusion boundaries. Record front/back and relative depth separately from assumed measurements. Identify parallel line families and possible vanishing points; avoid assuming all lines are orthogonal or camera level.
+
+**Executable Method:** Block out room, camera, major furniture and openings as editable low-detail objects. Choose a scale anchor (e.g. nominal door height), and fix it to remove scale ambiguity. Set camera aspect, lens, position, rotation and framing; compare projected landmarks using `projected_landmarks(scene,camera,points)` and `landmark_loss(scene,camera,points,targets)`. `points` maps landmark names to world xyz; targets map names to `(x,y,weight)` normalized from the bottom left, with nonnegative weights. Loss is mean weighted squared residual. Start with room edges and major footprints; alternate camera changes with object proportions and positions, then handle silhouettes, occlusion, semantic faces and smaller elements. Render at reference aspect with the same framing after each meaningful change. For a hinged opening place a pivot at a frame edge and rotate a leaf relative to that pivot; check the leaf remains attached to the jamb across the intended swing. Avoid treating an image-space shift alone as a valid hinge repair.
+
+**Verification Method:** Inspect the full render side by side or as an overlay; compare landmarks, perspective convergence, silhouette, relative size, floor contacts and foreground/background occlusion. Diagnose whether multiple objects move together in image space (camera) or just one (layout). Verify the pivot and frame in plan and in the camera view. Save the candidate and notes before and after edits. The projection loss is only a guide: it does not test occlusion or shape, and landmarks behind the camera error out. For rendered visibility use actual images or ray tests. Iterative visual comparison is recommended, not evidenced as executed here.
+
+**Failure Conditions and Side Effects:** Sparse or mistaken landmarks, lens distortion, cropped objects and axis assumptions can mislead. Normalized coordinates depend on render aspect and Blender's camera settings. A numeric fit is not unique and may violate hidden geometry or physical plausibility. Don't assume object intent when the evidence is ambiguous.
+
+**Evidence and Knowledge Origin:** Common goals and reference images supplied in this workspace; general perspective/scene-layout knowledge. No development GT or student trajectories. Independent transfer not tested.
+
+## Capability Name: Directional appearance and illumination separation
+**Applicable Conditions:** Editable indoor surfaces with visible large-scale color, roughness and directional textures.
+
+**Problem and Technical Hypotheses:** A photographed surface color includes illumination, shadow, exposure and material response. Reproducing a shadow by darkening an entire material can fail elsewhere. Wood grain, floor boards and tiles have directional patterns and physical repeat scale; object-local coordinates may rotate with objects, while world coordinates may be preferable for continuous surfaces.
+
+**Executable Method:** Establish neutral material base colors and simple area/environment lighting before adding texture. Use the callable `make_directional_material(name,color_a,color_b,scale,roughness)`, where colors are linear RGBA, scale is three positive local-coordinate frequencies and roughness is a Principled BSDF value. It creates a new material, returning it without assigning it; append it to a mesh's material slots. Object coordinates are in the object's local space: larger frequency on an axis gives shorter variation in that direction, so elongate noise along grain by reducing the frequency along that axis. Orient the object or use explicit mapping/UVs when the intended grain differs from local axes. For regular boards or tiles build parameterized geometry or UV patterns; this noise is not a board generator. Keep visible large color regions and local pattern scale more important than node count.
+
+**Verification Method:** Render a neutral-lit material swatch and the full scene, checking color, direction, repeat scale, and highlight width. Temporarily hold lighting fixed while changing material, then hold material fixed while changing lighting; inspect shadows and lit surfaces separately. Check object transforms, UV orientation and seams; an unwrapped UV workflow may be needed for different faces. Compare at final image resolution. These visual checks have not been executed on the development images.
+
+**Failure Conditions and Side Effects:** Local coordinates and nonuniform object scale change apparent world frequency; different objects may not align. Noise is not a physically accurate grain model, and texture complexity is not proof of better resemblance. A single image cannot uniquely separate albedo from lighting; exposure and color management matter. Material creation modifies Blender data and the caller must manage assignment and cleanup.
+
+**Evidence and Knowledge Origin:** General shader and coordinate knowledge, prompted by the RGB appearance goals. No GT-derived shader claims or transfer results.
+
+## Capability Name: Support and assembly diagnostics
+**Applicable Conditions:** Candidate mesh scenes with hypothesized horizontal supports and semantic assemblies.
+
+**Problem and Technical Hypotheses:** Loose props, disconnected components and penetrations can undermine an otherwise convincing view. A support relation is directional and differs from parenting or constraints; neither AABB overlap nor parenting proves contact. Axis-aligned bounds are a coarse screen, not surface collision geometry.
+
+**Executable Method:** In Blender call `support_diagnostic(child,support,tolerance)` on evaluated mesh objects, with nonnegative tolerance in scene world units. The returned dict contains vertical AABB gap and XY overlap when available. Positive gap means a gap between bounding extremes; near-zero means these extremes nearly coincide; possible penetration means vertical bounding intervals overlap beyond tolerance; unknown support covers absent XY overlap or unavailable mesh geometry. Sloped surfaces, overhangs and rotation make results especially ambiguous. Call `assembly_links(objects)` to list only explicit in-set parent and object-constraint relations; this is not a geometric connectivity test. Review semantic intent independently. Do not automatically translate an object or door: first identify intended surfaces, hinge and assembly, inspect in multiple views, then make a reversible targeted edit.
+
+**Verification Method:** Re-run the diagnostics after edits, inspect the full assembly from side/top and camera, and use evaluated surface proximity, normals, ray casts or collision tests where appropriate. Check intentional intersections, gaps and occlusions as well as supports. Near-zero and possible penetration require surface-level follow-up; no finding proves physical contact or structural connectivity. Check that door leaf, pivot, frame and opening remain coherent after repair.
+
+**Failure Conditions and Side Effects:** Axis-aligned bounds may overlap even for disjoint meshes or miss the intended local contact; tolerance is scale-dependent. Empty/non-mesh objects are unknown. Positive XY overlap does not establish support. Constraints and parenting need not represent real connections; no automatic repair is performed. Evaluation of large meshes can be costly.
+
+**Evidence and Knowledge Origin:** User-specified verification boundaries and general geometry knowledge. No historical student actions or GT used. Synthetic tests, if performed, are recorded outside the public library in `/app/research_evidence.json`.
+
+
+A frozen general capability library is available read-only at /capabilities. Its entry point is /capabilities/SKILL.md. You may inspect and use its documented methods when applicable, or choose your own methods. It contains no task-specific teacher feedback or reference scene assets. Keep any dependency needed to reproduce your final source with the delivered workspace.

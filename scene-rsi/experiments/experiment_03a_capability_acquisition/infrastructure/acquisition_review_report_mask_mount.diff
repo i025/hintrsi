@@ -1,0 +1,19 @@
+--- before/report.py
++++ after/report.py
+@@ -569,6 +569,7 @@
+            'phase_usage':'/report_evidence/analysis/acquisition_review_usage.json',
+            'library_method_overlap':'/report_evidence/analysis/acquisition_review_library_overlap.json',
+            'projection_summary':'/report_evidence/analysis/projection_summary.json',
++           'actual_projection_images':'/projection_evidence/<run>/mapping_XXX/ contains actual GT/student masks, overlay and available image crops. Replace each original run/analysis/projection prefix with /projection_evidence/<run>/.',
+            'paired_projection_differences':'/report_evidence/analysis/paired_projection_differences.json',
+            'technical_summary':'/report_evidence/analysis/technical_summary.json',
+            'library_evidence':'/evidence/index.json','actual_student_technical_evidence':'/technical_evidence/<run>/index.json',
+@@ -580,6 +581,8 @@
+     mounts=[{'source':str(bundle),'target':'/report_evidence'},
+             {'source':str(EXP/'acquisition_review_inputs/library_evidence'),'target':'/evidence'},
+             {'source':str(EXP/'acquisition_review_inputs/technical_evidence'),'target':'/technical_evidence'}]
++    mounts += [{'source':str(EXP/'runs'/job['id']/'analysis/projection'),
++                'target':'/projection_evidence/'+job['id']} for job in test_jobs()]
+     config=session_file('report',mounts)
+     reference=json.loads((EXP/'configs/data_split.json').read_text())['development'][0]['reference']
+     return [{'id':'REPORT','checkpoint':str(seed),'image':reference,'prompt':str(prompt_file('report')),'session':str(config)}]

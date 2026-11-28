@@ -1,0 +1,56 @@
+{
+  "perceptual_critic": {
+    "status": "T0_T1_actual_baselines",
+    "inputs": [
+      "reference RGB",
+      "one anonymous reconstruction RGB"
+    ],
+    "gt": false,
+    "code": false,
+    "output": "perceptual_review.json",
+    "sdk_session": "configs/session.json"
+  },
+  "technical_diagnostician": {
+    "status": "interface_only_not_executed",
+    "origin": "Experiment02 TEACHER_PROMPT, target selection generalized instead of supplied fixed target",
+    "modes": {
+      "no_gt": {
+        "prompt": "prompts/technical_no_gt.txt",
+        "gt": false
+      },
+      "development_gt": {
+        "prompt": "prompts/technical_development_gt.txt",
+        "gt": "Explicit authorized development-only read-only mount; never independent human holdout used for adjustment"
+      }
+    },
+    "inputs": [
+      "frozen perceptual critique",
+      "student source",
+      "actual state",
+      "actual trajectory",
+      "authorized development GT only in selected mode"
+    ],
+    "output": "teacher_diagnosis.json"
+  },
+  "exploration_teacher": {
+    "status": "interface_only_not_executed",
+    "origin": "Experiment02 diagnostic/hint JSON format reused",
+    "prompt": "prompts/exploration_teacher.txt",
+    "inputs": [
+      "actual technical diagnosis",
+      "cited evidence"
+    ],
+    "outputs": [
+      "candidate methods",
+      "error hint",
+      "strategy extension",
+      "exploration extension"
+    ],
+    "not_run_now": true
+  },
+  "alignment_versions": {
+    "T2": "Pending genuine development human cases",
+    "T3": "Pending actual human-teacher disagreement and a separate selection split"
+  },
+  "shared_agent_execution": "harness/run_sdk_session.py; no new Agent execution loop"
+}

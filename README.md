@@ -2,6 +2,12 @@
 
 这里整理了原始 Hint 实验交接包、Ofox 补充 baseline，以及后续通过 Codex CLI 运行的各版代码、配置、测试、实验成绩和诊断记录。上传整理时间：2026-11-24。原始实验目录保留，仓库是独立的脱敏副本。
 
+## 2026-11-28：Scene 能力获取与教师评价实验
+
+新增 [实验 03-A 报告](scene-rsi/experiments/experiment_03a_capability_acquisition/REPORT_ZH.md)与[实验 03-B 报告](scene-rsi/experiments/experiment_03b_teacher_alignment/REPORT_ZH.md)。03-A 为四个新场景 × A0–A5 六组，共 24 次独立学生运行，22 次完整交付、2 次未生成文件；没有建立稳定迁移收益或 A5 最优的结论。03-B 完成 32 次 T0/T1 自动评价，未收集真实人工标签，T2/T3 尚未运行，不能宣称完成人类对齐。
+
+[03-A 对照页面](scene-rsi/experiments/experiment_03a_capability_acquisition/analysis/comparison.html)、[03-B 人工评价材料](scene-rsi/experiments/experiment_03b_teacher_alignment/human_review/independent/index.html)、[联合调用与 Token 账本](scene-rsi/experiments/experiment_03_usage_summary.json)。147 个 SDK 会话共 570 次请求，已知输入＋输出 16,566,207 Token，14 次请求缺少用量，实际 Codex 美元账单未知。完整原始轨迹、场景与 GT 见 [实验 03 Release](https://github.com/i025/hintrsi/releases/tag/scene-rsi-experiment-03)。旧实验保留独立。
+
 ## 2026-11-28：Scene 教师诊断与主动探索实验
 
 新增 [Scene 实验 02](scene-rsi/experiments/experiment_02_teacher_guided_exploration/README.md)：三个共同检查点、E0–E4 五组、每组两次，共 30 次学生重建；全部完成独立再生成且交付渲染逐像素一致。教师 Hint 改变了部分策略和缺陷，但主动探索并非始终优于其他组；这不代表完成了 RSI 或可迁移能力学习。

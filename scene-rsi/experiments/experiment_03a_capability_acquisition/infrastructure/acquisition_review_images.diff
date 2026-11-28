@@ -1,0 +1,29 @@
+--- with_report/review_capability_acquisition.py
++++ with_render_evidence/review_capability_acquisition.py
+@@ -51,7 +51,7 @@
+ 
+ Analyze spatial relationships, identifiable orientation, scale/proportion, occlusion and camera/layout confounding; distinguish 2D consistency from 3D structural plausibility. GT is one valid implementation, not a unique correct program. Do not compute or claim world-position/angle error unless a reliable coordinate frame, scale and semantic correspondence are established. Both GT and student world transforms are provided to inspect relations, not to imply alignment. Hidden and symmetry-ambiguous properties must remain uncertain.
+ 
+-Inspect actual material output connections, object/material bindings, texture coordinates, mapping direction/scale, image resource paths and packed resources; node existence or complexity alone is not adoption or improvement. Record actual visible/reference agreement separately from implementation detail. A texture on a genuine object is not automatically an image-plane shortcut; flag replacement by a full-reference plane only with scene/code evidence.
++Actual rendered PNGs preserved with executed Blender captures are available under executions/*/artifacts/; correlate them with the student tool events before crediting an observation or comparison. Inspect actual material output connections, object/material bindings, texture coordinates, mapping direction/scale, image resource paths and packed resources; node existence or complexity alone is not adoption or improvement. Record actual visible/reference agreement separately from implementation detail. A texture on a genuine object is not automatically an image-plane shortcut; flag replacement by a full-reference plane only with scene/code evidence.
+ 
+ Propose semantic correspondences needed for later objective projection-mask comparison. Use a semantic_correspondence array. Each item must have gt_instance_ids (an array of real integers), gt_semantic_label, student_object_names (an explicit list of complete mesh or assembly-root names from the actual original student scene state), confidence (high/medium/low/unknown), basis (evidence array), ambiguity (limitation array), and orientation_identifiability (string). Read the actual GT visible-object and instance-statistics records for IDs; never invent an instance ID. Empty roots may represent their real descendant meshes, but must actually exist in state. For unknown or ambiguous repeated/symmetric matches use confidence=unknown and explain the limit; do not force a match. Include all parts only when their semantic assembly membership is supported. Never invent object names or use broad substring unions. High confidence is a proposal for separate deterministic validation, not a completed numeric match or human-reviewed annotation. Disclose that these semantic correspondences are model-proposed and have not been manually verified. Do not fabricate mask or 3D errors.
+ 
+@@ -157,6 +157,8 @@
+                 copied(run/'analysis'/name,target/phase/name,provenance)
+             for capture in sorted((run/'capture').glob('blender_*')):
+                 text_tree(capture,target/phase/'executions'/capture.name,provenance)
++                for image in sorted((capture/'artifacts').rglob('*.png')):
++                    copied(image,target/phase/'executions'/capture.name/'artifacts'/image.relative_to(capture/'artifacts'),provenance)
+         index.append({'condition':condition,'public_library':'/evidence/'+condition+'/public_library',
+                       'learning_evidence':'/evidence/'+condition+'/learning',
+                       'validation_evidence':'/evidence/'+condition+'/validation','frozen_record':row})
+@@ -209,6 +211,8 @@
+         text_tree(workspace,bundle/'final_source',provenance)
+         for capture in sorted((run/'capture').glob('blender_*')):
+             text_tree(capture,bundle/'executions'/capture.name,provenance)
++            for image in sorted((capture/'artifacts').rglob('*.png')):
++                copied(image,bundle/'executions'/capture.name/'artifacts'/image.relative_to(capture/'artifacts'),provenance)
+         text_tree(run/'analysis/technical',bundle/'independent_evaluation',provenance)
+         for name in ('GT.json','objects_in_view.json','metadata.json','instance_segmentation.png'):
+             copied(Path(scene['directory'])/name,bundle/'reference_gt'/name,provenance)

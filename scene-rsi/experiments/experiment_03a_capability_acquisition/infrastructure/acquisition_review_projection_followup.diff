@@ -1,0 +1,290 @@
+--- before_partial_followup/review_capability_acquisition.py
++++ single_missing_index_followup/review_capability_acquisition.py
+@@ -20,9 +20,9 @@
+ CPU_SETS=[list(range(32,40)),list(range(40,48)),list(range(64,72)),list(range(72,80))]
+ TOOLS=['Read','Glob','Grep','Write']
+ OUTPUTS={'library-audit':'library_audit.json','visual':'visual_evaluation.json',
+-         'technical':'technical_annotation.json','projection-review':'projection_identity_review.json','knowledge-comparison':'knowledge_comparison.json','report':'REPORT_ZH.md'}
++         'technical':'technical_annotation.json','projection-review':'projection_identity_review.json','projection-followup':'projection_identity_review.json','knowledge-comparison':'knowledge_comparison.json','report':'REPORT_ZH.md'}
+ BUDGETS={'library-audit':(900,60),'visual':(600,36),'technical':(900,60),
+-         'knowledge-comparison':(700,40),'projection-review':(600,36),'report':(900,60)}
++         'knowledge-comparison':(700,40),'projection-review':(600,36),'projection-followup':(240,16),'report':(900,60)}
+ TEXT_SUFFIXES={'.py','.json','.jsonl','.md','.txt','.log','.csv'}
+ 
+ LIBRARY_PROMPT='''You are an independent automated auditor of five frozen transferable Blender capability libraries. This is a pre-test audit, not a knowledge-generation or repair session. Read /app/input_index.json. All library and research evidence inputs are read-only under /evidence. You may write only your audit at /app/library_audit.json. Do not revise any condition, generate a better replacement library, or give a condition an extra validation opportunity.
+@@ -78,6 +78,14 @@
+ 
+ Write /app/projection_identity_review.json with annotation_kind=automated_model, scene_id, projection_correspondence_review:[{run_id,mappings:[{mapping_index,measurement_eligible:true/false/null,identity_ambiguity:[],non_identity_limits:[],basis:[],reason:string}]}], limitations and human_rating:null. Save a valid JSON incrementally after each completed run, retaining earlier reviewed entries. Never fill unfinished reviews with invented decisions. Complete all six runs within this bounded session; write concise evidence-based decisions rather than a general research essay. Finish after the file is saved.
+ '''
++FOLLOWUP_PROMPT=PROJECTION_PROMPT.replace('ONE test scene and its six completed task/group runs',
++    'ONE completed task/group run and ONLY its originally unreviewed mapping indices').replace(
++    'the six planned runs','the one planned run').replace('Review only these six runs','Review only this run and the listed missing indices').replace(
++    'Every original proposal needs one reviewed entry','Every listed missing original proposal needs one reviewed entry').replace(
++    'Complete all six runs within this bounded session','Complete only the listed missing indices within this 240-second, 16-request session')+'''
++
++This is the single prespecified missing-coverage followup round. Selection used only absent original mapping indices after all original scene sessions ended, never their eligibility values. /app/input_index.json lists expected_mapping_indices. Emit ONLY those original indices, do not renumber them and do not re-review indices already written by an earlier reviewer. Your input proposal subset preserves original fields and array positions. Write the same output schema with one actual run_id; use null when evidence is insufficient. Save actual decisions incrementally; do not claim a complete run just because this SDK session can end. There will be no automatic second followup or favorable-result resampling.
++'''
+ REPORT_PROMPT='''You are a research reporter operating through the same fixed Claude Agent SDK and model backend as the experiment. All students, independent evaluations, semantic projection comparisons and earlier research reviews have ended. This is reporting only: do not change students, capability libraries, mappings, frozen predictions or measurements. Read /app/input_index.json and select evidence files from the read-only indexed bundles. Do not paste all raw trajectories into a single argument or invent results missing from the index.
+ 
+ Write the final report in Chinese to /app/REPORT_ZH.md. For user-facing file citations, use the original source paths in provenance.json, preferably relative to this experiment; guest-only /report_evidence, /evidence and /technical_evidence paths are reading locations and do not resolve outside the reviewer namespace. Code, function names, IDs and evidence paths may retain their actual spelling. Lead with what actually completed, the observed paired results and their limits. Separate deterministic observations, automated visual judgments, automated technical/source interpretations and hypotheses. Human ratings are unavailable and must remain null; never describe model judges as human evaluators. Cite exact files, actual images, code lines, tool events and recorded measurements. Read analysis/paired_projection_differences.json: compare only two-sided measured masks for the same scene and exact GT-instance-ID set. Do not interpret means over different covered entity sets as a group quality difference. Model-proposed semantic correspondences are not human-verified. Unknown correspondence, unmatched instances, symmetry, hidden geometry and unaligned coordinate frames do not justify fabricated 3D error.
+@@ -96,7 +104,7 @@
+ ''' 
+ 
+ PROMPTS={'library-audit':LIBRARY_PROMPT,'visual':VISUAL_PROMPT,'technical':TECHNICAL_PROMPT,
+-         'knowledge-comparison':COMPARISON_PROMPT,'projection-review':PROJECTION_PROMPT,'report':REPORT_PROMPT}
++         'knowledge-comparison':COMPARISON_PROMPT,'projection-review':PROJECTION_PROMPT,'projection-followup':FOLLOWUP_PROMPT,'report':REPORT_PROMPT}
+ 
+ 
+ def write(path,value):
+@@ -141,7 +149,7 @@
+ 
+ def session_file(stage,mounts=None,visual=False):
+     path=EXP/'configs'/('acquisition_review_'+stage+'.json')
+-    write(path,{'role':'visual_evaluator' if visual else ('research_reporter' if stage=='report' else ('projection_identity_reviewer' if stage=='projection-review' else 'posthoc_annotator')),
++    write(path,{'role':'visual_evaluator' if visual else ('research_reporter' if stage=='report' else ('projection_identity_reviewer' if stage in ('projection-review','projection-followup') else 'posthoc_annotator')),
+                 'tools':['Read','Write'] if visual or stage=='report' else TOOLS,
+                 'initial_images':[{'path':'/app/reference.png','label':'Reference image'},
+                                   {'path':'/app/final.png','label':'Candidate reconstruction'}] if stage in ('visual','technical') else [],
+@@ -329,46 +337,111 @@
+ 
+ 
+ def merge_projection_reviews():
+-    expected={};scenes=set()
++    expected={};scenes=set();original_sources={}
+     for job in test_jobs():
+         run_id=job['id'];scenes.add(run_id.rsplit('-',1)[0])
+         source=EXP/'acquisition_reviews/technical'/run_id/'workspace/technical_annotation.json'
+         expected[run_id]=list(range(len(json.loads(source.read_text()).get('semantic_correspondence',[])))) if source.exists() else None
+-    actual=[];sources=[];missing_outputs=[]
+-    for scene in sorted(scenes):
+-        source=EXP/'acquisition_reviews/projection-review'/scene/'workspace/projection_identity_review.json'
++        original_sources[run_id]=str(source)
++    fragments=[];sources=[];missing_outputs=[]
++    candidates=[('projection-review',scene,EXP/'acquisition_reviews/projection-review'/scene/'workspace/projection_identity_review.json') for scene in sorted(scenes)]
++    candidates += [('projection-followup',job['id'],EXP/'acquisition_reviews/projection-followup'/job['id']/'workspace/projection_identity_review.json') for job in test_jobs()]
++    for stage,identity,source in candidates:
+         if source.exists():
+             annotation=json.loads(source.read_text())
+-            actual.extend(annotation.get('projection_correspondence_review',[]))
+-            sources.append({'scene_id':scene,'source':str(source)})
+-        else:missing_outputs.append(str(source))
++            for record in annotation.get('projection_correspondence_review',[]):
++                fragments.append({'record':record,'source':str(source),'stage':stage})
++            sources.append({'stage':stage,'identity':identity,'source':str(source)})
++        elif stage=='projection-review':missing_outputs.append(str(source))
+     grouped={}
+-    for record in actual:grouped.setdefault(record['run_id'],[]).append(record)
+-    coverage=[]
++    for fragment in fragments:grouped.setdefault(fragment['record']['run_id'],[]).append(fragment)
++    merged=[];coverage=[]
+     for run_id,indices in expected.items():
+         records=grouped.get(run_id,[])
+-        received=[row['mapping_index'] for record in records for row in record.get('mappings',[])]
++        mappings=[{**row,'decision_source':record['source'],'decision_stage':record['stage']}
++                  for record in records for row in record['record'].get('mappings',[])]
++        no_proposals=(indices==[])
++        if records or no_proposals:
++            merged.append({'run_id':run_id,'mappings':mappings,
++                           'source_fragments':records,
++                           'record_status':'no_proposals' if no_proposals else 'actual_model_fragments',
++                           'original_annotation':original_sources[run_id]})
++        received=[row['mapping_index'] for row in mappings]
+         valid=[index for index in received if type(index) is int]
+         missing=[index for index in (indices or []) if index not in valid]
+         duplicates=sorted({index for index in valid if valid.count(index)>1})
+         unexpected=[index for index in valid if indices is None or index not in indices]
+         invalid=[index for index in received if type(index) is not int]
+-        complete=(indices is not None and len(records)==1 and not missing and not duplicates and not unexpected and not invalid)
++        complete=(indices is not None and (bool(records) or no_proposals) and not missing and not duplicates and not unexpected and not invalid)
+         coverage.append({'run_id':run_id,'expected_mapping_indices':indices,'received_mapping_indices':received,
+                          'missing_mapping_indices':missing,'duplicate_mapping_indices':duplicates,
+                          'unexpected_mapping_indices':unexpected,'invalid_mapping_indices':invalid,
+-                         'run_record_count':len(records),'complete':complete})
++                         'source_fragment_count':len(records),'record_status':'no_proposals' if no_proposals else 'reviewed_or_unknown',
++                         'complete':complete})
+     unexpected_runs=[run for run in grouped if run not in expected]
+-    result={'annotation_kind':'automated_model','merge_kind':'Mechanical concatenation of actual per-scene SDK reviews; no missing judgments invented.',
+-            'projection_correspondence_review':actual,'source_reviews':sources,'missing_scene_outputs':missing_outputs,
+-            'expected_run_count':len(expected),'reviewed_run_count':len(grouped),
++    for run_id in unexpected_runs:
++        records=grouped[run_id]
++        merged.append({'run_id':run_id,'mappings':[{**row,'decision_source':record['source'],'decision_stage':record['stage']} for record in records for row in record['record'].get('mappings',[])],
++                       'source_fragments':records,'record_status':'unexpected_run'})
++    unresolved=[{'run_id':row['run_id'],'mapping_index':index,'status':'unknown',
++                 'reason':'No actual review decision was written; missing coverage is not an eligibility judgment.'}
++                for row in coverage for index in row['missing_mapping_indices']]
++    result={'annotation_kind':'automated_model','merge_kind':'Mechanical per-run merge of original scene reviews and at most one missing-index followup; duplicates retained, never selected by outcome.',
++            'projection_correspondence_review':merged,'source_reviews':sources,'missing_scene_outputs':missing_outputs,
++            'expected_run_count':len(expected),'reviewed_run_count':len([row for row in merged if row['run_id'] in expected]),
+             'expected_mapping_count':sum(len(indices or []) for indices in expected.values()),
+-            'reviewed_mapping_count':sum(len(row.get('mappings',[])) for row in actual),
+-            'mapping_coverage':coverage,'unexpected_runs':unexpected_runs,
+-            'complete':not missing_outputs and not unexpected_runs and all(row['complete'] for row in coverage),
+-            'human_rating':None}
++            'reviewed_mapping_count':sum(len(row.get('mappings',[])) for row in merged),
++            'mapping_coverage':coverage,'remaining_unreviewed':unresolved,'unexpected_runs':unexpected_runs,
++            'followup_plan':'configs/acquisition_review_projection_followup_plan.json',
++            'complete':not unexpected_runs and all(row['complete'] for row in coverage),'human_rating':None}
+     write(EXP/'analysis/projection_identity_review.json',result)
+     return {key:result[key] for key in ('complete','expected_run_count','reviewed_run_count','expected_mapping_count','reviewed_mapping_count')}
++
++
++def projection_followup_jobs():
++    require_students_ended()
++    scenes=sorted({job['id'].rsplit('-',1)[0] for job in test_jobs()})
++    for scene in scenes:
++        status=json.loads((EXP/'acquisition_reviews/projection-review'/scene/'status.json').read_text())
++        assert status.get('finished_at') and status.get('owned_processes_stopped'),'All original scene review sessions must end before missing-index selection.'
++    plan_path=EXP/'configs/acquisition_review_projection_followup_plan.json'
++    if plan_path.exists():return json.loads(plan_path.read_text())['jobs']
++    assert not list((EXP/'acquisition_reviews/projection-followup').glob('*/status.json')),'Only one frozen followup plan is allowed.'
++    merge_projection_reviews()
++    aggregate=json.loads((EXP/'analysis/projection_identity_review.json').read_text())
++    jobs=[];selection=[]
++    for row in aggregate['mapping_coverage']:
++        indices=row['missing_mapping_indices'];run_id=row['run_id']
++        if not indices:continue
++        source=EXP/'acquisition_reviews/technical'/run_id/'workspace/technical_annotation.json'
++        original=json.loads(source.read_text())['semantic_correspondence']
++        scene=run_id.rsplit('-',1)[0]
++        proposals=[{**original[index],'run_id':run_id,'scene_id':scene,'mapping_index':index,'annotation_source':str(source)} for index in indices]
++        bundle=EXP/'acquisition_review_inputs/projection_followup_evidence'/run_id
++        seed=EXP/'acquisition_review_inputs/projection_followup'/run_id
++        provenance=[];copied(source,bundle/'technical_annotation.json',provenance)
++        for name in ('reference.png','final.png'):copied(EXP/'runs'/run_id/'workspace'/name,bundle/name,provenance)
++        (bundle/'proposed_projection_mappings.jsonl').write_text(''.join(json.dumps(item,ensure_ascii=False)+'\n' for item in proposals))
++        write(bundle/'proposed_projection_mappings.json',proposals);write(bundle/'provenance.json',provenance)
++        index={'scene_id':scene,'planned_run_count':1,'run_id':run_id,'expected_mapping_indices':indices,
++               'expected_mapping_count':len(indices),'proposals':'/projection_evidence/proposed_projection_mappings.json',
++               'original_indexed_proposals':'/projection_evidence/proposed_projection_mappings.jsonl',
++               'original_annotation':'/projection_evidence/technical_annotation.json',
++               'technical_index':'/technical_evidence/'+run_id+'/index.json',
++               'selection_rule':'Only original absent mapping indices, regardless of eligibility values. One followup round; no repeated decisions.',
++               'scope':'One run and original missing indices only; no future mask scores or other reviewer decisions.'}
++        write(seed/'input_index.json',index)
++        mounts=[{'source':str(bundle),'target':'/projection_evidence'},
++                {'source':str(EXP/'acquisition_review_inputs/technical_evidence'/run_id),'target':'/technical_evidence/'+run_id}]
++        common=session_file('projection-followup',mounts)
++        config=EXP/'configs'/('acquisition_review_projection_followup_'+run_id+'.json');shutil.copy2(common,config)
++        jobs.append({'id':run_id,'checkpoint':str(seed),'image':str(EXP/'runs'/run_id/'workspace/reference.png'),
++                     'prompt':str(prompt_file('projection-followup')),'session':str(config)})
++        selection.append({'run_id':run_id,'original_missing_mapping_indices':indices,'source_annotation':str(source)})
++    write(plan_path,{'frozen_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'rounds':1,
++          'selection_rule':'Missing original run/index coverage only; no eligibility-based selection or resampling.',
++          'source_coverage':aggregate['mapping_coverage'],'selection':selection,'jobs':jobs,'seconds':240,'model_requests':16})
++    return jobs
+ 
+ 
+ def comparison_jobs():
+@@ -571,19 +644,39 @@
+     if not source.exists():return None
+     annotation=json.loads(source.read_text())
+     entries=annotation.get('libraries',[]) if source==comparison else annotation.get('conditions',[])
+-    methods={};unknown={}
++    methods={};unknown={};basis={};validation_status={}
+     for entry in entries:
+-        condition=entry['condition'];labels=entry.get('canonical_semantic_methods',[])
+-        methods[condition]={row['canonical_label'] for row in labels if row.get('status') in ('implemented','validated')}
+-        unknown[condition]=[row['canonical_label'] for row in labels if row.get('status')=='unknown']
++        condition=entry['condition']
++        if 'canonical_semantic_methods' in entry:
++            labels=entry['canonical_semantic_methods']
++            methods[condition]={row['canonical_label'] for row in labels if row.get('status') in ('implemented','validated')}
++            unknown[condition]=[row['canonical_label'] for row in labels if row.get('status')=='unknown']
++            basis[condition]='SDK canonical labels with explicit implemented/validated status'
++            validation_status[condition]='Per-method statuses supplied by the original annotation'
++        elif 'methods' in entry:
++            methods[condition]=set(entry['methods']);unknown[condition]=[]
++            basis[condition]='Exact declared method labels from the actual SDK comparison; no controller semantic classification'
++            validation_status[condition]='unavailable: per-method implementation/validation status was not returned'
++        else:
++            methods[condition]=set();unknown[condition]=['method_set_unavailable']
++            basis[condition]='unknown: neither actual method-list schema was returned'
++            validation_status[condition]='unavailable'
+     pairs=[]
++    reported_pairs={tuple(row['pair'].split('-')):row for row in annotation.get('semantic_jaccard',{}).get('pairs',[])}
+     for first,second in combinations(sorted(methods),2):
+         intersection=methods[first]&methods[second];union=methods[first]|methods[second]
++        value=len(intersection)/len(union) if union and 'method_set_unavailable' not in unknown[first]+unknown[second] else None
++        reported=reported_pairs.get((first,second))
+         pairs.append({'conditions':[first,second],'shared_labels':sorted(intersection),'union_labels':sorted(union),
+-                      'known_methods_jaccard':len(intersection)/len(union) if union else None,
++                      'known_methods_jaccard':value,'method_set_basis':{first:basis[first],second:basis[second]},
++                      'per_method_validation_status':{first:validation_status[first],second:validation_status[second]},
++                      'model_reported_jaccard':reported.get('jaccard') if reported else None,
++                      'mechanical_value_matches_model':abs(value-reported['jaccard'])<=1e-9 if reported and value is not None else None,
+                       'unknown_labels':{first:unknown[first],second:unknown[second]}})
+     result={'annotation_source':str(source),'pairs':pairs,'method_sets':{key:sorted(value) for key,value in methods.items()},
+-            'interpretation':'Jaccard of SDK-annotated canonical semantic methods with implemented/validated evidence. Unknown labels are not absence. No code-text similarity or statistical significance claim.',
++            'interpretation':'Mechanical exact-label Jaccard from the actual SDK method sets. Structured canonical rows retain their explicit status filter; declared methods without statuses are not called validated. Unknown coverage is not absence. No controller semantic relabeling, code-text similarity or significance claim.',
++            'method_set_basis':basis,'per_method_validation_status':validation_status,
++            'model_supplied_semantic_jaccard':annotation.get('semantic_jaccard'),
+             'canonical_semantic_vocabulary':annotation.get('canonical_semantic_vocabulary',[])}
+     write(EXP/'analysis/acquisition_review_library_overlap.json',result)
+     return result
+@@ -698,6 +791,33 @@
+             fixture_review[1]['mappings'].pop()
+             write(target,{'projection_correspondence_review':fixture_review})
+             assert merge_projection_reviews()['complete'] is False
++            original_status=EXP/'acquisition_reviews/projection-review/FIXTURE/status.json'
++            write(original_status,{'status':'running'})
++            try:
++                projection_followup_jobs()
++                raise RuntimeError('Followup was not blocked while an original session was running.')
++            except AssertionError:
++                pass
++            write(original_status,{'status':'completed','finished_at':1,'owned_processes_stopped':True})
++            followup=projection_followup_jobs()
++            assert len(followup)==1 and followup[0]['id']=='FIXTURE-A1'
++            followup_index=json.loads((Path(followup[0]['checkpoint'])/'input_index.json').read_text())
++            assert followup_index['expected_mapping_indices']==[1]
++            subset=json.loads((EXP/'acquisition_review_inputs/projection_followup_evidence/FIXTURE-A1/proposed_projection_mappings.json').read_text())
++            assert len(subset)==1 and subset[0]['mapping_index']==1
++            assert all(subset[0][key]==value for key,value in original_proposals[1].items())
++            followup_output=EXP/'acquisition_reviews/projection-followup/FIXTURE-A1/workspace/projection_identity_review.json'
++            write(followup_output,{'projection_correspondence_review':[{'run_id':'FIXTURE-A1','mappings':[{'mapping_index':1,'measurement_eligible':None,'identity_ambiguity':[],
++                'non_identity_limits':[],'basis':[],'reason':'Synthetic merge fixture only.'}]}]})
++            assert merge_projection_reviews()['complete'] is True
++            merged_actual=json.loads((EXP/'analysis/projection_identity_review.json').read_text())
++            actual_run=next(row for row in merged_actual['projection_correspondence_review'] if row['run_id']=='FIXTURE-A1')
++            assert len(actual_run['mappings'])==2 and len({row['decision_source'] for row in actual_run['mappings']})==2
++            assert projection_followup_jobs()==followup
++            duplicate=json.loads(followup_output.read_text())
++            duplicate['projection_correspondence_review'][0]['mappings'].append({'mapping_index':0,'measurement_eligible':True})
++            write(followup_output,duplicate)
++            assert merge_projection_reviews()['complete'] is False
+             write(EXP/'runs/FIXTURE-A0/status.json',{'status':'running'})
+             try:
+                 require_students_ended()
+@@ -708,7 +828,7 @@
+             EXP=actual_exp
+     report={'recorded_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'real_model_calls':0,
+             'scope':'Synthetic image-byte transport fixture and prompt/context boundaries, not visual understanding or a research evaluation.',
+-            'two_ordered_valid_png_attachments':True,'missing_final_technical_run_retained_with_reference_only':True,'original_projection_proposal_fields_and_indices_preserved':True,'per_scene_projection_context_and_exact_merge_coverage_checked':True,'generic_fidelity_prompt_without_target_defects':True,
++            'two_ordered_valid_png_attachments':True,'missing_final_technical_run_retained_with_reference_only':True,'original_projection_proposal_fields_and_indices_preserved':True,'per_scene_projection_context_and_exact_merge_coverage_checked':True,'single_missing_index_followup_gate_plan_and_provenance_checked':True,'generic_fidelity_prompt_without_target_defects':True,
+             'no_condition_library_or_gt_inputs_for_visual':True,'posthoc_stages_require_all_student_supervisors_finished':True,
+             'shared_sdk_and_bridge_modified':False}
+     write(EXP/'infrastructure/acquisition_review_offline_check.json',report)
+@@ -717,7 +837,7 @@
+ 
+ if __name__=='__main__':
+     parser=argparse.ArgumentParser()
+-    parser.add_argument('stage',choices=['freeze','library-audit','visual','technical','knowledge-comparison','projection-review','merge-projection-review','report','summarize','check'])
++    parser.add_argument('stage',choices=['freeze','library-audit','visual','technical','knowledge-comparison','projection-review','projection-followup','merge-projection-review','report','summarize','check'])
+     parser.add_argument('--prepare-only',action='store_true')
+     parser.add_argument('--workers',type=int,choices=[1,2,4],default=2)
+     parser.add_argument('--base-port',type=int,default=19365)
+@@ -729,11 +849,11 @@
+     elif args.stage=='merge-projection-review':print(json.dumps(merge_projection_reviews()),flush=True)
+     else:
+         jobs={'library-audit':library_audit_jobs,'visual':visual_jobs,'technical':technical_jobs,
+-              'knowledge-comparison':comparison_jobs,'projection-review':projection_review_jobs,'report':report_jobs}[args.stage]()
++              'knowledge-comparison':comparison_jobs,'projection-review':projection_review_jobs,'projection-followup':projection_followup_jobs,'report':report_jobs}[args.stage]()
+         if args.run:jobs=[job for job in jobs if job['id'] in args.run]
+         write(EXP/'configs'/('acquisition_review_'+args.stage+'_jobs.json'),jobs)
+         if args.prepare_only:print(json.dumps({'stage':args.stage,'prepared':len(jobs),'model_calls':0}),flush=True)
+         else:
+             batch(jobs,args.stage,args)
+-            if args.stage=='projection-review':print(json.dumps(merge_projection_reviews()),flush=True)
++            if args.stage in ('projection-review','projection-followup'):print(json.dumps(merge_projection_reviews()),flush=True)
+             if args.stage=='report':publish_report()

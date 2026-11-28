@@ -1,0 +1,22 @@
+{
+  "tested_units": {
+    "projected_landmarks and landmark_loss": "Executed on a centered point and a point behind the camera. Center projected to (0.5, 0.5), loss was 0; behind-camera loss raised ValueError.",
+    "world_bounds and support_diagnostic": "Executed on synthetic boxes with known positions, a non-mesh pivot, and selection-inspired objects. Evaluated AABBs and gap classifications returned as documented; no surface collision test was performed.",
+    "assembly_links": "Executed for a parented hinged leaf and pivot; returned the parent relation. Pivot remained stationary when the pivot rotated, but no frame or opening was built or checked.",
+    "make_directional_material": "Created and bound a material to a mesh; inspected the complete linked Object-coordinate to mapping to noise to ramp to Principled base color to material output chain, mapping values, and absence of image texture nodes. No rendered appearance was checked."
+  },
+  "actual_commands": ["blender -b --factory-startup --python-exit-code 1 --python /app/validation_probe.py > /app/validation_probe.log 2>&1"],
+  "actual_outputs": {
+    "execution": "Exit 0, Blender 5.2.2 LTS; complete printed observations in /app/validation_probe.log and /app/validation_probe_results.json.",
+    "geometry": "Near-zero gap 0; positive gap 0.5; possible penetration gap approximately -0.1; non-overlapping XY and non-mesh yielded unknown support. Negative tolerance raised ValueError.",
+    "assembly": "Parent leaf-to-pivot link returned; pivot displacement 0 after rotation; leaf evaluated bounds changed to rotated values.",
+    "appearance": "Assigned material and all five links to surface output observed; mapping approximately (0.2, 3, 4); no image texture nodes.",
+    "projection": "Center (0.5, 0.5), depth 10; behind depth -1 and not in frame; loss 0 for center; behind point raised missing-or-behind-camera error."
+  },
+  "selection_probe": "Saved editable /app/selection_probe.blend from /app/validation_probe.py. It contains a simplified table top, chair seat, floor and hinged leaf, not a fitted reconstruction or reference image plane. The chair seat-to-floor AABB result is positive gap approximately 0.59; as the seat is an internal component and no legs were modeled this does not establish that an entire chair is unsupported. The table top is also not a complete assembly. No image comparison, frame/opening fit, or selection GT was available.",
+  "failed_or_rejected_candidates": ["No candidate unit was removed. Negative tolerance and behind-camera landmark intentionally produced ValueError; these observations are retained in /app/validation_probe_results.json. AABB near-zero and possible penetration are candidates, not confirmed contact or mesh intersections."],
+  "changes": "No library source revisions: the callable tests did not demonstrate a non-executable candidate. Probe and its results are retained outside the student library. Previous source and evidence were left intact.",
+  "remaining_unvalidated_methods": ["Rendered swatch and scene appearance, grain direction at image scale and lighting/material separation", "Scene-specific camera fit, semantic orientation and independent transfer", "Hinge-to-jamb and opening coherence in a complete assembly", "Surface contact, actual intersection, and constraint-link behavior", "Visual and physical accuracy of the selection probe"],
+  "applicability_and_side_effects": "Projection loss checks image coordinates, not visibility or 3D physical validity. Support uses evaluated mesh world AABBs and cannot prove contact or intersection; unknown is not absence of support. Parent links do not prove geometry connectivity. Material creation adds Blender datablocks and requires assignment; this test used procedural object coordinates with no image resource. Diagnostics do not move objects. Whole assemblies must be distinguished from their parts before repair; a stationary pivot alone does not establish an intact hinge/frame/opening relation.",
+  "final_library_files": ["/app/library/SKILL.md", "/app/library/capabilities.json", "/app/library/reconstruct.py"]
+}

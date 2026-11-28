@@ -1,0 +1,27 @@
+--- before/review_capability_acquisition.py
++++ after/review_capability_acquisition.py
+@@ -70,7 +70,7 @@
+ '''
+ REPORT_PROMPT='''You are a research reporter operating through the same fixed Claude Agent SDK and model backend as the experiment. All students, independent evaluations, semantic projection comparisons and earlier research reviews have ended. This is reporting only: do not change students, capability libraries, mappings, frozen predictions or measurements. Read /app/input_index.json and select evidence files from the read-only indexed bundles. Do not paste all raw trajectories into a single argument or invent results missing from the index.
+ 
+-Write the final report in Chinese to /app/REPORT_ZH.md. Code, function names, IDs and evidence paths may retain their actual spelling. Lead with what actually completed, the observed paired results and their limits. Separate deterministic observations, automated visual judgments, automated technical/source interpretations and hypotheses. Human ratings are unavailable and must remain null; never describe model judges as human evaluators. Cite exact files, actual images, code lines, tool events and recorded measurements. Model-proposed semantic correspondences are not human-verified. Unknown correspondence, unmatched instances, symmetry, hidden geometry and unaligned coordinate frames do not justify fabricated 3D error.
++Write the final report in Chinese to /app/REPORT_ZH.md. For user-facing file citations, use the original source paths in provenance.json, preferably relative to this experiment; guest-only /report_evidence, /evidence and /technical_evidence paths are reading locations and do not resolve outside the reviewer namespace. Code, function names, IDs and evidence paths may retain their actual spelling. Lead with what actually completed, the observed paired results and their limits. Separate deterministic observations, automated visual judgments, automated technical/source interpretations and hypotheses. Human ratings are unavailable and must remain null; never describe model judges as human evaluators. Cite exact files, actual images, code lines, tool events and recorded measurements. Model-proposed semantic correspondences are not human-verified. Unknown correspondence, unmatched instances, symmetry, hidden geometry and unaligned coordinate frames do not justify fabricated 3D error.
+ 
+ Answer all ten questions explicitly with actual evidence: (1) What technical knowledge was actually found by direct development-GT inspection? (2) What substantive differences exist among A1-A5 libraries? (3) What knowledge redundancy exists, including all ten canonical-semantic-method Jaccard pairs and their evidence/unknown coverage? (4) Did students actually use the new tools or methods? (5) Did relative positions, orientations and spatial relationships improve? (6) Did materials, texture mapping and appearance improve? (7) Did active-exploration trajectories transfer better than ordinary strategy guidance? (8) What additional value, if any, did GT provide? (9) Are GT and exploration complementary? (10) What regressions or side effects occurred?
+ 
+@@ -285,10 +285,15 @@
+         copied(EXP/'runs'/run/'analysis/technical/result.json',reviews/run/'deterministic_result.json',provenance)
+         results.append(record)
+     copied(EXP/'acquisition_reviews/library-audit/AUDIT/workspace/library_audit.json',reviews/'library_audit.json',provenance)
++    for name in ('observed_results.json','paired_observed_differences.json','library_path_mentions.json','student_initial_condition_audit.json','serialized_backend_context_audit.json','common_light_index.json'):
++        copied(EXP/'analysis'/name,reviews/name,provenance)
+     write(reviews/'provenance.json',provenance)
+     seed=EXP/'acquisition_review_inputs/knowledge_comparison';seed.mkdir(parents=True,exist_ok=True)
+     write(seed/'input_index.json',{'libraries':index,'library_prefix_note':'Library evidence uses /evidence as in the pre-test audit.',
+           'planned_run_count':len(test_jobs()),'runs':results,'pre_test_audit':'/reviews/library_audit.json',
++          'observed_results':'/reviews/observed_results.json','prespecified_arithmetic_contrasts':'/reviews/paired_observed_differences.json',
++          'library_path_inventory':'/reviews/library_path_mentions.json','actual_context_audits':['/reviews/student_initial_condition_audit.json','/reviews/serialized_backend_context_audit.json'],
++          'common_light_index':'/reviews/common_light_index.json',
+           'actual_technical_evidence':'/technical_evidence/<run>/index.json',
+           'technical_prefix_note':'Within each run index, replace /evidence/ with /technical_evidence/<run>/ when following its paths.'})
+     mounts=[{'source':str(libraries),'target':'/evidence'},{'source':str(reviews),'target':'/reviews'},
