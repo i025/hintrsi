@@ -191,6 +191,7 @@ def default_command():
     command = ["codex", "exec", "--ephemeral", "--json", "--skip-git-repo-check",
                "--ignore-user-config", "--ignore-rules", "--sandbox", "read-only",
                "--model", MODEL, "-c", "model_reasoning_effort=" + json.dumps(EFFORT)]
+    command += ["-c", "agents.enabled=false", "-c", "features.multi_agent_v2=false"]
     for name in DISABLED_FEATURES:
         command += ["-c", "features." + name + "=false"]
     command += ["-c", 'web_search="disabled"', "-c", "project_doc_max_bytes=0",

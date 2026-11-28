@@ -1,0 +1,29 @@
+--- previous/build.py
++++ build.py
+@@ -5,7 +5,7 @@
+ 
+ def mat(n,c,rough=.7,metal=0):
+  m=bpy.data.materials.new(n); m.diffuse_color=(*c,1); m.use_nodes=True; p=m.node_tree.nodes.get('Principled BSDF'); p.inputs['Base Color'].default_value=(*c,1); p.inputs['Roughness'].default_value=rough; p.inputs['Metallic'].default_value=metal; return m
+-white=mat('warm white walls',(.78,.78,.76)); trim=mat('white trim',(.91,.91,.88)); oak=mat('pale natural wood',(.68,.46,.33)); oaklight=mat('blind slats',(.78,.58,.46)); dark=mat('charcoal door',(.09,.085,.08)); inset=mat('door inset',(.12,.115,.11)); black=mat('black metal',(.025,.025,.025),.45); gray=mat('chair grey',(.42,.43,.43)); tabletop=mat('desktop charcoal',(.09,.10,.11)); floor=mat('wood floor',(.40,.35,.30)); teal=mat('turquoise planter',(.045,.25,.25),.35); soil=mat('dark potting soil',(.055,.05,.04)); leafm=[mat('grass %d'%i,c) for i,c in enumerate([(.17,.20,.045),(.23,.25,.07),(.30,.29,.08),(.11,.16,.035)])]
++white=mat('warm white walls',(.78,.78,.76)); trim=mat('white trim',(.91,.91,.88)); oak=mat('pale natural wood',(.68,.46,.33)); oaklight=mat('blind slats',(.78,.58,.46)); dark=mat('charcoal door',(.09,.085,.08)); inset=mat('door inset',(.12,.115,.11)); black=mat('black metal',(.025,.025,.025),.45); gray=mat('chair grey',(.20,.21,.21)); tabletop=mat('desktop charcoal',(.09,.10,.11)); floor=mat('wood floor',(.40,.35,.30)); teal=mat('turquoise planter',(.045,.25,.25),.35); soil=mat('dark potting soil',(.055,.05,.04)); leafm=[mat('grass %d'%i,c) for i,c in enumerate([(.17,.20,.045),(.23,.25,.07),(.30,.29,.08),(.11,.16,.035)])]
+ def cube(n,loc,scale,ma,bevel=0):
+  bpy.ops.mesh.primitive_cube_add(size=1, location=loc); o=bpy.context.object; o.name=n; o.dimensions=scale; bpy.ops.object.transform_apply(location=False,rotation=False,scale=True); o.data.materials.append(ma)
+  if bevel:
+@@ -18,7 +18,7 @@
+ # room
+ cube('floor slab',(0,0,-.09),(8,8,.18),floor)
+ # floor plank geometry with varied tones
+-woods=[mat('floor board %d'%i,(.35+i*.014,.31+i*.012,.27+i*.01)) for i in range(8)]
++woods=[mat('floor board %d'%i,(.20+i*.014,.17+i*.012,.14+i*.01)) for i in range(8)]
+ for i in range(23):
+  x=-3.8+i*.34
+  for j in range(6):
+@@ -93,7 +93,7 @@
+   ob.location.y=1.55+(ob.location.y-1.55)*1.5
+   ob.scale.x*=1.5
+  if any(ob.name.startswith(n) for n in ['door casing','dark door leaf','raised door panel']):
+-  ob.location.x-=1.15
++  ob.location.x-=1.8
+  if ob.name.startswith(('teal round planter','soil in pot','ornamental grass blade')):
+   ob.location.y+=1.6
+ # Fine procedural grain keeps the materials editable without external assets.

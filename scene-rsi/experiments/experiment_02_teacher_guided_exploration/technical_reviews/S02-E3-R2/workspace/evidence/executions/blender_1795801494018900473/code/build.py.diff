@@ -1,0 +1,21 @@
+--- previous/build.py
++++ build.py
+@@ -4,7 +4,7 @@
+ bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
+ def mat(n,c,rough=.7,metal=0):
+  m=bpy.data.materials.new(n); m.diffuse_color=(*c,1); m.use_nodes=True; p=m.node_tree.nodes.get('Principled BSDF'); p.inputs['Base Color'].default_value=(*c,1); p.inputs['Roughness'].default_value=rough; p.inputs['Metallic'].default_value=metal; return m
+-white=mat('warm painted white',(0.87,.88,.85)); shelf=mat('shelf white',(.93,.94,.92)); wall=mat('pale sage tiles',(.72,.76,.70)); grout=mat('fine grey grout',(.52,.57,.52)); floor=mat('dark grey flooring',(.25,.27,.27)); wood=mat('light natural wood',(.68,.49,.32)); inset=mat('wood panel inset',(.75,.57,.39)); dark=mat('lamp metal',(.12,.12,.11),.35,.55); shade=mat('warm ivory lampshades',(.93,.91,.83)); bedmat=mat('pale lavender bedding',(.84,.81,.86)); rug=mat('cream mottled rug',(.68,.60,.50)); glass=mat('cabinet glass',(.65,.72,.69),.2)
++white=mat('warm painted white',(0.87,.88,.85)); shelf=mat('shelf white',(.93,.94,.92)); wall=mat('pale sage tiles',(.72,.76,.70)); grout=mat('fine grey grout',(.52,.57,.52)); floor=mat('dark grey flooring',(.25,.27,.27)); wood=mat('light natural wood',(.68,.49,.32)); inset=mat('wood panel inset',(.75,.57,.39)); dark=mat('lamp metal',(.12,.12,.11),.35,.55); shade=mat('warm ivory lampshades',(.93,.91,.83)); bedmat=mat('pale lavender bedding',(.84,.81,.86)); rug=mat('cream mottled rug',(.68,.60,.50)); glass=mat('cabinet glass',(.65,.72,.69),.2); glass.node_tree.nodes.get('Principled BSDF').inputs['Transmission Weight'].default_value=.85
+ def cube(n,loc,scale,ma,bev=0):
+  bpy.ops.mesh.primitive_cube_add(size=1,location=loc); o=bpy.context.object; o.name=n; o.dimensions=scale; bpy.ops.object.transform_apply(location=False,rotation=False,scale=True); o.data.materials.append(ma)
+  if bev: mod=o.modifiers.new('soft edges','BEVEL'); mod.width=bev; mod.segments=2; o.modifiers.new('weighted normals','WEIGHTED_NORMAL')
+@@ -49,6 +49,9 @@
+ def lamp(x,y,height):
+  cyl('floor lamp round base',(x,y,.025),.19,.04,dark);cyl('floor lamp slender stem',(x,y,height/2),.014,height,dark);cone('white fabric tapered lampshade',(x,y,height-.10),.20,.15,.34,shade);point('lamp warm glow',(x,y,height-.10),45,(1,.78,.50))
+ lamp(-2.05,.65,1.65);lamp(.47,1.77,1.67)
++# Warm light escapes the top and bottom of the rear shade onto the tiled wall.
++point('rear lamp upper glow',(.47,1.77,1.85),75,(1,.70,.40))
++point('rear lamp lower glow',(.47,1.77,1.36),45,(1,.72,.45))
+ # rug on floor
+ cube('beige area rug',(.30,.52,.012),(1.8,1.75,.018),rug,.05)
+ # bed foreground runs toward camera

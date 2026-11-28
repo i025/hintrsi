@@ -1,0 +1,36 @@
+--- previous/external/exploration_geometry.py
++++ external/exploration_geometry.py
+@@ -141,6 +141,33 @@
+                        'post_base_seat_connections': post_connections,
+                        'contact_claim': 'Positive gap proves separation. Zero gap/bounds overlap alone does not prove physical contact. Negative local clearance is reported separately.'})
+     result.update(floor_objects=floor_names, chairs=chairs)
++    # Diagnostic close views are evaluator outputs; the student's scene is not saved.
++    camera = scene.camera
++    scene.render.engine = 'CYCLES'
++    scene.cycles.device = 'CPU'
++    scene.cycles.samples = 16
++    scene.cycles.use_denoising = True
++    scene.render.resolution_x = 512
++    scene.render.resolution_y = 384
++    scene.render.resolution_percentage = 100
++    scene.render.image_settings.file_format = 'PNG'
++    camera.data.type = 'ORTHO'
++    camera.data.ortho_scale = 1.4
++    views = []
++    for i, group in enumerate(groups):
++        if not group:
++            continue
++        center = Vector((sum(meshes[n]['center'][0] for n in group)/len(group),
++                         sum(meshes[n]['center'][1] for n in group)/len(group), .25))
++        for obj in scene.objects:
++            if obj.type == 'MESH':obj.hide_render = obj.name not in group + floor_names
++        camera.location = center + Vector((2,-2,.4))
++        camera.rotation_euler = (center-camera.location).to_track_quat('-Z','Y').to_euler()
++        scene.render.filepath = str(output / ('chair_'+str(i+1)+'_support.png'))
++        bpy.ops.render.render(write_still=True)
++        views.append({'chair':i+1,'camera_location':list(camera.location),'target':list(center),
++                       'scope':'Isolated chair/floor support view; other mesh objects hidden for diagnosis only.'})
++    result['support_views'] = views
+ 
+ if args.case == 'S02':
+     door_names = [n for n in meshes if re.search(r'door', n, re.I)

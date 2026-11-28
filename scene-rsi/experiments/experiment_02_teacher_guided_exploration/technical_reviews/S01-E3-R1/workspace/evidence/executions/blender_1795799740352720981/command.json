@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "-b",
+    "/app/scene.blend",
+    "-t",
+    "8",
+    "--python-expr",
+    "import bpy\nfrom mathutils import Vector\ns=bpy.context.scene\nbpy.ops.object.camera_add(location=(0,-7,1.05))\nc=bpy.context.object\nc.rotation_euler=(Vector((0,0,0.7))-c.location).to_track_quat(\"-Z\",\"Y\").to_euler()\nc.data.type=\"ORTHO\"\nc.data.ortho_scale=5.5\ns.camera=c\ns.render.filepath=\"/tmp/chair_side_check.png\"\ns.cycles.samples=16\nbpy.ops.render.render(write_still=True)"
+  ],
+  "cwd": "/app",
+  "started_at": 1795799740.3528883
+}

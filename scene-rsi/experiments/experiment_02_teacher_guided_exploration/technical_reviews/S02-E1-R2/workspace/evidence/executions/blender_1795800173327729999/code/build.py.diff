@@ -1,0 +1,30 @@
+--- previous/build.py
++++ build.py
+@@ -49,7 +49,14 @@
+ def lamp(x,y,height):
+  cyl('floor lamp round base',(x,y,.025),.19,.04,dark);cyl('floor lamp slender stem',(x,y,height/2),.014,height,dark);cone('white fabric tapered lampshade',(x,y,height-.10),.20,.15,.34,shade);point('lamp warm glow',(x,y,height-.10),110,(1,.78,.50))
+ lamp(-2.05,.65,1.65);lamp(.47,1.77,1.67)
++# Warm pools cast on the tiled wall by the rear floor lamp.
++area('rear lamp wall wash',(.47,1.65,1.65),100,.32,(1,.75,.47),(.47,2.14,2.25))
+ # rug on floor
++rug.node_tree.nodes.get('Principled BSDF').inputs['Roughness'].default_value=.95
++nodes=rug.node_tree.nodes; links=rug.node_tree.links
++noise=nodes.new('ShaderNodeTexNoise');noise.inputs['Scale'].default_value=7;noise.inputs['Detail'].default_value=3
++ramp=nodes.new('ShaderNodeValToRGB');ramp.color_ramp.elements[0].color=(.42,.32,.23,1);ramp.color_ramp.elements[1].color=(.78,.70,.59,1)
++links.new(noise.outputs['Fac'],ramp.inputs['Fac']);links.new(ramp.outputs['Color'],nodes.get('Principled BSDF').inputs['Base Color'])
+ cube('beige area rug',(.30,.52,.012),(1.8,1.75,.018),rug,.05)
+ # bed foreground runs toward camera
+ cube('bed wooden base',(-.35,-1.05,.32),(1.58,2.75,.36),wood,.035)
+@@ -66,9 +73,9 @@
+  o=cube(n,(0,0,0),dim,ma,.006);o.parent=pivot;o.location=loc;return o
+ doorpart('wood door leaf',(-.44,0,1.48),(.88,.07,2.96),wood)
+ for z,h in [(.72,1.16),(2.17,1.20)]:
+- doorpart('recessed door panel',(-.44,-.042,z),(.68,.012,h),inset)
+- for xx in [-.79,-.09]:doorpart('door panel molding',(xx,-.053,z),(.018,.016,h+.04),wood)
+- for zz in [z-h/2,z+h/2]:doorpart('door panel molding',(-.44,-.053,zz),(.70,.016,.018),wood)
++ doorpart('recessed door panel',(-.44,.042,z),(.68,.012,h),inset)
++ for xx in [-.79,-.09]:doorpart('door panel molding',(xx,.053,z),(.018,.016,h+.04),wood)
++ for zz in [z-h/2,z+h/2]:doorpart('door panel molding',(-.44,.053,zz),(.70,.016,.018),wood)
+ # lighting and camera
+ area('large soft overhead',(-1,-2,4.7),500,4.0,(1,.95,.87),(0,.6,.3)); area('front fill',(1,-4,3.5),230,3,(.88,.92,1),(0,1,1))
+ bpy.ops.object.camera_add(location=(-2.8,-3.5,3.05));cam=bpy.context.object;cam.name='Camera';cam.rotation_euler=(Vector((-.45,.65,1.05))-cam.location).to_track_quat('-Z','Y').to_euler();cam.data.type='PERSP';cam.data.lens=32;bpy.context.scene.camera=cam

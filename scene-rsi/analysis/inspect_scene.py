@@ -64,7 +64,16 @@ for material in bpy.data.materials:
                       if hasattr(socket, 'default_value') and not socket.is_linked}
             nodes.append({'name': node.name, 'type': node.bl_idname, 'inputs': inputs,
                           'image': node.image.name if node.type == 'TEX_IMAGE' and node.image else None,
-                          'node_group': node.node_tree.name if node.type == 'GROUP' and node.node_tree else None})
+                          'node_group': node.node_tree.name if node.type == 'GROUP' and node.node_tree else None,
+                          'properties': {key: value(getattr(node, key)) for key in
+                                         ('operation', 'blend_type', 'vector_type', 'noise_dimensions',
+                                          'noise_type', 'normalize', 'projection', 'projection_blend',
+                                          'interpolation', 'extension', 'distribution') if hasattr(node, key)},
+                          'color_ramp': {'interpolation': node.color_ramp.interpolation,
+                                         'elements': [{'position': e.position, 'color': list(e.color)}
+                                                      for e in node.color_ramp.elements]}
+                                        if node.type == 'VALTORGB' else None,
+                          'coordinate_object': node.object.name if node.type == 'TEX_COORD' and node.object else None})
         links = [{'from_node': link.from_node.name, 'from_socket': link.from_socket.name,
                   'to_node': link.to_node.name, 'to_socket': link.to_socket.name} for link in material.node_tree.links]
     materials.append({'name': material.name, 'diffuse_color': list(material.diffuse_color),
@@ -76,6 +85,7 @@ for image in bpy.data.images:
     packed = bool(image.packed_file) or bool(image.packed_files)
     images.append({'name': image.name, 'source': image.source, 'filepath': image.filepath,
                    'size': list(image.size), 'packed': packed,
+                   'has_data': image.has_data, 'colorspace': image.colorspace_settings.name,
                    'missing_external': image.source in ('FILE', 'TILED') and not packed and not Path(absolute).exists()})
 state = {'file': args.input, 'blender_version': bpy.app.version_string,
          'camera': scene.camera.name if scene.camera else None,

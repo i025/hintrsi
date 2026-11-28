@@ -1,0 +1,23 @@
+--- previous/build.py
++++ build.py
+@@ -47,7 +47,7 @@
+ # faces on inward x side
+ for j,y in enumerate([-.58,.22,1.02,1.82,2.62]):
+  for k,z in enumerate([.17,.47,.77]):
+-  m= [black,wood,white,black,sage][(j*2+k)%5]
++  m= [black,wood,white,black,white][(j*2+k)%5]
+   cube('cabinet drawer front',(1.242,y,z),(.025,.75,.27),m,.006)
+   cyl('drawer knob',(1.218,y,z),.022,.045,steel,(0,math.pi/2,0),20)
+ # wall cabinets on right
+@@ -80,6 +80,11 @@
+  a=Vector(a); b=Vector(b); mid=a.lerp(b,.55); side=Vector((width,0,0)); verts=[a,mid+side,b,mid-side]; mesh=bpy.data.meshes.new(n); mesh.from_pydata(verts,[],[(0,1,2,3)]); mesh.materials.append(leaf); obj=bpy.data.objects.new(n,mesh); bpy.context.collection.objects.link(obj); sol=obj.modifiers.new('leaf thickness','SOLIDIFY'); sol.thickness=.008
+ for i,(z,dx,dy,dz) in enumerate([(0.6,-.20,.02,.42),(.72,.22,.01,.35),(.9,-.16,0,.43),(1.02,.16,.04,.4),(1.2,-.1,0,.35)]): blade('pointed plant leaf',(1.05,3.45,z),(1.05+dx,3.45+dy,z+dz),.045)
+ blade('tall bud',(1.06,3.45,1.52),(1.09,3.45,1.85),.055)
++# Digital clock on the range control panel, oriented to face the camera.
++bpy.ops.object.text_add(location=(-1.40,1.055,1.39), rotation=(math.radians(78),0,0))
++clock=bpy.context.object; clock.name='range clock display'; clock.data.body='12:01'; clock.data.align_x='CENTER'; clock.data.align_y='CENTER'; clock.data.size=.15; clock.data.extrude=.001; clock.data.materials.append(black)
++# Strong oblique sunlight creates the bright strip on the floor.
++bpy.ops.object.light_add(type='SUN', location=(-2,-2,4)); sun=bpy.context.object; sun.name='angled sunlight'; sun.data.energy=1.3; sun.data.angle=math.radians(1.5); sun.rotation_euler=(math.radians(25),math.radians(-30),math.radians(-30))
+ # lighting
+ def area(n,loc,power,size,target):
+  bpy.ops.object.light_add(type='AREA', location=loc); o=bpy.context.object; o.name=n; o.data.energy=power; o.data.shape='DISK'; o.data.size=size; o.rotation_euler=(Vector(target)-o.location).to_track_quat('-Z','Y').to_euler()

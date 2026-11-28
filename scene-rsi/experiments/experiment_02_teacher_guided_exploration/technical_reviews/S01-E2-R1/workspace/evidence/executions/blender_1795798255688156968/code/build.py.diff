@@ -1,0 +1,37 @@
+--- previous/build.py
++++ build.py
+@@ -5,7 +5,7 @@
+ 
+ def mat(n,c,rough=.7,metal=0):
+  m=bpy.data.materials.new(n); m.diffuse_color=(*c,1); m.use_nodes=True; p=m.node_tree.nodes.get('Principled BSDF'); p.inputs['Base Color'].default_value=(*c,1); p.inputs['Roughness'].default_value=rough; p.inputs['Metallic'].default_value=metal; return m
+-white=mat('warm white walls',(.78,.78,.76)); trim=mat('white trim',(.91,.91,.88)); oak=mat('pale natural wood',(.68,.46,.33)); oaklight=mat('blind slats',(.78,.58,.46)); dark=mat('charcoal door',(.22,.22,.21)); inset=mat('door inset',(.255,.25,.24)); black=mat('black metal',(.025,.025,.025),.45); gray=mat('chair grey',(.42,.43,.43)); tabletop=mat('desktop charcoal',(.25,.26,.27)); floor=mat('wood floor',(.40,.35,.30)); teal=mat('turquoise planter',(.045,.25,.25),.35); soil=mat('dark potting soil',(.055,.05,.04)); leafm=[mat('grass %d'%i,c) for i,c in enumerate([(.17,.20,.045),(.23,.25,.07),(.30,.29,.08),(.11,.16,.035)])]
++white=mat('warm white walls',(.78,.78,.76)); trim=mat('white trim',(.91,.91,.88)); oak=mat('pale natural wood',(.68,.46,.33)); oaklight=mat('blind slats',(.78,.58,.46)); dark=mat('charcoal door',(.075,.075,.07)); inset=mat('door inset',(.095,.09,.085)); black=mat('black metal',(.025,.025,.025),.45); gray=mat('chair grey',(.28,.29,.29)); tabletop=mat('desktop charcoal',(.095,.10,.11)); floor=mat('wood floor',(.24,.20,.16)); teal=mat('turquoise planter',(.045,.25,.25),.35); soil=mat('dark potting soil',(.055,.05,.04)); leafm=[mat('grass %d'%i,c) for i,c in enumerate([(.17,.20,.045),(.23,.25,.07),(.30,.29,.08),(.11,.16,.035)])]
+ def cube(n,loc,scale,ma,bevel=0):
+  bpy.ops.mesh.primitive_cube_add(size=1, location=loc); o=bpy.context.object; o.name=n; o.dimensions=scale; bpy.ops.object.transform_apply(location=False,rotation=False,scale=True); o.data.materials.append(ma)
+  if bevel:
+@@ -18,7 +18,7 @@
+ # room
+ cube('floor slab',(0,0,-.09),(8,8,.18),floor)
+ # floor plank geometry with varied tones
+-woods=[mat('floor board %d'%i,(.35+i*.014,.31+i*.012,.27+i*.01)) for i in range(8)]
++woods=[mat('floor board %d'%i,(.22+i*.012,.18+i*.011,.145+i*.009)) for i in range(8)]
+ for i in range(23):
+  x=-3.8+i*.34
+  for j in range(6):
+@@ -32,11 +32,11 @@
+ for z in [1.45,3.01]: cube('window horizontal casing',(-1.95,2.93,z),(2.88,.13,.12),oak,.01)
+ for i in range(31): cube('horizontal venetian slat',(-1.95,2.91,1.56+i*.045),(2.65,.06,.025),oaklight,.006)
+ # door rear right
+-cube('door casing',(1.72,2.97,1.29),(1.23,.12,2.58),trim,.015)
+-cube('dark door leaf',(1.72,2.87,1.28),(1.12,.12,2.49),dark,.012)
+-for x in [1.43,2.01]:
+- for z,h in [(.39,.55),(1.05,.46),(1.59,.46),(2.13,.47)]:
+-  cube('raised door panel',(x,2.795,z),(.43,.025,h),inset,.008)
++cube('door casing',(1.88,2.97,1.45),(1.55,.12,2.90),trim,.015)
++cube('dark door leaf',(1.88,2.87,1.44),(1.44,.12,2.81),dark,.012)
++for x in [1.51,2.25]:
++ for z,h in [(.44,.62),(1.18,.52),(1.79,.52),(2.40,.53)]:
++  cube('raised door panel',(x,2.795,z),(.55,.025,h),inset,.008)
+ # bookcase below window, 4 bays 2 rows
+ cube('bookcase top',(-1.95,2.48,1.03),(2.8,.48,.12),oak,.012); cube('bookcase bottom',(-1.95,2.48,.08),(2.8,.48,.11),oak,.01)
+ for x in [-3.31,-2.63,-1.95,-1.27,-.59]: cube('bookcase upright',(x,2.48,.55),(.075,.47,.9),oak,.008)

@@ -1,0 +1,28 @@
+--- previous/build.py
++++ build.py
+@@ -47,10 +47,15 @@
+  cube('lower cabinet door',(xx,1.63,.355),(.31,.035,.59),shelf,.004)
+ # lamps
+ def lamp(x,y,height):
+- cyl('floor lamp round base',(x,y,.025),.19,.04,dark);cyl('floor lamp slender stem',(x,y,height/2),.014,height,dark);cone('white fabric tapered lampshade',(x,y,height-.10),.20,.15,.34,shade);point('lamp warm glow',(x,y,height-.10),45,(1,.78,.50))
++ cyl('floor lamp round base',(x,y,.025),.19,.04,dark);cyl('floor lamp slender stem',(x,y,height/2),.014,height,dark);cone('white fabric tapered lampshade',(x,y,height-.10),.20,.15,.34,shade);point('lamp warm glow',(x,y,height-.10),100,(1,.78,.50)); point('lamp upper wall glow',(x,y,height+.17),45,(1,.82,.62))
+ lamp(-2.05,.65,1.65);lamp(.47,1.77,1.67)
+ # rug on floor
+ cube('beige area rug',(.30,.52,.012),(1.8,1.75,.018),rug,.05)
++# Soft, irregular color variation in the woven rug
++nodes=rug.node_tree.nodes; links=rug.node_tree.links
++noise=nodes.new('ShaderNodeTexNoise'); noise.inputs['Scale'].default_value=5.0; noise.inputs['Detail'].default_value=3.0
++ramp=nodes.new('ShaderNodeValToRGB'); ramp.color_ramp.elements[0].position=.27; ramp.color_ramp.elements[0].color=(.44,.34,.24,1); ramp.color_ramp.elements[1].position=.72; ramp.color_ramp.elements[1].color=(.78,.69,.56,1)
++links.new(noise.outputs['Fac'],ramp.inputs[0]); links.new(ramp.outputs['Color'],nodes.get('Principled BSDF').inputs['Base Color'])
+ # bed foreground runs toward camera
+ cube('bed wooden base',(-.35,-1.05,.32),(1.58,2.75,.36),wood,.035)
+ cube('thick pale mattress',(-.35,-1.05,.58),(1.63,2.80,.25),bedmat,.07)
+@@ -61,7 +66,7 @@
+ # black doorway behind leaf
+ cube('dark door opening',(1.72,2.12,1.50),(.32,.025,3.0),dark)
+ # door assembly local coords rotate around hinge
+-pivot=bpy.data.objects.new('open door hinge',None);bpy.context.collection.objects.link(pivot);pivot.location=(1.95,-0.40,0);pivot.rotation_euler[2]=math.radians(-35)
++pivot=bpy.data.objects.new('open door hinge',None);bpy.context.collection.objects.link(pivot);pivot.location=(1.65,-0.65,0);pivot.rotation_euler[2]=math.radians(-20)
+ def doorpart(n,loc,dim,ma):
+  o=cube(n,(0,0,0),dim,ma,.006);o.parent=pivot;o.location=loc;return o
+ doorpart('wood door leaf',(-.44,0,1.48),(.88,.07,2.96),wood)

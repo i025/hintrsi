@@ -37,8 +37,10 @@ def process_resources():
             'live_cpu_seconds': sum(processes[pid][1] for pid in owned if pid in processes) / os.sysconf('SC_CLK_TCK')}
 
 
-def execute(directory, image, prompt, seconds=1500, calls=120, cpus=None, port=18865):
-    directory = prepare(directory, image, prompt)
+def execute(directory, image, prompt, seconds=1500, calls=120, cpus=None, port=18865,
+            checkpoint=None, session=None):
+    session = session or {}
+    directory = prepare(directory, image, prompt, checkpoint, session)
     (directory / 'proxy').mkdir(exist_ok=True)
     (directory / 'claude_code_proxy.py').symlink_to(ROOT / 'sdk/litellm_proxy/claude_code_proxy.py')
     backend_home = directory / 'backend_home'
@@ -48,7 +50,11 @@ def execute(directory, image, prompt, seconds=1500, calls=120, cpus=None, port=1
     services = []
     socket_directory = Path(tempfile.mkdtemp(prefix='scene-rsi-'))
     proxy_socket = socket_directory / 'proxy.sock'
-    api_base = 'http://127.0.0.1:' + str(port) + '/sessions/' + directory.name + '/student/solve/v1'
+    # The legacy code-task teacher route advertises a wholly read-only container.
+    # Scene diagnosis writes its output in a separate, writable evidence copy.
+    api_role = 'diagnostic_teacher' if session.get('role') == 'teacher' else session.get('role', 'student')
+    api_base = ('http://127.0.0.1:' + str(port) + '/sessions/' + directory.name +
+                '/' + api_role + '/solve/v1')
     config = {'model_list': [{'model_name': 'default_model', 'litellm_params': {
         'model': 'openai/gpt-6.1-terra', 'api_base': api_base, 'api_key': 'local-scene'}}],
         'litellm_settings': {'callbacks': ['claude_code_proxy.proxy_handler_instance'],
@@ -68,7 +74,10 @@ def execute(directory, image, prompt, seconds=1500, calls=120, cpus=None, port=1
     state = {'status': 'starting', 'model': 'gpt-6.1-terra', 'reasoning_effort': 'low',
              'agent_loop': 'Claude Agent SDK', 'started_at': started,
              'seconds_limit': seconds, 'model_call_limit': calls, 'cpu_affinity': cpus,
-             'hint_enabled': False, 'persistent_capability_enabled': False, 'teacher_enabled': False}
+             'hint_enabled': session.get('hint_enabled', False),
+             'persistent_capability_enabled': False, 'teacher_enabled': session.get('role') == 'teacher',
+             'role': session.get('role', 'student'), 'condition': session.get('condition'),
+             'checkpoint': str(checkpoint) if checkpoint else None}
 
     def save():
         (directory / 'status.json').write_text(json.dumps(state, indent=2))
@@ -181,6 +190,9 @@ if __name__ == '__main__':
     parser.add_argument('--calls', type=int, default=120)
     parser.add_argument('--port', type=int, default=18865)
     parser.add_argument('--cpus', default='32,33,34,35,36,37,38,39')
+    parser.add_argument('--checkpoint')
+    parser.add_argument('--session-config')
     args = parser.parse_args()
     execute(args.directory, args.image, Path(args.prompt).read_text(), args.seconds, args.calls,
-            [int(x) for x in args.cpus.split(',')], args.port)
+            [int(x) for x in args.cpus.split(',')], args.port, args.checkpoint,
+            json.loads(Path(args.session_config).read_text()) if args.session_config else None)

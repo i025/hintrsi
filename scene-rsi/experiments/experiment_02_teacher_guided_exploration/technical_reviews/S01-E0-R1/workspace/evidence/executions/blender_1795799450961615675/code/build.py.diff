@@ -1,0 +1,22 @@
+--- previous/build.py
++++ build.py
+@@ -96,6 +96,19 @@
+   ob.location.x-=1.15
+  if ob.name.startswith(('teal round planter','soil in pot','ornamental grass blade')):
+   ob.location.y+=1.6
++# Fine procedural grain keeps the materials editable without external assets.
++def grain(material, scale, detail, strength, dark_factor):
++ nt=material.node_tree; p=nt.nodes.get('Principled BSDF'); base=p.inputs['Base Color'].default_value[:]
++ tex=nt.nodes.new('ShaderNodeTexNoise'); tex.inputs['Scale'].default_value=scale; tex.inputs['Detail'].default_value=detail; tex.inputs['Roughness'].default_value=.72
++ coord=nt.nodes.new('ShaderNodeTexCoord'); mapping=nt.nodes.new('ShaderNodeVectorMath'); mapping.operation='MULTIPLY'; mapping.inputs[1].default_value=(3.0,28.0,3.0); nt.links.new(coord.outputs['Generated'],mapping.inputs[0]); nt.links.new(mapping.outputs[0],tex.inputs['Vector'])
++ ramp=nt.nodes.new('ShaderNodeValToRGB'); ramp.color_ramp.elements[0].color=tuple(c*dark_factor for c in base[:3])+(1,); ramp.color_ramp.elements[1].color=tuple(min(1,c*1.14) for c in base[:3])+(1,); nt.links.new(tex.outputs['Fac'],ramp.inputs[0]); nt.links.new(ramp.outputs[0],p.inputs['Base Color'])
++ bump=nt.nodes.new('ShaderNodeBump'); bump.inputs['Strength'].default_value=strength; bump.inputs['Distance'].default_value=.035; nt.links.new(tex.outputs['Fac'],bump.inputs['Height']); nt.links.new(bump.outputs[0],p.inputs['Normal'])
++for m in woods: grain(m,4,3,.22,.55)
++grain(oak,3,2,.08,.75)
++grain(tabletop,3,2,.06,.8)
++# The lamp stands at the outer end of the shelves, rather than in front of them.
++for ob in bpy.context.scene.objects:
++ if ob.name.startswith(('lamp foot','lamp stem','cream lampshade')): ob.location.y-=1.0
+ # camera and lights
+ world=bpy.context.scene.world or bpy.data.worlds.new('World'); bpy.context.scene.world=world; world.use_nodes=True; world.node_tree.nodes['Background'].inputs[0].default_value=(.8,.8,.8,1); world.node_tree.nodes['Background'].inputs[1].default_value=.8
+ def area(loc,power,size,target):

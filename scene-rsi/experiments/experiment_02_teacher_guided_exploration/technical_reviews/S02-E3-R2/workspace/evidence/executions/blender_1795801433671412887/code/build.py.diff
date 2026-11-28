@@ -1,0 +1,18 @@
+--- previous/build.py
++++ build.py
+@@ -64,11 +64,11 @@
+ pivot=bpy.data.objects.new('open door hinge',None);bpy.context.collection.objects.link(pivot);pivot.location=(1.72,2.05,0);pivot.rotation_euler[2]=math.radians(75)
+ def doorpart(n,loc,dim,ma):
+  o=cube(n,(0,0,0),dim,ma,.006);o.parent=pivot;o.location=loc;return o
+-doorpart('wood door leaf',(-.70,0,1.48),(1.40,.07,2.96),wood)
++doorpart('wood door leaf',(-.85,0,1.48),(1.70,.07,2.96),wood)
+ for z,h in [(.72,1.16),(2.17,1.20)]:
+- doorpart('recessed door panel',(-.70,-.042,z),(1.16,.012,h),inset)
+- for xx in [-1.29,-.11]:doorpart('door panel molding',(xx,-.053,z),(.018,.016,h+.04),wood)
+- for zz in [z-h/2,z+h/2]:doorpart('door panel molding',(-.70,-.053,zz),(1.18,.016,.018),wood)
++ doorpart('recessed door panel',(-.85,.042,z),(1.46,.012,h),inset)
++ for xx in [-1.59,-.11]:doorpart('door panel molding',(xx,.053,z),(.018,.016,h+.04),wood)
++ for zz in [z-h/2,z+h/2]:doorpart('door panel molding',(-.85,.053,zz),(1.48,.016,.018),wood)
+ # lighting and camera
+ area('large soft overhead',(-1,-2,4.7),500,4.0,(1,.95,.87),(0,.6,.3)); area('front fill',(1,-4,3.5),230,3,(.88,.92,1),(0,1,1))
+ bpy.ops.object.camera_add(location=(-2.8,-3.5,3.05));cam=bpy.context.object;cam.name='Camera';cam.rotation_euler=(Vector((0,.65,1.05))-cam.location).to_track_quat('-Z','Y').to_euler();cam.data.type='PERSP';cam.data.lens=27;bpy.context.scene.camera=cam

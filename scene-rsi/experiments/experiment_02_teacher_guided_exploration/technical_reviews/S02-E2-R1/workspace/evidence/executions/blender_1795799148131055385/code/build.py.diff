@@ -1,0 +1,20 @@
+--- previous/build.py
++++ build.py
+@@ -4,7 +4,7 @@
+ bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
+ def mat(n,c,rough=.7,metal=0):
+  m=bpy.data.materials.new(n); m.diffuse_color=(*c,1); m.use_nodes=True; p=m.node_tree.nodes.get('Principled BSDF'); p.inputs['Base Color'].default_value=(*c,1); p.inputs['Roughness'].default_value=rough; p.inputs['Metallic'].default_value=metal; return m
+-white=mat('warm painted white',(0.87,.88,.85)); shelf=mat('shelf white',(.93,.94,.92)); wall=mat('pale sage tiles',(.72,.76,.70)); grout=mat('fine grey grout',(.52,.57,.52)); floor=mat('dark grey flooring',(.25,.27,.27)); wood=mat('light natural wood',(.72,.55,.40)); inset=mat('wood panel inset',(.77,.61,.46)); dark=mat('lamp metal',(.12,.12,.11),.35,.55); shade=mat('warm ivory lampshades',(.93,.91,.83)); bedmat=mat('pale lavender bedding',(.84,.81,.86)); rug=mat('cream mottled rug',(.68,.60,.50)); glass=mat('cabinet glass',(.65,.72,.69),.2)
++white=mat('warm painted white',(0.87,.88,.85)); shelf=mat('shelf white',(.93,.94,.92)); wall=mat('pale sage tiles',(.72,.76,.70)); grout=mat('fine grey grout',(.52,.57,.52)); floor=mat('dark grey flooring',(.25,.27,.27)); wood=mat('light natural wood',(.72,.55,.40)); inset=mat('wood panel inset',(.77,.61,.46)); dark=mat('lamp metal',(.12,.12,.11),.35,.55); shade=mat('warm ivory lampshades',(.93,.91,.83)); bedmat=mat('pale lavender bedding',(.84,.81,.86)); rug=mat('cream mottled rug',(.68,.60,.50)); glass=mat('cabinet glass',(.36,.40,.38),.2)
+ def cube(n,loc,scale,ma,bev=0):
+  bpy.ops.mesh.primitive_cube_add(size=1,location=loc); o=bpy.context.object; o.name=n; o.dimensions=scale; bpy.ops.object.transform_apply(location=False,rotation=False,scale=True); o.data.materials.append(ma)
+  if bev: mod=o.modifiers.new('soft edges','BEVEL'); mod.width=bev; mod.segments=2; o.modifiers.new('weighted normals','WEIGHTED_NORMAL')
+@@ -66,7 +66,7 @@
+ # black doorway behind leaf
+ cube('dark door opening',(1.72,2.12,1.50),(.32,.025,3.0),dark)
+ # door assembly local coords rotate around hinge
+-pivot=bpy.data.objects.new('open door hinge',None);bpy.context.collection.objects.link(pivot);pivot.location=(1.65,-0.65,0);pivot.rotation_euler[2]=math.radians(-20)
++pivot=bpy.data.objects.new('open door hinge',None);bpy.context.collection.objects.link(pivot);pivot.location=(1.30,-0.65,0);pivot.rotation_euler[2]=math.radians(-20)
+ def doorpart(n,loc,dim,ma):
+  o=cube(n,(0,0,0),dim,ma,.006);o.parent=pivot;o.location=loc;return o
+ doorpart('wood door leaf',(-.44,0,1.48),(.88,.07,2.96),wood)

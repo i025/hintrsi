@@ -1,0 +1,81 @@
+{
+  "annotation_kind": "automated_controller_evidence_review",
+  "human_review": false,
+  "coverage": "30/30 annotation structures, new-label naming and comparison claims checked; targeted strategy/source/state checks are cited. This is automated evidence review, not exhaustive human validation.",
+  "rules": [
+    "Raw model annotations and student outputs are never rewritten.",
+    "Semantically equivalent coordinate-driven vertical gradient shaders share one metric label; original coordinate-frame details remain in the raw annotation and source.",
+    "Sequential render reads and edits establish iteration, but do not alone establish an explicit comparison between distinct candidates.",
+    "An executed method switch with observed candidate renders and an explicit selection rationale in a source comment also supports qualitative comparison; a final chat claim is not required.",
+    "Unknown comparison is not proof that comparison did not occur internally.",
+    "Origin attribution uses the actual received guidance; the complete teacher diagnosis is not evidence that every student received every teacher method."
+  ],
+  "label_aliases": {
+    "vertical_gradient_shader": "coordinate_vertical_gradient_shader",
+    "world_position_gradient_shader": "coordinate_vertical_gradient_shader",
+    "doorway_height_gradient": "coordinate_vertical_gradient_shader"
+  },
+  "alias_evidence": [
+    "S03-E0-R1 workspace/build.py:34-37 maps Generated Z through ColorRamp to surface color.",
+    "S03-E1-R1 workspace/build.py:34-42 maps Position Z through MapRange and ColorRamp to surface color.",
+    "S03-E0-R2 workspace/build.py:37-38 maps Position Z through MapRange and ColorRamp to surface color."
+  ],
+  "comparison_overrides": [
+    {
+      "run": "S02-E3-R1",
+      "value": "unknown",
+      "reason": "The raw annotator credited candidate comparison from four render-read/edit cycles and a final comparison against the reference. The visible final statement only says the door face increased but remains smaller than the reference; no between-candidate comparison or selection rationale is recorded. Retain iteration evidence; comparison status is unknown.",
+      "evidence": "runs/S02-E3-R1/analysis/sdk_events.json events 4-32, especially final visible text at event 32."
+    },
+    {
+      "run": "S03-E2-R2",
+      "value": true,
+      "reason": "Noise, Wave and revised Noise were actually rendered and read. The subsequent Edit explicitly selects irregular stretched noise rather than repeated stripes, and the final output graph uses Noise. This supports qualitative method selection from observable code and renders, without a quantitative crop ranking or hidden-reasoning claim.",
+      "evidence": "runs/S03-E2-R2/analysis/sdk_events.json events 16,18,20,24,26-28; event 26 source comment 'Use irregular, stretched noise ... rather than repeated stripes'; the three captured executed build.py versions and final_state.json shader links."
+    }
+  ],
+  "candidate_comparison_overrides": [
+    {
+      "run": "S01-E1-R1",
+      "candidate_index": 0,
+      "reason": "Camera renders and revisions are observed, but the raw annotator itself notes that explicit selection rationale is absent. Keep the individual candidate's comparison unknown consistently with the overall assessment."
+    },
+    {
+      "run": "S01-E4-R2",
+      "candidate_index": 2,
+      "reason": "The camera/color refinements were executed, but the explicit selection statement concerns the two chair methods. Do not extend that target-method comparison claim to the separate camera/material refinements."
+    }
+  ],
+  "reviewed_runs": [
+    "S01-E0-R1",
+    "S01-E0-R2",
+    "S01-E1-R1",
+    "S01-E1-R2",
+    "S01-E2-R1",
+    "S01-E2-R2",
+    "S01-E3-R1",
+    "S01-E3-R2",
+    "S01-E4-R1",
+    "S01-E4-R2",
+    "S02-E0-R1",
+    "S02-E0-R2",
+    "S02-E1-R1",
+    "S02-E1-R2",
+    "S02-E2-R1",
+    "S02-E2-R2",
+    "S02-E3-R1",
+    "S02-E3-R2",
+    "S02-E4-R1",
+    "S02-E4-R2",
+    "S03-E0-R1",
+    "S03-E0-R2",
+    "S03-E1-R1",
+    "S03-E1-R2",
+    "S03-E2-R1",
+    "S03-E2-R2",
+    "S03-E3-R1",
+    "S03-E3-R2",
+    "S03-E4-R1",
+    "S03-E4-R2"
+  ]
+}

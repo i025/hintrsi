@@ -1,0 +1,265 @@
+"""Posthoc world-mesh evidence and controlled renders; no student feedback."""
+import argparse
+import json
+import math
+from pathlib import Path
+import re
+import sys
+
+import bpy
+from bpy_extras.object_utils import world_to_camera_view
+from mathutils import Vector
+from mathutils.bvhtree import BVHTree
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--input', required=True)
+parser.add_argument('--output', required=True)
+parser.add_argument('--case', required=True)
+parser.add_argument('--baseline')
+parser.add_argument('--mask', action='store_true')
+args = parser.parse_args(sys.argv[sys.argv.index('--') + 1:])
+output = Path(args.output)
+output.mkdir(parents=True, exist_ok=True)
+bpy.ops.wm.open_mainfile(filepath=args.input, load_ui=False, use_scripts=False)
+scene = bpy.context.scene
+for obj in scene.objects:
+    for modifier in obj.modifiers:
+        modifier.show_viewport = modifier.show_render
+        if modifier.type in ('SUBSURF', 'MULTIRES'):
+            modifier.levels = modifier.render_levels
+bpy.context.view_layer.update()
+depsgraph = bpy.context.evaluated_depsgraph_get()
+EPS = 0.0001
+
+
+def mesh_data(obj):
+    evaluated = obj.evaluated_get(depsgraph)
+    mesh = evaluated.to_mesh()
+    vertices = [evaluated.matrix_world @ v.co for v in mesh.vertices]
+    polygons = [tuple(face.vertices) for face in mesh.polygons]
+    evaluated.to_mesh_clear()
+    low = [min(v[axis] for v in vertices) for axis in range(3)]
+    high = [max(v[axis] for v in vertices) for axis in range(3)]
+    return {'vertices': vertices, 'polygons': polygons, 'low': low, 'high': high,
+            'center': [(a + b) / 2 for a, b in zip(low, high)]}
+
+
+def bvh(mesh):
+    return BVHTree.FromPolygons(mesh['vertices'], mesh['polygons'])
+
+
+def summary(obj, mesh):
+    return {'name': obj.name, 'bounds_min': mesh['low'], 'bounds_max': mesh['high'],
+            'world_matrix': [list(row) for row in obj.matrix_world],
+            'parent': obj.parent.name if obj.parent else None,
+            'modifiers': [m.type for m in obj.modifiers],
+            'local_z_world_axis': list((obj.matrix_world.to_3x3() @ Vector((0, 0, 1))).normalized())}
+
+
+meshes = {obj.name: mesh_data(obj) for obj in scene.objects
+          if obj.type == 'MESH' and not obj.hide_render and len(obj.data.vertices)}
+result = {'input': args.input, 'case': args.case, 'tolerance_blender_units': EPS,
+          'geometry': 'Actual evaluated world-space mesh vertices/polygons, including enabled modifiers.',
+          'modifier_evaluation': 'Render visibility and subdivision levels copied into the evaluation graph. Viewport-dependent Geometry Nodes can still differ from a true render depsgraph.',
+          'bounds': {name: {'low': m['low'], 'high': m['high']} for name, m in meshes.items()},
+          'camera': {'name': scene.camera.name, 'matrix': [list(r) for r in scene.camera.matrix_world],
+                     'lens': scene.camera.data.lens} if scene.camera else None}
+
+if args.case == 'S01':
+    floor_names = [n for n, m in meshes.items() if re.search(r'floor|plank', n, re.I)
+                   and not re.search(r'lamp', n, re.I) and m['high'][2] < .2]
+    vertices, polygons = [], []
+    for name in floor_names:
+        mesh = meshes[name]
+        offset = len(vertices)
+        vertices += mesh['vertices']
+        polygons += [tuple(i + offset for i in face) for face in mesh['polygons']]
+    floor = BVHTree.FromPolygons(vertices, polygons)
+    origin_z = max(v.z for v in vertices) + 3
+    names = [n for n in meshes if re.search(r'chair|caster|wheel|five.star|seat|backrest|tyre|tire', n, re.I)]
+    anchors = [(-.85, .70), (1.02, -.68)]
+    groups = [[], []]
+    for name in names:
+        center = meshes[name]['center']
+        nearest = min(range(2), key=lambda i: (center[0]-anchors[i][0])**2 + (center[1]-anchors[i][1])**2)
+        groups[nearest].append(name)
+
+    def support(name):
+        mesh = meshes[name]
+        points = [v for v in mesh['vertices'] if v.z <= mesh['low'][2] + EPS]
+        measurements = []
+        for v in points:
+            hit, normal, face, distance = floor.ray_cast(Vector((v.x, v.y, origin_z)), Vector((0, 0, -1)))
+            if hit is not None:
+                nearest, _, _, surface_distance = floor.find_nearest(v)
+                measurements.append({'mesh_point': list(v), 'local_floor_z': hit.z,
+                                     'signed_vertical_gap': v.z-hit.z,
+                                     'floor_surface_distance': surface_distance})
+        gaps = [m['signed_vertical_gap'] for m in measurements]
+        return {'name': name, 'minimum_world_z': mesh['low'][2],
+                'samples': measurements, 'minimum_signed_gap': min(gaps) if gaps else None,
+                'maximum_signed_gap': max(gaps) if gaps else None,
+                'positive_separation': bool(gaps and min(gaps) > EPS),
+                'vertices_below_local_floor_top': bool(gaps and min(gaps) < -EPS)}
+
+    chairs = []
+    for i, group in enumerate(groups):
+        lows = [meshes[n]['low'][2] for n in group]
+        highs = [meshes[n]['high'][2] for n in group]
+        wheels = [n for n in group if re.search(r'wheel|tyre|tire', n, re.I)]
+        arms = [n for n in group if re.search(r'base|star|spoke|leg|support', n, re.I)
+                and n not in wheels]
+        connectors = [n for n in group if re.search(r'fork|axle|yoke', n, re.I)]
+        wheel_support = [support(n) for n in wheels]
+        lowest_name = min(group, key=lambda n: meshes[n]['low'][2]) if group else None
+        lowest = support(lowest_name) if lowest_name else None
+        connections = []
+        def connection(first_name, second_name):
+            first, second = bvh(meshes[first_name]), bvh(meshes[second_name])
+            distances = [second.find_nearest(v)[3] for v in meshes[first_name]['vertices']]
+            distances += [first.find_nearest(v)[3] for v in meshes[second_name]['vertices']]
+            return {'first': first_name, 'second': second_name,
+                    'surface_intersection_pairs': len(first.overlap(second)),
+                    'sampled_surface_distance': min(distances),
+                    'scope': 'BVH surface-intersection pairs and bidirectional vertex-to-surface samples; no dynamics simulation.'}
+        for wheel in wheels:
+            if not arms:
+                continue
+            center = meshes[wheel]['center']
+            arm = min(arms, key=lambda n: sum((a-b)**2 for a,b in zip(meshes[n]['center'], center)))
+            connections.append({'wheel': wheel, 'nearest_base_part': arm, **connection(wheel, arm)})
+        posts = [n for n in group if re.search(r'post|column|piston|central', n, re.I)]
+        shells = [n for n in group if re.search(r'shell|seat', n, re.I)]
+        post_connections = [connection(post, other) for post in posts for other in arms + shells]
+        connector_connections = [connection(connector, other) for connector in connectors for other in wheels + arms]
+        chairs.append({'chair': i+1, 'assignment': 'Nearest original chair anchor, checked against actual names and source.',
+                       'original_anchor_xy': anchors[i], 'parts': [summary(bpy.data.objects[n], meshes[n]) for n in group],
+                       'minimum_world_z': min(lows) if lows else None,
+                       'height': max(highs)-min(lows) if lows else None,
+                       'lowest_part_support': lowest, 'wheel_support': wheel_support,
+                       'normalized_lowest_gap': lowest['minimum_signed_gap']/(max(highs)-min(lows))
+                       if lowest and lowest['minimum_signed_gap'] is not None else None,
+                       'wheel_base_connections': connections,
+                       'post_base_seat_connections': post_connections,
+                       'connector_connections': connector_connections,
+                       'part_roles': {'wheels': wheels, 'base_parts': arms, 'posts': posts,
+                                      'shells': shells, 'connectors': connectors},
+                       'contact_claim': 'Positive gap proves separation. Zero gap/bounds overlap alone does not prove physical contact. Negative local clearance is reported separately.'})
+    result.update(floor_objects=floor_names, chairs=chairs)
+    # Diagnostic close views are evaluator outputs; the student's scene is not saved.
+    camera = scene.camera
+    scene.render.engine = 'CYCLES'
+    scene.cycles.device = 'CPU'
+    scene.cycles.samples = 16
+    scene.cycles.use_denoising = True
+    scene.render.resolution_x = 512
+    scene.render.resolution_y = 384
+    scene.render.resolution_percentage = 100
+    scene.render.image_settings.file_format = 'PNG'
+    camera.data.type = 'ORTHO'
+    camera.data.ortho_scale = 1.4
+    views = []
+    for i, group in enumerate(groups):
+        if not group:
+            continue
+        center = Vector((sum(meshes[n]['center'][0] for n in group)/len(group),
+                         sum(meshes[n]['center'][1] for n in group)/len(group), .25))
+        for obj in scene.objects:
+            if obj.type == 'MESH':obj.hide_render = obj.name not in group + floor_names
+        camera.location = center + Vector((2,-2,.4))
+        camera.rotation_euler = (center-camera.location).to_track_quat('-Z','Y').to_euler()
+        scene.render.filepath = str(output / ('chair_'+str(i+1)+'_support.png'))
+        bpy.ops.render.render(write_still=True)
+        views.append({'chair':i+1,'camera_location':list(camera.location),'target':list(center),
+                       'scope':'Isolated chair/floor support view; other mesh objects hidden for diagnosis only.'})
+    result['support_views'] = views
+
+if args.case == 'S02':
+    door_names = [n for n in meshes if re.search(r'door', n, re.I)
+                  and not re.search(r'opening|doorway|casing|frame|cabinet|cupboard', n, re.I)]
+    result['door_objects'] = []
+    for name in door_names:
+        obj, mesh = bpy.data.objects[name], meshes[name]
+        projected = [world_to_camera_view(scene, scene.camera, v) for v in mesh['vertices']]
+        result['door_objects'].append({**summary(obj, mesh),
+            'projected_xy_bounds_unclipped': [[min(v.x for v in projected), min(v.y for v in projected)],
+                                            [max(v.x for v in projected), max(v.y for v in projected)]]})
+    result['hinges'] = [{'name': o.name, 'matrix': [list(r) for r in o.matrix_world],
+                         'children': [c.name for c in o.children]}
+                        for o in scene.objects if re.search(r'hinge|pivot', o.name, re.I)]
+    result['openings_and_frames'] = [summary(bpy.data.objects[n], meshes[n]) for n in meshes
+        if re.search(r'door|doorway', n, re.I) and n not in door_names
+        and not re.search(r'cabinet|cupboard', n, re.I)]
+    result['semantic_door_match'] = 'Name/source correspondence must be reviewed; no IoU is emitted here.'
+    if args.mask and door_names:
+        def emission(name, color):
+            material = bpy.data.materials.new(name)
+            material.use_nodes = True
+            material.node_tree.nodes.clear()
+            shader = material.node_tree.nodes.new('ShaderNodeEmission')
+            shader.inputs['Color'].default_value = (*color, 1)
+            terminal = material.node_tree.nodes.new('ShaderNodeOutputMaterial')
+            material.node_tree.links.new(shader.outputs[0], terminal.inputs['Surface'])
+            return material
+        white, black = emission('Evaluation white', (1,1,1)), emission('Evaluation black', (0,0,0))
+        for obj in scene.objects:
+            if obj.type in ('MESH','CURVE','FONT','SURFACE'):
+                obj.data = obj.data.copy()
+                obj.data.materials.clear()
+                obj.data.materials.append(white if obj.name in door_names else black)
+            if obj.type == 'LIGHT':obj.hide_render = True
+        scene.world.use_nodes = True
+        for node in scene.world.node_tree.nodes:
+            if node.type == 'BACKGROUND':node.inputs['Strength'].default_value = 0
+        scene.render.engine = 'CYCLES'
+        scene.cycles.device = 'CPU'
+        scene.cycles.samples = 8
+        scene.cycles.use_denoising = False
+        scene.view_settings.view_transform = 'Standard'
+        scene.view_settings.look = 'None'
+        scene.view_settings.exposure = 0
+        scene.view_settings.gamma = 1
+        scene.render.resolution_x = 640
+        scene.render.resolution_y = 360
+        scene.render.resolution_percentage = 100
+        scene.render.image_settings.file_format = 'PNG'
+        scene.render.filepath = str(output / 'door_visible_mask.png')
+        bpy.ops.render.render(write_still=True)
+        for obj in scene.objects:
+            if obj.type in ('MESH','CURVE','FONT','SURFACE') and obj.name not in door_names:obj.hide_render = True
+        scene.render.filepath = str(output / 'door_amodal_mask.png')
+        bpy.ops.render.render(write_still=True)
+        result['mask_scope'] = 'Actual visible/amodal semantic geometry with opaque emission override; original scene is never saved. Transparency can differ from the original shader.'
+
+if args.case == 'S03' and args.baseline:
+    original_state = json.loads(Path('/inputs/baseline_state.json').read_text())
+    camera_name = original_state['camera']
+    light_names = [o['name'] for o in original_state['objects'] if o['type'] == 'LIGHT']
+    if args.input != args.baseline:
+        for obj in list(scene.objects):
+            if obj.type in ('CAMERA','LIGHT'):bpy.data.objects.remove(obj, do_unlink=True)
+        with bpy.data.libraries.load(args.baseline, link=False) as (data_from, data_to):
+            data_to.objects = [camera_name] + light_names
+            data_to.worlds = [original_state['world']['name']]
+        for obj in data_to.objects:
+            scene.collection.objects.link(obj)
+            if obj.type == 'CAMERA':scene.camera = obj
+        scene.world = data_to.worlds[0]
+    for name in ('view_transform','look','exposure','gamma'):
+        setattr(scene.view_settings, name, original_state['render'][name])
+    scene.render.engine = 'CYCLES'
+    scene.cycles.device = 'CPU'
+    scene.cycles.samples = original_state['render']['cycles_samples']
+    scene.cycles.use_denoising = True
+    scene.render.resolution_x = 640
+    scene.render.resolution_y = 360
+    scene.render.resolution_percentage = 100
+    scene.render.image_settings.file_format = 'PNG'
+    scene.render.filepath = str(output / 'fixed_camera_lighting.png')
+    bpy.ops.render.render(write_still=True)
+    result['controlled_render'] = {'baseline': args.baseline,
+        'fixed': ['camera transform/intrinsics', 'light objects and parameters', 'world', 'display transform', 'samples', 'resolution'],
+        'not_fixed': ['candidate geometry', 'candidate materials'],
+        'scope': 'Auxiliary diagnostic; geometry edits remain a possible confound. No student output is replaced.'}
+
+(output / 'geometry.json').write_text(json.dumps(result, indent=2))

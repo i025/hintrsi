@@ -1,0 +1,11 @@
+--- previous/build.py
++++ build.py
+@@ -71,7 +71,7 @@
+  for zz in [z-h/2,z+h/2]:doorpart('door panel molding',(.44,-.053,zz),(.70,.016,.018),wood)
+ # lighting and camera
+ area('large soft overhead',(-1,-2,4.7),500,4.0,(1,.95,.87),(0,.6,.3)); area('front fill',(1,-4,3.5),230,3,(.88,.92,1),(0,1,1))
+-bpy.ops.object.camera_add(location=(-2.8,-3.5,3.05));cam=bpy.context.object;cam.name='Camera';cam.rotation_euler=(Vector((0,.65,1.05))-cam.location).to_track_quat('-Z','Y').to_euler();cam.data.type='PERSP';cam.data.lens=32;bpy.context.scene.camera=cam
++bpy.ops.object.camera_add(location=(-2.8,-3.5,3.05));cam=bpy.context.object;cam.name='Camera';cam.rotation_euler=(Vector((0,.65,1.05))-cam.location).to_track_quat('-Z','Y').to_euler();cam.data.type='PERSP';cam.data.lens=38;cam.data.shift_x=-.23;bpy.context.scene.camera=cam
+ scene=bpy.context.scene;scene.render.engine='CYCLES';scene.cycles.samples=32;scene.cycles.use_denoising=True;scene.render.threads_mode='FIXED';scene.render.threads=8
+ scene.world.color=(.23,.23,.23);scene.view_settings.view_transform='AgX';scene.render.resolution_x=640;scene.render.resolution_y=360;scene.render.resolution_percentage=100
+ scene.render.image_settings.file_format='PNG';scene.render.filepath='/app/final.png';bpy.ops.wm.save_as_mainfile(filepath='/app/scene.blend');bpy.ops.render.render(write_still=True)

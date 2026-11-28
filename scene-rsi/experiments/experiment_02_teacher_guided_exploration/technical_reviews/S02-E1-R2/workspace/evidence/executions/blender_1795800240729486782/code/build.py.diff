@@ -1,0 +1,35 @@
+--- previous/build.py
++++ build.py
+@@ -41,7 +41,8 @@
+ for z in [.04,.67,1.43]:cube('cabinet shelf',(x,y,z),(.68,.43,.045),white)
+ # glass panes in upper doors, frames
+ for xx in [x-.17,x+.17]:
+- cube('glass cabinet pane',(xx,1.646,1.075),(.27,.016,.63),glass)
++ # Open glazed aperture reveals the cabinet interior and shelf.
++ cube('cabinet interior shelf',(xx,1.84,1.02),(.29,.39,.025),shelf)
+  for dx in [-.15,.15]: cube('glass door stile',(xx+dx,1.624,1.075),(.035,.032,.70),shelf)
+  for z in [.73,1.42]:cube('glass door rail',(xx,1.624,z),(.32,.032,.035),shelf)
+  cube('lower cabinet door',(xx,1.63,.355),(.31,.035,.59),shelf,.004)
+@@ -50,7 +51,7 @@
+  cyl('floor lamp round base',(x,y,.025),.19,.04,dark);cyl('floor lamp slender stem',(x,y,height/2),.014,height,dark);cone('white fabric tapered lampshade',(x,y,height-.10),.20,.15,.34,shade);point('lamp warm glow',(x,y,height-.10),110,(1,.78,.50))
+ lamp(-2.05,.65,1.65);lamp(.47,1.77,1.67)
+ # Warm pools cast on the tiled wall by the rear floor lamp.
+-area('rear lamp wall wash',(.47,1.65,1.65),100,.32,(1,.75,.47),(.47,2.14,2.25))
++area('rear lamp wall wash',(.47,1.89,1.92),55,.28,(1,.75,.47),(.47,2.14,2.5))
+ # rug on floor
+ rug.node_tree.nodes.get('Principled BSDF').inputs['Roughness'].default_value=.95
+ nodes=rug.node_tree.nodes; links=rug.node_tree.links
+@@ -59,10 +60,10 @@
+ links.new(noise.outputs['Fac'],ramp.inputs['Fac']);links.new(ramp.outputs['Color'],nodes.get('Principled BSDF').inputs['Base Color'])
+ cube('beige area rug',(.30,.52,.012),(1.8,1.75,.018),rug,.05)
+ # bed foreground runs toward camera
+-cube('bed wooden base',(-.35,-1.05,.32),(1.58,2.75,.36),wood,.035)
+-cube('thick pale mattress',(-.35,-1.05,.58),(1.63,2.80,.25),bedmat,.07)
++cube('bed wooden base',(-.85,-1.05,.32),(1.58,2.75,.36),wood,.035)
++cube('thick pale mattress',(-.85,-1.05,.58),(1.63,2.80,.25),bedmat,.07)
+ # right foreground tall white furniture, cropped
+-cube('right white bed end panel',(1.80,-1.35,.72),(.10,1.75,1.45),shelf,.015)
++cube('right white bed end panel',(1.45,-1.65,.72),(.10,1.75,1.45),shelf,.015)
+ cube('right white furniture top',(2.02,-.83,1.25),(.55,1.05,.12),shelf,.015)
+ # open door on back right, leaf angled into room
+ # black doorway behind leaf

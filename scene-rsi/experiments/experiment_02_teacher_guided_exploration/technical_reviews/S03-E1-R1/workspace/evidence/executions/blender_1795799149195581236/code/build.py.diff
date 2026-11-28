@@ -1,0 +1,25 @@
+--- previous/build.py
++++ build.py
+@@ -17,8 +17,12 @@
+  d=Vector(b)-Vector(a); o=cyl(n,(Vector(a)+Vector(b))/2,r,d.length,ma); o.rotation_euler=d.to_track_quat('Z','Y').to_euler(); return o
+ # room floor and wall
+ cube('floor',(0,1.2,-.055),(4.5,7,.1),wood)
+-# individual pale plank floor with seams
++# individual pale plank floor with subtle elongated wood grain
+ planks=[mat('oak tone '+str(i),(0.66+i*.018,0.60+i*.017,0.53+i*.016)) for i in range(4)]
++for m in planks:
++ n=m.node_tree.nodes; l=m.node_tree.links; tex=n.new('ShaderNodeTexNoise'); tex.inputs['Scale'].default_value=5; tex.inputs['Detail'].default_value=3; tex.inputs['Roughness'].default_value=.7
++ coord=n.new('ShaderNodeTexCoord'); mapping=n.new('ShaderNodeVectorMath'); mapping.operation='MULTIPLY'; mapping.inputs[1].default_value=(18,1.3,3)
++ l.new(coord.outputs['Generated'],mapping.inputs[0]); l.new(mapping.outputs[0],tex.inputs['Vector']); ramp=n.new('ShaderNodeValToRGB'); ramp.color_ramp.elements[0].color=(.42,.34,.28,1); ramp.color_ramp.elements[1].color=(.78,.70,.62,1); l.new(tex.outputs['Fac'],ramp.inputs[0]); l.new(ramp.outputs[0],n.get('Principled BSDF').inputs['Base Color'])
+ for i in range(14):
+  x=-2.1+i*.32
+  cube('floor plank',(x,1.4,.002),(.315,6.8,.012),planks[i%4])
+@@ -90,7 +94,7 @@
+ area('large overhead softbox',(0,-.4,3.8),220,4,(0,1,0)); area('rear daylight',(0,3,3.0),100,2,(0,1,0)); area('front fill',(0,-3,2.8),70,3,(0,1,1))
+ world=bpy.context.scene.world; world.color=(.3,.3,.3)
+ # camera
+-bpy.ops.object.camera_add(location=(-.35,-1.7,2.15)); cam=bpy.context.object; cam.rotation_euler=(Vector((.12,2.0,1.0))-cam.location).to_track_quat('-Z','Y').to_euler(); cam.data.lens=23; bpy.context.scene.camera=cam
++bpy.ops.object.camera_add(location=(-.65,-1.85,2.35)); cam=bpy.context.object; cam.rotation_euler=(Vector((.22,2.0,.88))-cam.location).to_track_quat('-Z','Y').to_euler(); cam.data.lens=23; bpy.context.scene.camera=cam
+ scene=bpy.context.scene; scene.render.engine='CYCLES'; scene.cycles.samples=32; scene.cycles.use_denoising=True; scene.render.threads_mode='FIXED'; scene.render.threads=8
+ scene.render.resolution_x=640; scene.render.resolution_y=360; scene.render.resolution_percentage=100
+ scene.view_settings.view_transform='AgX'; scene.render.image_settings.file_format='PNG'; scene.render.filepath='/app/final.png'

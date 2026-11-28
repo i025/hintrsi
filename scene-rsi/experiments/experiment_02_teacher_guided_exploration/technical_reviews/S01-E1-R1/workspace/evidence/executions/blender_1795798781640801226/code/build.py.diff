@@ -1,0 +1,28 @@
+--- previous/build.py
++++ build.py
+@@ -56,8 +56,8 @@
+ cyl('lamp foot',(-3.42,1.72,.035),.16,.05,black); bar('lamp stem',(-3.42,1.72,.06),(-3.42,1.72,1.62),.018,black)
+ bpy.ops.mesh.primitive_cone_add(vertices=48,radius1=.27,radius2=.18,depth=.49,location=(-3.42,1.72,1.83)); bpy.context.object.name='cream lampshade'; bpy.context.object.data.materials.append(trim)
+ # table foreground
+-cube('desk top',(-2.0,-1.25,.77),(2.6,1.5,.11),tabletop,.025)
+-for x in [-3.13,-.87]:
++cube('desk top',(-1.35,-1.25,.77),(2.6,1.5,.11),tabletop,.025)
++for x in [-2.48,-.22]:
+  for y in [-1.85,-.65]: cube('desk leg',(x,y,.37),(.07,.07,.74),black)
+ # chair shell made as smooth curved strips spanning seat and back
+ def chair(cx,cy,angle):
+@@ -82,11 +82,11 @@
+   a=2*math.pi*i/5; end=(cx+.48*math.cos(a),cy+.48*math.sin(a),.12); bar('five star chair base',(cx,cy,.18),end,.035,black); cyl('caster wheel',(end[0],end[1],.075),.075,.09,black,20)
+ chair(-.85,.70,-1.1); chair(1.02,-.68,-.75)
+ # planter foreground right
+-bpy.ops.mesh.primitive_cone_add(vertices=64,radius1=.48,radius2=.63,depth=.52,location=(3,-1.6,.27)); bpy.context.object.name='teal round planter'; bpy.context.object.data.materials.append(teal)
+-cyl('soil in pot',(3,-1.6,.54),.60,.035,soil,64)
++bpy.ops.mesh.primitive_cone_add(vertices=64,radius1=.48,radius2=.63,depth=.52,location=(2.45,-1.6,.27)); bpy.context.object.name='teal round planter'; bpy.context.object.data.materials.append(teal)
++cyl('soil in pot',(2.45,-1.6,.54),.60,.035,soil,64)
+ # blades are tapered triangular grass leaves
+ for i in range(380):
+- a=random.random()*math.tau; r=random.random()**.6*.40; x=3+r*math.cos(a); y=-1.6+r*math.sin(a); h=random.uniform(.5,1.35); lean=random.uniform(.12,.65); a2=a+random.uniform(-.5,.5); tip=(x+lean*math.cos(a2),y+lean*math.sin(a2),.54+h); w=random.uniform(.012,.032); side=Vector((-math.sin(a2)*w,math.cos(a2)*w,0)); base=Vector((x,y,.55)); mid=base.lerp(Vector(tip),.55)+Vector((0,0,.12)); verts=[base-side,base+side,mid+side*.6,Vector(tip),mid-side*.6]; mesh=bpy.data.meshes.new('blade'); mesh.from_pydata(verts,[],[(0,1,2,3,4)]); mesh.materials.append(random.choice(leafm)); ob=bpy.data.objects.new('ornamental grass blade',mesh); bpy.context.collection.objects.link(ob)
++ a=random.random()*math.tau; r=random.random()**.6*.40; x=2.45+r*math.cos(a); y=-1.6+r*math.sin(a); h=random.uniform(.5,1.35); lean=random.uniform(.12,.65); a2=a+random.uniform(-.5,.5); tip=(x+lean*math.cos(a2),y+lean*math.sin(a2),.54+h); w=random.uniform(.012,.032); side=Vector((-math.sin(a2)*w,math.cos(a2)*w,0)); base=Vector((x,y,.55)); mid=base.lerp(Vector(tip),.55)+Vector((0,0,.12)); verts=[base-side,base+side,mid+side*.6,Vector(tip),mid-side*.6]; mesh=bpy.data.meshes.new('blade'); mesh.from_pydata(verts,[],[(0,1,2,3,4)]); mesh.materials.append(random.choice(leafm)); ob=bpy.data.objects.new('ornamental grass blade',mesh); bpy.context.collection.objects.link(ob)
+ # camera and lights
+ world=bpy.context.scene.world or bpy.data.worlds.new('World'); bpy.context.scene.world=world; world.use_nodes=True; world.node_tree.nodes['Background'].inputs[0].default_value=(.8,.8,.8,1); world.node_tree.nodes['Background'].inputs[1].default_value=.8
+ def area(loc,power,size,target):

@@ -1,0 +1,28 @@
+--- previous/external/exploration_geometry.py
++++ external/exploration_geometry.py
+@@ -200,15 +200,16 @@
+     original_state = json.loads(Path('/inputs/baseline_state.json').read_text())
+     camera_name = original_state['camera']
+     light_names = [o['name'] for o in original_state['objects'] if o['type'] == 'LIGHT']
+-    for obj in list(scene.objects):
+-        if obj.type in ('CAMERA','LIGHT'):bpy.data.objects.remove(obj, do_unlink=True)
+-    with bpy.data.libraries.load(args.baseline, link=False) as (data_from, data_to):
+-        data_to.objects = [camera_name] + light_names
+-        data_to.worlds = data_from.worlds
+-    for obj in data_to.objects:
+-        scene.collection.objects.link(obj)
+-        if obj.type == 'CAMERA':scene.camera = obj
+-    scene.world = data_to.worlds[0]
++    if args.input != args.baseline:
++        for obj in list(scene.objects):
++            if obj.type in ('CAMERA','LIGHT'):bpy.data.objects.remove(obj, do_unlink=True)
++        with bpy.data.libraries.load(args.baseline, link=False) as (data_from, data_to):
++            data_to.objects = [camera_name] + light_names
++            data_to.worlds = data_from.worlds
++        for obj in data_to.objects:
++            scene.collection.objects.link(obj)
++            if obj.type == 'CAMERA':scene.camera = obj
++        scene.world = data_to.worlds[0]
+     for name in ('view_transform','look','exposure','gamma'):
+         setattr(scene.view_settings, name, original_state['render'][name])
+     scene.render.engine = 'CYCLES'

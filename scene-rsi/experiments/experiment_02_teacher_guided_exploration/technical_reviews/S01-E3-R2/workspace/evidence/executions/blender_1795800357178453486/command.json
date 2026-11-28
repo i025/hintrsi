@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "-b",
+    "/app/scene.blend",
+    "-t",
+    "8",
+    "--python-expr",
+    "import bpy; from mathutils import Vector; dg=bpy.context.evaluated_depsgraph_get(); wheels=[o for o in bpy.data.objects if o.name.startswith('caster wheel')]; planks=[o for o in bpy.data.objects if o.name.startswith('individual oak floor plank')]; print('CASTER SUPPORT'); [(lambda p: print(w.name, 'wheel_bottom',round(min((w.evaluated_get(dg).matrix_world @ v.co).z for v in w.evaluated_get(dg).to_mesh().vertices),5), 'support',p.name if p else 'slab', round(max((p.matrix_world @ Vector(c)).z for c in p.bound_box),5) if p else 0))(next((p for p in planks if abs(w.location.x-p.location.x)<=p.dimensions.x/2 and abs(w.location.y-p.location.y)<=p.dimensions.y/2),None)) for w in wheels]"
+  ],
+  "cwd": "/app",
+  "started_at": 1795800357.178541
+}

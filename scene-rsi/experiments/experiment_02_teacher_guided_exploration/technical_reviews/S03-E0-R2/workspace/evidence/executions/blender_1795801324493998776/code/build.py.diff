@@ -1,0 +1,20 @@
+--- previous/build.py
++++ build.py
+@@ -69,7 +69,7 @@
+  cyl('purple control dial',(x,1.055,1.42),.115,.07,purple,(math.pi/2,0,0))
+  cube('dial index',(x,1.012,1.46),(.012,.008,.07),black)
+ # Digital clock between the two controls
+-bpy.ops.object.text_add(location=(-1.40,1.067,1.42), rotation=(math.pi/2,0,0)); clock=bpy.context.object; clock.name='range clock 12:01'; clock.data.body='12:01'; clock.data.align_x='CENTER'; clock.data.align_y='CENTER'; clock.data.size=.13; clock.data.extrude=.001; clock.data.materials.append(black)
++bpy.ops.object.text_add(location=(-1.40,1.00,1.42), rotation=(math.pi/2,0,0)); clock=bpy.context.object; clock.name='range clock 12:01'; clock.data.body='12:01'; clock.data.align_x='CENTER'; clock.data.align_y='CENTER'; clock.data.size=.13; clock.data.extrude=.001; clock.data.materials.append(black)
+ # range oven face on visible right side
+ cube('oven door',(-.765,.43,.51),(.035,1.10,.68),dark,.01)
+ rod('oven handle',(-.71,-.02,.82),(-.71,.86,.82),.025,purple)
+@@ -90,7 +90,7 @@
+ area('large overhead softbox',(0,-.4,3.8),350,4,(0,1,0)); area('rear daylight',(0,3,3.0),180,2,(0,1,0)); area('front fill',(0,-3,2.8),120,3,(0,1,1))
+ world=bpy.context.scene.world; world.color=(.22,.22,.22)
+ # camera
+-bpy.ops.object.camera_add(location=(0.42,-0.72,2.25)); cam=bpy.context.object; cam.rotation_euler=(Vector((0.05,2.0,1.0))-cam.location).to_track_quat('-Z','Y').to_euler(); cam.data.lens=22; bpy.context.scene.camera=cam
++bpy.ops.object.camera_add(location=(0.55,-1.7,2.25)); cam=bpy.context.object; cam.rotation_euler=(Vector((-0.45,2.0,1.0))-cam.location).to_track_quat('-Z','Y').to_euler(); cam.data.lens=22; bpy.context.scene.camera=cam
+ scene=bpy.context.scene; scene.render.engine='CYCLES'; scene.cycles.samples=32; scene.cycles.use_denoising=True; scene.render.threads_mode='FIXED'; scene.render.threads=8
+ scene.render.resolution_x=640; scene.render.resolution_y=360; scene.render.resolution_percentage=100
+ scene.view_settings.view_transform='AgX'; scene.render.image_settings.file_format='PNG'; scene.render.filepath='/app/final.png'

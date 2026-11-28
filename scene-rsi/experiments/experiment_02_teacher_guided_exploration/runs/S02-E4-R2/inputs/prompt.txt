@@ -1,0 +1,12 @@
+Given the reference image and the provided reconstruction checkpoint, continue improving the editable Blender scene to reconstruct the reference as faithfully as possible, including visible objects, geometry, spatial relationships, materials, lighting, and camera viewpoint.
+
+You start from the existing build.py, scene.blend, final.png, and local resources in /app. This is a new session with a shared scene checkpoint; the previous agent conversation has not been restored. Choose your own inspection, reconstruction, and revision workflow.
+
+Use only the provided reference image, checkpoint, and available Blender environment. Do not retrieve an existing reconstruction or access external reference scene data.
+
+Deliver executable Blender Python source with /app/build.py as its entry point, the editable /app/scene.blend, and /app/final.png at 640 x 360 pixels. Keep other required local source and material resources in /app. Rendering uses Blender 5.2.2 on CPU with eight threads. Your additional execution budget is 25 minutes and at most 120 model requests. You may finish early.
+
+Additional guidance:
+The reference has a broad angled wooden door leaf occupying the center-right foreground, but the reconstruction shows mainly the dark opening and lacks that leaf's visible floor and wall occlusion.
+
+Implement and compare at least two candidates: one that changes the hinge swing while preserving its location, and another that tests a different hinge or doorway placement with a coherent leaf assembly. First use a diagnostic view or visibility render to distinguish wall hiding from an edge-on camera projection. Compare each candidate's rendered leaf outline, exposed face and overlap with the floor and doorway against the reference, keeping the camera fixed for the initial comparison. Inspect top and side views for wall or furniture intersections and lost hinge alignment. If neither candidate works, test camera-relative framing separately and check whether the bed and shelving landmarks deteriorate.

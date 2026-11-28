@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "-b",
+    "/app/scene.blend",
+    "-t",
+    "8",
+    "--python-expr",
+    "import bpy; from mathutils import Vector; dg=bpy.context.evaluated_depsgraph_get(); wheels=[o for o in bpy.context.scene.objects if o.name.startswith('caster wheel')]; print('CONTACTS'); [(lambda p: print(o.name, 'wheel bottom',round(p.z-.075,5),'support', (lambda hit: round(hit[1].z,5) if hit[0] else None)(bpy.context.scene.ray_cast(dg,Vector((p.x,p.y,.025)),Vector((0,0,-1)))))(o.matrix_world.translation) for o in wheels]"
+  ],
+  "cwd": "/app",
+  "started_at": 1795799699.9913561
+}

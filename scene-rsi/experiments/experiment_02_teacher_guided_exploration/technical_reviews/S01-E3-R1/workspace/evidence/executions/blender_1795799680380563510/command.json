@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "-b",
+    "/app/scene.blend",
+    "-t",
+    "8",
+    "--python-expr",
+    "import bpy; from mathutils import Vector; dg=bpy.context.evaluated_depsgraph_get(); wheels=[o for o in bpy.context.scene.objects if o.name.startswith('caster wheel')]; floor=[o for o in bpy.context.scene.objects if o.name.startswith('individual oak floor plank')]; print('WHEEL CONTACT CHECK'); [(lambda ev: print(o.name, 'lowest', round(min((ev.matrix_world @ v.co).z for v in ev.to_mesh().vertices),5), 'floor', .015))(o.evaluated_get(dg)) for o in wheels]"
+  ],
+  "cwd": "/app",
+  "started_at": 1795799680.3807275
+}

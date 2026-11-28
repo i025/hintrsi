@@ -1,0 +1,48 @@
+--- previous/external/exploration_geometry.py
++++ external/exploration_geometry.py
+@@ -77,7 +77,9 @@
+     floor = BVHTree.FromPolygons(vertices, polygons)
+     origin_z = max(v.z for v in vertices) + 3
+     names = [n for n in meshes if re.search(r'chair|caster|wheel|five.star|seat|backrest|tyre|tire', n, re.I)]
+-    anchors = [(-.85, .70), (1.02, -.68)]
++    original_anchors = [(-.85, .70), (1.02, -.68)]
++    post_names = ['chair central post', 'chair central post.001']
++    anchors = [meshes[name]['center'][:2] for name in post_names]
+     groups = [[], []]
+     for name in names:
+         center = meshes[name]['center']
+@@ -132,8 +134,10 @@
+         shells = [n for n in group if re.search(r'shell|seat', n, re.I)]
+         post_connections = [connection(post, other) for post in posts for other in arms + shells]
+         connector_connections = [connection(connector, other) for connector in connectors for other in wheels + arms]
+-        chairs.append({'chair': i+1, 'assignment': 'Nearest original chair anchor, checked against actual names and source.',
+-                       'original_anchor_xy': anchors[i], 'parts': [summary(bpy.data.objects[n], meshes[n]) for n in group],
++        chairs.append({'chair': i+1, 'assignment': 'Nearest actual current central post; retained post names and construction order verified for all ten fixed-case branches.',
++                       'original_anchor_xy': original_anchors[i], 'current_anchor_xy': anchors[i],
++                       'current_post_name': post_names[i],
++                       'parts': [summary(bpy.data.objects[n], meshes[n]) for n in group],
+                        'minimum_world_z': min(lows) if lows else None,
+                        'height': max(highs)-min(lows) if lows else None,
+                        'lowest_part_support': lowest, 'wheel_support': wheel_support,
+@@ -175,8 +179,8 @@
+     result['support_views'] = views
+ 
+ if args.case == 'S02':
+-    door_names = [n for n in meshes if re.search(r'door', n, re.I)
+-                  and not re.search(r'opening|doorway|casing|frame|cabinet|cupboard', n, re.I)]
++    door_root = scene.objects['open door hinge']
++    door_names = [o.name for o in door_root.children_recursive if o.name in meshes]
+     result['door_objects'] = []
+     for name in door_names:
+         obj, mesh = bpy.data.objects[name], meshes[name]
+@@ -189,8 +193,8 @@
+                         for o in scene.objects if re.search(r'hinge|pivot', o.name, re.I)]
+     result['openings_and_frames'] = [summary(bpy.data.objects[n], meshes[n]) for n in meshes
+         if re.search(r'door|doorway', n, re.I) and n not in door_names
+-        and not re.search(r'cabinet|cupboard', n, re.I)]
+-    result['semantic_door_match'] = 'Name/source correspondence must be reviewed; no IoU is emitted here.'
++        and not re.search(r'cabinet|cupboard|glass', n, re.I)]
++    result['semantic_door_match'] = 'Source-verified open door hinge descendants; glass cupboard doors are excluded. No IoU is emitted here.'
+     if args.mask and door_names:
+         def emission(name, color):
+             material = bpy.data.materials.new(name)

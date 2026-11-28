@@ -1,0 +1,18 @@
+--- previous/build.py
++++ build.py
+@@ -87,6 +87,15 @@
+   ob.location.x=-3.9+(3.12-y)
+   ob.location.y=x+3.5
+   ob.rotation_euler.rotate_axis('Z',-math.pi/2)
++# Broaden the window-wall furniture and draw the door toward the corner.
++for ob in list(bpy.context.scene.objects):
++ if any(ob.name.startswith(n) for n in ['blind backing','window vertical casing','window horizontal casing','horizontal venetian slat','bookcase','middle shelf']):
++  ob.location.y=1.55+(ob.location.y-1.55)*1.5
++  ob.scale.x*=1.5
++ if any(ob.name.startswith(n) for n in ['door casing','dark door leaf','raised door panel']):
++  ob.location.x-=1.15
++ if ob.name.startswith(('teal round planter','soil in pot','ornamental grass blade')):
++  ob.location.y+=1.6
+ # camera and lights
+ world=bpy.context.scene.world or bpy.data.worlds.new('World'); bpy.context.scene.world=world; world.use_nodes=True; world.node_tree.nodes['Background'].inputs[0].default_value=(.8,.8,.8,1); world.node_tree.nodes['Background'].inputs[1].default_value=.8
+ def area(loc,power,size,target):

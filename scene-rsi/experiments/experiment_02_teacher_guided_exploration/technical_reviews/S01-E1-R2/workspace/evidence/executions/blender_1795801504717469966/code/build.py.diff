@@ -1,0 +1,42 @@
+--- previous/build.py
++++ build.py
+@@ -5,7 +5,7 @@
+ 
+ def mat(n,c,rough=.7,metal=0):
+  m=bpy.data.materials.new(n); m.diffuse_color=(*c,1); m.use_nodes=True; p=m.node_tree.nodes.get('Principled BSDF'); p.inputs['Base Color'].default_value=(*c,1); p.inputs['Roughness'].default_value=rough; p.inputs['Metallic'].default_value=metal; return m
+-white=mat('warm white walls',(.78,.78,.76)); trim=mat('white trim',(.91,.91,.88)); oak=mat('pale natural wood',(.68,.46,.33)); oaklight=mat('blind slats',(.78,.58,.46)); dark=mat('charcoal door',(.085,.082,.078)); inset=mat('door inset',(.105,.10,.095)); black=mat('black metal',(.025,.025,.025),.45); gray=mat('chair grey',(.42,.43,.43)); tabletop=mat('desktop charcoal',(.105,.11,.115)); floor=mat('wood floor',(.40,.35,.30)); teal=mat('turquoise planter',(.045,.25,.25),.35); soil=mat('dark potting soil',(.055,.05,.04)); leafm=[mat('grass %d'%i,c) for i,c in enumerate([(.17,.20,.045),(.23,.25,.07),(.30,.29,.08),(.11,.16,.035)])]
++white=mat('warm white walls',(.78,.78,.76)); trim=mat('white trim',(.91,.91,.88)); oak=mat('pale natural wood',(.68,.46,.33)); oaklight=mat('blind slats',(.78,.58,.46)); dark=mat('charcoal door',(.085,.082,.078)); inset=mat('door inset',(.105,.10,.095)); black=mat('black metal',(.025,.025,.025),.45); gray=mat('chair grey',(.23,.24,.24)); tabletop=mat('desktop charcoal',(.105,.11,.115)); floor=mat('wood floor',(.40,.35,.30)); teal=mat('turquoise planter',(.045,.25,.25),.35); soil=mat('dark potting soil',(.055,.05,.04)); leafm=[mat('grass %d'%i,c) for i,c in enumerate([(.17,.20,.045),(.23,.25,.07),(.30,.29,.08),(.11,.16,.035)])]
+ def cube(n,loc,scale,ma,bevel=0):
+  bpy.ops.mesh.primitive_cube_add(size=1, location=loc); o=bpy.context.object; o.name=n; o.dimensions=scale; bpy.ops.object.transform_apply(location=False,rotation=False,scale=True); o.data.materials.append(ma)
+  if bevel:
+@@ -27,10 +27,10 @@
+ cube('back wall',(0,3.12,1.7),(8,.18,3.4),white); cube('left wall',(-3.9,0,1.7),(.18,6.3,3.4),white)
+ cube('back baseboard',(0,2.99,.11),(8,.08,.20),trim,.01); cube('left baseboard',(-3.78,0,.11),(.08,6,.2),trim,.01)
+ # window and wood frame on rear wall
+-cube('blind backing',(-1.95,2.995,2.23),(2.65,.04,1.38),oaklight)
+-for x in [-3.33,-.57]: cube('window vertical casing',(x,2.93,2.23),(.12,.13,1.65),oak,.01)
+-for z in [1.45,3.01]: cube('window horizontal casing',(-1.95,2.93,z),(2.88,.13,.12),oak,.01)
+-for i in range(31): cube('horizontal venetian slat',(-1.95,2.91,1.56+i*.045),(2.65,.06,.025),oaklight,.006)
++cube('blind backing',(-1.95,2.995,1.98),(2.65,.04,1.38),oaklight)
++for x in [-3.33,-.57]: cube('window vertical casing',(x,2.93,1.98),(.12,.13,1.65),oak,.01)
++for z in [1.20,2.76]: cube('window horizontal casing',(-1.95,2.93,z),(2.88,.13,.12),oak,.01)
++for i in range(31): cube('horizontal venetian slat',(-1.95,2.91,1.31+i*.045),(2.65,.06,.025),oaklight,.006)
+ # door rear right
+ cube('door casing',(1.72,2.97,1.29),(1.23,.12,2.58),trim,.015)
+ cube('dark door leaf',(1.72,2.87,1.28),(1.12,.12,2.49),dark,.012)
+@@ -79,6 +79,15 @@
+ # blades are tapered triangular grass leaves
+ for i in range(380):
+  a=random.random()*math.tau; r=random.random()**.6*.40; x=3+r*math.cos(a); y=-1.6+r*math.sin(a); h=random.uniform(.5,1.35); lean=random.uniform(.12,.65); a2=a+random.uniform(-.5,.5); tip=(x+lean*math.cos(a2),y+lean*math.sin(a2),.54+h); w=random.uniform(.012,.032); side=Vector((-math.sin(a2)*w,math.cos(a2)*w,0)); base=Vector((x,y,.55)); mid=base.lerp(Vector(tip),.55)+Vector((0,0,.12)); verts=[base-side,base+side,mid+side*.6,Vector(tip),mid-side*.6]; mesh=bpy.data.meshes.new('blade'); mesh.from_pydata(verts,[],[(0,1,2,3,4)]); mesh.materials.append(random.choice(leafm)); ob=bpy.data.objects.new('ornamental grass blade',mesh); bpy.context.collection.objects.link(ob)
++# Fine-grained timber variations for the floor and desktop
++for material in woods + [tabletop, oak, oaklight]:
++ nodes=material.node_tree.nodes; links=material.node_tree.links
++ bs=nodes.get('Principled BSDF'); original=bs.inputs['Base Color'].default_value[:]
++ tex=nodes.new('ShaderNodeTexNoise'); tex.inputs['Scale'].default_value=7 if material in woods else 5; tex.inputs['Detail'].default_value=3; tex.inputs['Roughness'].default_value=.7
++ coord=nodes.new('ShaderNodeTexCoord'); mapping=nodes.new('ShaderNodeVectorMath'); mapping.operation='MULTIPLY'; mapping.inputs[1].default_value=(12,1.2,4)
++ links.new(coord.outputs['Generated'],mapping.inputs[0]); links.new(mapping.outputs[0],tex.inputs['Vector'])
++ ramp=nodes.new('ShaderNodeValToRGB'); ramp.color_ramp.elements[0].position=.2; ramp.color_ramp.elements[0].color=tuple(v*.66 for v in original[:3])+(1,); ramp.color_ramp.elements[1].position=.8; ramp.color_ramp.elements[1].color=tuple(min(v*1.15,1) for v in original[:3])+(1,)
++ links.new(tex.outputs['Fac'],ramp.inputs[0]); links.new(ramp.outputs[0],bs.inputs['Base Color'])
+ # camera and lights
+ world=bpy.context.scene.world or bpy.data.worlds.new('World'); bpy.context.scene.world=world; world.use_nodes=True; world.node_tree.nodes['Background'].inputs[0].default_value=(.8,.8,.8,1); world.node_tree.nodes['Background'].inputs[1].default_value=.8
+ def area(loc,power,size,target):

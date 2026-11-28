@@ -1,0 +1,36 @@
+--- previous/build.py
++++ build.py
+@@ -46,16 +46,22 @@
+ for z in [.04,.67,1.43]:cube('cabinet shelf',(x,y,z),(.68,.43,.045),white)
+ # glass panes in upper doors, frames
+ for xx in [x-.17,x+.17]:
+- cube('glass cabinet pane',(xx,1.646,1.075),(.27,.016,.63),glass)
++ # Leave the upper doors open visually, revealing their recessed interiors.
++ cube('cabinet interior shelf',(xx,1.83,1.02),(.27,.36,.025),shelf)
+  for dx in [-.15,.15]: cube('glass door stile',(xx+dx,1.624,1.075),(.035,.032,.70),shelf)
+  for z in [.73,1.42]:cube('glass door rail',(xx,1.624,z),(.32,.032,.035),shelf)
+  cube('lower cabinet door',(xx,1.63,.355),(.31,.035,.59),shelf,.004)
+ # lamps
+ def lamp(x,y,height):
+- cyl('floor lamp round base',(x,y,.025),.19,.04,dark);cyl('floor lamp slender stem',(x,y,height/2),.014,height,dark);cone('white fabric tapered lampshade',(x,y,height-.10),.20,.15,.34,shade);point('lamp warm glow',(x,y,height-.10),45,(1,.78,.50))
++ cyl('floor lamp round base',(x,y,.025),.19,.04,dark);cyl('floor lamp slender stem',(x,y,height/2),.014,height,dark);cone('white fabric tapered lampshade',(x,y,height-.10),.20,.15,.34,shade);point('lamp warm glow',(x,y,height-.10),110,(1,.75,.48))
+ lamp(-2.05,.65,1.65);lamp(.47,1.77,1.67)
+ # rug on floor
+ cube('beige area rug',(.30,.52,.012),(1.8,1.75,.018),rug,.05)
++# Soft, mottled pile of the beige rug
++nodes=rug.node_tree.nodes; links=rug.node_tree.links
++noise=nodes.new('ShaderNodeTexNoise'); noise.inputs['Scale'].default_value=4.5; noise.inputs['Detail'].default_value=3.0; noise.inputs['Roughness'].default_value=.75
++ramp=nodes.new('ShaderNodeValToRGB'); ramp.color_ramp.elements[0].color=(.38,.29,.22,1); ramp.color_ramp.elements[1].color=(.75,.66,.55,1)
++links.new(noise.outputs['Fac'],ramp.inputs[0]); links.new(ramp.outputs['Color'],nodes.get('Principled BSDF').inputs['Base Color'])
+ # bed foreground runs toward camera
+ cube('bed wooden base',(-.75,-1.05,.32),(1.58,2.75,.36),wood,.035)
+ cube('thick pale mattress',(-.75,-1.05,.58),(1.63,2.80,.25),bedmat,.07)
+@@ -76,7 +82,7 @@
+  for zz in [z-h/2,z+h/2]:doorpart('door panel molding',(-.44,-.053,zz),(.70,.016,.018),wood)
+ # lighting and camera
+ area('large soft overhead',(-1,-2,4.7),500,4.0,(1,.95,.87),(0,.6,.3)); area('front fill',(1,-4,3.5),230,3,(.88,.92,1),(0,1,1))
+-bpy.ops.object.camera_add(location=(-2.8,-3.5,3.05));cam=bpy.context.object;cam.name='Camera';cam.rotation_euler=(Vector((-.42,.65,1.05))-cam.location).to_track_quat('-Z','Y').to_euler();cam.data.type='PERSP';cam.data.lens=34;bpy.context.scene.camera=cam
++bpy.ops.object.camera_add(location=(-2.8,-3.5,3.05));cam=bpy.context.object;cam.name='Camera';cam.rotation_euler=(Vector((-.62,.65,1.05))-cam.location).to_track_quat('-Z','Y').to_euler();cam.data.type='PERSP';cam.data.lens=34;bpy.context.scene.camera=cam
+ scene=bpy.context.scene;scene.render.engine='CYCLES';scene.cycles.samples=32;scene.cycles.use_denoising=True;scene.render.threads_mode='FIXED';scene.render.threads=8
+ scene.world.color=(.23,.23,.23);scene.view_settings.view_transform='AgX';scene.render.resolution_x=640;scene.render.resolution_y=360;scene.render.resolution_percentage=100
+ scene.render.image_settings.file_format='PNG';scene.render.filepath='/app/final.png';bpy.ops.wm.save_as_mainfile(filepath='/app/scene.blend');bpy.ops.render.render(write_still=True)

@@ -1,0 +1,1316 @@
+--- source_at_formal_run/sdk/codex_cli_bridge.py
++++ final_source/sdk/codex_cli_bridge.py
+@@ -191,6 +191,7 @@
+     command = ["codex", "exec", "--ephemeral", "--json", "--skip-git-repo-check",
+                "--ignore-user-config", "--ignore-rules", "--sandbox", "read-only",
+                "--model", MODEL, "-c", "model_reasoning_effort=" + json.dumps(EFFORT)]
++    command += ["-c", "agents.enabled=false", "-c", "features.multi_agent_v2=false"]
+     for name in DISABLED_FEATURES:
+         command += ["-c", "features." + name + "=false"]
+     command += ["-c", 'web_search="disabled"', "-c", "project_doc_max_bytes=0",
+--- source_at_formal_run/harness/run_sdk_session.py
++++ final_source/harness/run_sdk_session.py
+@@ -50,7 +50,11 @@
+     services = []
+     socket_directory = Path(tempfile.mkdtemp(prefix='scene-rsi-'))
+     proxy_socket = socket_directory / 'proxy.sock'
+-    api_base = 'http://127.0.0.1:' + str(port) + '/sessions/' + directory.name + '/student/solve/v1'
++    # The legacy code-task teacher route advertises a wholly read-only container.
++    # Scene diagnosis writes its output in a separate, writable evidence copy.
++    api_role = 'diagnostic_teacher' if session.get('role') == 'teacher' else session.get('role', 'student')
++    api_base = ('http://127.0.0.1:' + str(port) + '/sessions/' + directory.name +
++                '/' + api_role + '/solve/v1')
+     config = {'model_list': [{'model_name': 'default_model', 'litellm_params': {
+         'model': 'openai/gpt-6.1-terra', 'api_base': api_base, 'api_key': 'local-scene'}}],
+         'litellm_settings': {'callbacks': ['claude_code_proxy.proxy_handler_instance'],
+--- source_at_formal_run/analysis/audit_exploration.py
++++ final_source/analysis/audit_exploration.py
+@@ -0,0 +1,105 @@
++"""Inspect actual request conditions and the scientific record, without hashes."""
++import argparse
++import json
++from pathlib import Path
++
++ROOT=Path(__file__).resolve().parents[1]
++EXP=ROOT/'experiments/experiment_02_teacher_guided_exploration'
++
++
++def strings(value):
++    if isinstance(value,str):yield value
++    elif isinstance(value,list):
++        for item in value:yield from strings(item)
++    elif isinstance(value,dict):
++        for item in value.values():yield from strings(item)
++
++
++def audit_roles():
++    rows=[]
++    directories=[p for folder in ('runs','teachers','visual_reviews','technical_reviews') for p in sorted((EXP/folder).iterdir())]
++    directories += [EXP/'preflight/student',EXP/'preflight/native_agent_fix/session']
++    for run in directories:
++        commands=[json.loads(p.read_text()) for p in sorted((run/'bridge').glob('*/command.json'))]
++        native=[]
++        for line in (run/'bridge/codex_events.jsonl').read_text().splitlines():
++            row=json.loads(line);item=row['event'].get('item',{})
++            if item.get('type') not in (None,'agent_message','reasoning'):
++                native.append({'request_id':row['request_id'],'event':row['event']})
++        state=json.loads((run/'status.json').read_text())
++        record={'directory':str(run.relative_to(EXP)),'role':state['role'],'status':state['status'],
++                     'commands':len(commands),'all_model_flags_correct':all(c[c.index('--model')+1]=='gpt-6.1-terra' for c in commands),
++                     'all_effort_flags_correct':all('model_reasoning_effort="low"' in c for c in commands),
++                     'nonmessage_native_events':native,'auth_copy_removed':not (run/'backend_home/auth.json').exists()}
++        output_names={'teacher':'teacher_diagnosis.json','visual_evaluator':'visual_evaluation.json',
++                      'trajectory_annotator':'trajectory_annotation.json'}
++        if state['role'] in output_names:
++            name=output_names[state['role']]
++            if run==EXP/'preflight/native_agent_fix/session':name='observations.json'
++            trajectory=json.loads((run/'capture/trajs.json').read_text())['trajectories']['main_agent']
++            writes=[]
++            for line in trajectory.splitlines():
++                event=json.loads(line)
++                if event['type']!='assistant':continue
++                for block in event['message'].get('content',[]):
++                    if block.get('name')=='Write' and Path(block['input']['file_path']).name==name:
++                        writes.append(block['input']['content'])
++            record['output_write_requests']=len(writes)
++            record['first_write_matches_final']=bool(writes) and writes[0].strip()==(run/'workspace'/name).read_text().strip()
++        rows.append(record)
++    (EXP/'analysis/all_role_audit.json').write_text(json.dumps({'sessions':rows,
++        'scope':'Observed model command arguments and CLI event logs, not independent verification of provider weights or unexposed internal requests.'},indent=2))
++    print('Audited model configuration and native events for',len(rows),'role sessions.')
++
++
++def main():
++    parser=argparse.ArgumentParser()
++    parser.add_argument('--repetition',type=int,choices=[1,2])
++    parser.add_argument('--roles',action='store_true')
++    args=parser.parse_args()
++    if args.roles:
++        audit_roles();return
++    records=[];scene_images={};systems=[]
++    for run in sorted((EXP/'runs').iterdir()):
++        if args.repetition and not run.name.endswith('-R'+str(args.repetition)):continue
++        requests=[json.loads(line) for line in (run/'bridge/model_requests.jsonl').read_text().splitlines()]
++        first=requests[0];body=first['request'];request_dir=run/'bridge'/first['request_id']
++        images=json.loads((request_dir/'image_attachments.json').read_text())
++        actual=[Path(row['path']).read_bytes() for row in images]
++        scene_images.setdefault(run.name[:3],actual)
++        systems.append(body['messages'][0])
++        prompt=(run/'inputs/prompt.txt').read_text()
++        tools=[tool['function']['name'] for tool in body['tools']]
++        commands=[json.loads((run/'bridge'/r['request_id']/'command.json').read_text()) for r in requests]
++        expected_model=all(c[c.index('--model')+1]=='gpt-6.1-terra' for c in commands)
++        expected_effort=all('model_reasoning_effort="low"' in c for c in commands)
++        native=[]
++        events=run/'bridge/codex_events.jsonl'
++        for line in events.read_text().splitlines():
++            row=json.loads(line);event=row['event'];item=event.get('item',{})
++            if item.get('type') not in (None,'agent_message','reasoning'):
++                native.append({'request_id':row['request_id'],'event':event})
++        records.append({'run':run.name,'expected_prompt_in_initial_request':any(prompt in s for s in strings(body['messages'])),
++                        'initial_image_count':len(images),'same_initial_image_bytes_within_scene':actual==scene_images[run.name[:3]],
++                        'image_media_types':[row['media_type'] for row in images],
++                        'tools':tools,'model_command_correct':expected_model,'effort_command_correct':expected_effort,
++                        'non_message_native_events':native,'auth_copy_removed':not (run/'backend_home/auth.json').exists(),
++                        'session_config':json.loads((run/'inputs/session.json').read_text())})
++    teachers=[]
++    for run in sorted((EXP/'teachers').iterdir()):
++        unchanged=all((run/'workspace'/p.name).read_bytes()==p.read_bytes()
++                      for p in (EXP/'checkpoints'/run.name).iterdir() if p.is_file())
++        teachers.append({'case':run.name,'checkpoint_files_unchanged':unchanged,
++                         'diagnosis_present':(run/'workspace/teacher_diagnosis.json').exists(),
++                         'raw_role_metadata':'legacy student route; actual role teacher from session configuration',
++                         'auth_copy_removed':not (run/'backend_home/auth.json').exists()})
++    result={'runs':records,'teacher_records':teachers,'all_initial_system_messages_identical':all(s==systems[0] for s in systems),
++            'no_hash_or_checksum_system':True,'measurement':'Direct inspection of actual prompts, CLI arguments, image contents, tool lists and event logs.',
++            'limitation':'CLI request acceptance and recorded model flag establish the requested backend configuration, not independent inspection of provider weights.'}
++    (EXP/'analysis').mkdir(exist_ok=True)
++    filename='request_condition_audit'+('_R'+str(args.repetition) if args.repetition else '')+'.json'
++    (EXP/'analysis'/filename).write_text(json.dumps(result,indent=2))
++    print('Audited',len(records),'actual branch inputs; equal system messages:',result['all_initial_system_messages_identical'])
++
++
++if __name__=='__main__':main()
+--- source_at_formal_run/analysis/door_metrics_exploration.py
++++ final_source/analysis/door_metrics_exploration.py
+@@ -0,0 +1,75 @@
++"""Reference-view door measurements using the dataset's explicit instance mapping."""
++import json
++from pathlib import Path
++
++import numpy as np
++from PIL import Image
++
++ROOT=Path(__file__).resolve().parents[1]
++EXP=ROOT/'experiments/experiment_02_teacher_guided_exploration'
++OUT=EXP/'analysis/door'
++
++
++def features(mask):
++    y,x=np.nonzero(mask)
++    if not len(x):return {'pixels':0,'fraction':0,'centroid_xy':None,'bbox_xy':None}
++    h,w=mask.shape
++    return {'pixels':int(len(x)),'fraction':float(mask.mean()),
++            'centroid_xy':[float((x.mean()+.5)/w),float((y.mean()+.5)/h)],
++            'bbox_xy':[float(x.min()/w),float(y.min()/h),float((x.max()+1)/w),float((y.max()+1)/h)]}
++
++
++def reference_mask():
++    OUT.mkdir(parents=True,exist_ok=True)
++    config=next(s for s in json.loads((ROOT/'configs/scenes.json').read_text())['scenes'] if s['id']=='S02')
++    gt=Path(config['evaluation_directory'])
++    metadata=json.loads((gt/'metadata.json').read_text())
++    mapping=metadata['instance_map']['object_index_map']
++    ids=[int(key) for key,value in mapping.items() if 'paneldoorfactory' in value.lower()]
++    labels=np.asarray(Image.open(gt/'instance_segmentation.png').resize((640,360),Image.Resampling.NEAREST))
++    mask=np.isin(labels,ids)
++    info={'source':str(gt/'metadata.json'),'instance_source':str(gt/'instance_segmentation.png'),
++          'matched_ids':ids,'matched_names':{str(i):mapping[str(i)] for i in ids},
++          'mapping_reliable':len(ids)==1 and bool(mask.any()),'features':features(mask),
++          'scope':'Explicit PanelDoorFactory instance in the provided uint16 segmentation. Nearest-neighbor resize to640x360. Not a global 3D coordinate alignment or hidden-structure metric.'}
++    Image.fromarray(mask.astype(np.uint8)*255).save(OUT/'gt_door_mask.png')
++    rgb=np.array(Image.open(gt/'color.png').convert('RGB').resize((640,360),Image.Resampling.LANCZOS))
++    overlay=rgb.copy();overlay[mask]=(rgb[mask]*.5+np.array([255,30,40])*.5).astype(np.uint8)
++    Image.fromarray(overlay).save(OUT/'gt_door_overlay.png')
++    (OUT/'reference_mapping.json').write_text(json.dumps(info,indent=2))
++    return mask,info
++
++
++def measure(directory,mask,info):
++    path=directory/'door_visible_mask.png'
++    if not path.exists():return {'available':False,'reason':'No successfully produced student semantic mask.'}
++    visible=np.asarray(Image.open(path).convert('RGB')).mean(axis=2)>128
++    amodal=np.asarray(Image.open(directory/'door_amodal_mask.png').convert('RGB')).mean(axis=2)>128
++    geometry=json.loads((directory/'geometry.json').read_text())
++    names=[obj['name'] for obj in geometry['door_objects']]
++    union=np.logical_or(visible,mask).sum()
++    reliable=info['mapping_reliable'] and bool(names)
++    return {'available':True,'student_door_names':names,'visible':features(visible),'amodal':features(amodal),
++            'visible_fraction_of_projected_door':float(visible.sum()/amodal.sum()) if amodal.any() else None,
++            'gt_instance_iou':float(np.logical_and(visible,mask).sum()/union) if reliable and union else None,
++            'gt_recall':float(np.logical_and(visible,mask).sum()/mask.sum()) if reliable else None,
++            'hinges':geometry['hinges'],'openings_and_frames':geometry.get('openings_and_frames',[]),
++            'scope':'Student leaf/panel union from actual source-named geometry with emission override. Camera/door edits can both change image overlap. Mask score does not prove hinge/frame plausibility; reference-invisible GT parts are not graded.'}
++
++
++def main():
++    mask,info=reference_mask()
++    baseline=measure(EXP/'analysis/baselines/S02/capture/target_geometry',mask,info)
++    results=[]
++    for run in sorted((EXP/'runs').glob('S02-*')):
++        row=measure(run/'analysis/technical/capture/target_geometry',mask,info)
++        row['run']=run.name
++        if row['available']:
++            row['iou_change_from_initial']=row['gt_instance_iou']-baseline['gt_instance_iou'] if row['gt_instance_iou'] is not None and baseline['gt_instance_iou'] is not None else None
++        results.append(row)
++    (OUT/'metrics.json').write_text(json.dumps({'reference':info,'initial':baseline,'runs':results},indent=2))
++    print('GT mapping:',info['matched_names'],'pixels:',info['features']['pixels'],'initial IoU:',baseline.get('gt_instance_iou'))
++    for row in results:print(row['run'],row.get('gt_instance_iou'),row.get('iou_change_from_initial'))
++
++
++if __name__=='__main__':main()
+--- source_at_formal_run/analysis/evaluate_exploration.py
++++ final_source/analysis/evaluate_exploration.py
+@@ -17,6 +17,22 @@
+ def write(path, value):
+     path.parent.mkdir(parents=True, exist_ok=True)
+     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n')
++
++
++def archive_temporary(run):
++    records=[]
++    for path in sorted((run/'tmp').rglob('*')):
++        relative=path.relative_to(run/'tmp')
++        if relative.parts[0].startswith('claude-') or path.is_symlink() or not path.is_file():continue
++        if path.suffix.lower() not in ('.blend','.blend1','.blend2','.png','.jpg','.jpeg','.exr','.py'):continue
++        target=run/'capture/temporary_artifacts'/relative
++        target.parent.mkdir(parents=True,exist_ok=True)
++        shutil.copy2(path,target)
++        records.append({'original_student_path':'/tmp/'+str(relative),
++                        'archived_path':str(target.relative_to(run)), 'bytes':path.stat().st_size,
++                        'origin':'Actual student-generated temporary file, copied after all student executions ended; not evaluator output.'})
++    write(run/'capture/temporary_artifact_provenance.json',records)
++    return records
+ 
+ 
+ def environment(run, output, replica):
+@@ -44,6 +60,8 @@
+ 
+ 
+ def invoke(argv, output, name, cpus, timeout):
++    index = argv.index('--') + 2
++    argv = argv[:index] + ['--python-exit-code', '1'] + argv[index:]
+     command = ['nice', '-n', '15', 'taskset', '-c', cpus, *argv]
+     write(output / (name + '_command.json'), command)
+     started = time.time()
+@@ -81,7 +99,9 @@
+         states.append({'input': '/original/scene.blend', 'output': '/capture/final_state.json'})
+     if (replica / 'scene.blend').exists():
+         states.append({'input': '/app/scene.blend', 'output': '/capture/regenerated_state.json'})
+-    for p in sorted((run / 'capture').glob('blender_*/artifacts/**/*.blend*')):
++    checkpoint_files = list((run / 'capture').glob('blender_*/artifacts/**/*.blend*'))
++    checkpoint_files += list((run / 'capture').glob('temporary_artifacts/**/*.blend*'))
++    for p in sorted(checkpoint_files):
+         relative = p.relative_to(run / 'capture')
+         states.append({'input':'/checkpoints/'+str(relative), 'output':'/capture/states/'+str(relative)+'.json'})
+     write(output / 'inputs/states.json', states)
+@@ -126,6 +146,7 @@
+ 
+ 
+ def main():
++    started = time.time()
+     parser=argparse.ArgumentParser()
+     parser.add_argument('--run',action='append')
+     parser.add_argument('--baselines',action='store_true')
+@@ -133,6 +154,7 @@
+     for run in (EXP/'runs').iterdir():
+         state=json.loads((run/'status.json').read_text())
+         if state['status'] in ('starting','running'):raise SystemExit('Students are still running')
++    for run in sorted((EXP/'runs').iterdir()):archive_temporary(run)
+     if args.baselines:
+         for scene in ('S01','S02','S03'):print(scene,baseline(scene),flush=True)
+     else:
+@@ -143,6 +165,9 @@
+             futures=[executor.submit(lane_work,lane) for lane in range(2)]
+             results=[future.result() for future in futures]
+         write(EXP/'analysis/technical_summary.json',results)
++    write(EXP/'analysis'/('baseline_evaluation_finished.json' if args.baselines else 'technical_evaluation_finished.json'),
++          {'started_at':started,'finished_at':time.time(),'wall_seconds':time.time()-started,
++           'workers':1 if args.baselines else 2,'cpu_threads_each':8,'stage_limit_seconds':600})
+ 
+ 
+ if __name__=='__main__':main()
+--- source_at_formal_run/analysis/exploration_geometry.py
++++ final_source/analysis/exploration_geometry.py
+@@ -22,6 +22,11 @@
+ output.mkdir(parents=True, exist_ok=True)
+ bpy.ops.wm.open_mainfile(filepath=args.input, load_ui=False, use_scripts=False)
+ scene = bpy.context.scene
++for obj in scene.objects:
++    for modifier in obj.modifiers:
++        modifier.show_viewport = modifier.show_render
++        if modifier.type in ('SUBSURF', 'MULTIRES'):
++            modifier.levels = modifier.render_levels
+ bpy.context.view_layer.update()
+ depsgraph = bpy.context.evaluated_depsgraph_get()
+ EPS = 0.0001
+@@ -55,6 +60,7 @@
+           if obj.type == 'MESH' and not obj.hide_render and len(obj.data.vertices)}
+ result = {'input': args.input, 'case': args.case, 'tolerance_blender_units': EPS,
+           'geometry': 'Actual evaluated world-space mesh vertices/polygons, including enabled modifiers.',
++          'modifier_evaluation': 'Render visibility and subdivision levels copied into the evaluation graph. Viewport-dependent Geometry Nodes can still differ from a true render depsgraph.',
+           'bounds': {name: {'low': m['low'], 'high': m['high']} for name, m in meshes.items()},
+           'camera': {'name': scene.camera.name, 'matrix': [list(r) for r in scene.camera.matrix_world],
+                      'lens': scene.camera.data.lens} if scene.camera else None}
+@@ -71,7 +77,9 @@
+     floor = BVHTree.FromPolygons(vertices, polygons)
+     origin_z = max(v.z for v in vertices) + 3
+     names = [n for n in meshes if re.search(r'chair|caster|wheel|five.star|seat|backrest|tyre|tire', n, re.I)]
+-    anchors = [(-.85, .70), (1.02, -.68)]
++    original_anchors = [(-.85, .70), (1.02, -.68)]
++    post_names = ['chair central post', 'chair central post.001']
++    anchors = [meshes[name]['center'][:2] for name in post_names]
+     groups = [[], []]
+     for name in names:
+         center = meshes[name]['center']
+@@ -100,39 +108,79 @@
+     for i, group in enumerate(groups):
+         lows = [meshes[n]['low'][2] for n in group]
+         highs = [meshes[n]['high'][2] for n in group]
+-        wheels = [n for n in group if re.search(r'caster|wheel|tyre|tire', n, re.I)]
++        wheels = [n for n in group if re.search(r'wheel|tyre|tire', n, re.I)]
+         arms = [n for n in group if re.search(r'base|star|spoke|leg|support', n, re.I)
+                 and n not in wheels]
++        connectors = [n for n in group if re.search(r'fork|axle|yoke', n, re.I)]
+         wheel_support = [support(n) for n in wheels]
+         lowest_name = min(group, key=lambda n: meshes[n]['low'][2]) if group else None
+         lowest = support(lowest_name) if lowest_name else None
+         connections = []
++        def connection(first_name, second_name):
++            first, second = bvh(meshes[first_name]), bvh(meshes[second_name])
++            distances = [second.find_nearest(v)[3] for v in meshes[first_name]['vertices']]
++            distances += [first.find_nearest(v)[3] for v in meshes[second_name]['vertices']]
++            return {'first': first_name, 'second': second_name,
++                    'surface_intersection_pairs': len(first.overlap(second)),
++                    'sampled_surface_distance': min(distances),
++                    'scope': 'BVH surface-intersection pairs and bidirectional vertex-to-surface samples; no dynamics simulation.'}
+         for wheel in wheels:
+             if not arms:
+                 continue
+             center = meshes[wheel]['center']
+             arm = min(arms, key=lambda n: sum((a-b)**2 for a,b in zip(meshes[n]['center'], center)))
+-            first, second = bvh(meshes[wheel]), bvh(meshes[arm])
+-            distances = [second.find_nearest(v)[3] for v in meshes[wheel]['vertices']]
+-            distances += [first.find_nearest(v)[3] for v in meshes[arm]['vertices']]
+-            connections.append({'wheel': wheel, 'nearest_base_part': arm,
+-                                'triangle_surface_intersections': len(first.overlap(second)),
+-                                'sampled_surface_distance': min(distances),
+-                                'scope': 'Triangle intersections and bidirectional vertex-to-surface samples; no dynamics simulation.'})
+-        chairs.append({'chair': i+1, 'assignment': 'Nearest original chair anchor, checked against actual names and source.',
+-                       'original_anchor_xy': anchors[i], 'parts': [summary(bpy.data.objects[n], meshes[n]) for n in group],
++            connections.append({'wheel': wheel, 'nearest_base_part': arm, **connection(wheel, arm)})
++        posts = [n for n in group if re.search(r'post|column|piston|central', n, re.I)]
++        shells = [n for n in group if re.search(r'shell|seat', n, re.I)]
++        post_connections = [connection(post, other) for post in posts for other in arms + shells]
++        connector_connections = [connection(connector, other) for connector in connectors for other in wheels + arms]
++        chairs.append({'chair': i+1, 'assignment': 'Nearest actual current central post; retained post names and construction order verified for all ten fixed-case branches.',
++                       'original_anchor_xy': original_anchors[i], 'current_anchor_xy': anchors[i],
++                       'current_post_name': post_names[i],
++                       'parts': [summary(bpy.data.objects[n], meshes[n]) for n in group],
+                        'minimum_world_z': min(lows) if lows else None,
+                        'height': max(highs)-min(lows) if lows else None,
+                        'lowest_part_support': lowest, 'wheel_support': wheel_support,
+                        'normalized_lowest_gap': lowest['minimum_signed_gap']/(max(highs)-min(lows))
+                        if lowest and lowest['minimum_signed_gap'] is not None else None,
+                        'wheel_base_connections': connections,
++                       'post_base_seat_connections': post_connections,
++                       'connector_connections': connector_connections,
++                       'part_roles': {'wheels': wheels, 'base_parts': arms, 'posts': posts,
++                                      'shells': shells, 'connectors': connectors},
+                        'contact_claim': 'Positive gap proves separation. Zero gap/bounds overlap alone does not prove physical contact. Negative local clearance is reported separately.'})
+     result.update(floor_objects=floor_names, chairs=chairs)
++    # Diagnostic close views are evaluator outputs; the student's scene is not saved.
++    camera = scene.camera
++    scene.render.engine = 'CYCLES'
++    scene.cycles.device = 'CPU'
++    scene.cycles.samples = 16
++    scene.cycles.use_denoising = True
++    scene.render.resolution_x = 512
++    scene.render.resolution_y = 384
++    scene.render.resolution_percentage = 100
++    scene.render.image_settings.file_format = 'PNG'
++    camera.data.type = 'ORTHO'
++    camera.data.ortho_scale = 1.4
++    views = []
++    for i, group in enumerate(groups):
++        if not group:
++            continue
++        center = Vector((sum(meshes[n]['center'][0] for n in group)/len(group),
++                         sum(meshes[n]['center'][1] for n in group)/len(group), .25))
++        for obj in scene.objects:
++            if obj.type == 'MESH':obj.hide_render = obj.name not in group + floor_names
++        camera.location = center + Vector((2,-2,.4))
++        camera.rotation_euler = (center-camera.location).to_track_quat('-Z','Y').to_euler()
++        scene.render.filepath = str(output / ('chair_'+str(i+1)+'_support.png'))
++        bpy.ops.render.render(write_still=True)
++        views.append({'chair':i+1,'camera_location':list(camera.location),'target':list(center),
++                       'scope':'Isolated chair/floor support view; other mesh objects hidden for diagnosis only.'})
++    result['support_views'] = views
+ 
+ if args.case == 'S02':
+-    door_names = [n for n in meshes if re.search(r'door', n, re.I)
+-                  and not re.search(r'opening|doorway|casing|frame|cabinet|cupboard', n, re.I)]
++    door_root = scene.objects['open door hinge']
++    door_names = [o.name for o in door_root.children_recursive if o.name in meshes]
+     result['door_objects'] = []
+     for name in door_names:
+         obj, mesh = bpy.data.objects[name], meshes[name]
+@@ -143,7 +191,10 @@
+     result['hinges'] = [{'name': o.name, 'matrix': [list(r) for r in o.matrix_world],
+                          'children': [c.name for c in o.children]}
+                         for o in scene.objects if re.search(r'hinge|pivot', o.name, re.I)]
+-    result['semantic_door_match'] = 'Name/source correspondence must be reviewed; no IoU is emitted here.'
++    result['openings_and_frames'] = [summary(bpy.data.objects[n], meshes[n]) for n in meshes
++        if re.search(r'door|doorway', n, re.I) and n not in door_names
++        and not re.search(r'cabinet|cupboard|glass', n, re.I)]
++    result['semantic_door_match'] = 'Source-verified open door hinge descendants; glass cupboard doors are excluded. No IoU is emitted here.'
+     if args.mask and door_names:
+         def emission(name, color):
+             material = bpy.data.materials.new(name)
+@@ -188,15 +239,16 @@
+     original_state = json.loads(Path('/inputs/baseline_state.json').read_text())
+     camera_name = original_state['camera']
+     light_names = [o['name'] for o in original_state['objects'] if o['type'] == 'LIGHT']
+-    for obj in list(scene.objects):
+-        if obj.type in ('CAMERA','LIGHT'):bpy.data.objects.remove(obj, do_unlink=True)
+-    with bpy.data.libraries.load(args.baseline, link=False) as (data_from, data_to):
+-        data_to.objects = [camera_name] + light_names
+-        data_to.worlds = data_from.worlds
+-    for obj in data_to.objects:
+-        scene.collection.objects.link(obj)
+-        if obj.type == 'CAMERA':scene.camera = obj
+-    scene.world = data_to.worlds[0]
++    if args.input != args.baseline:
++        for obj in list(scene.objects):
++            if obj.type in ('CAMERA','LIGHT'):bpy.data.objects.remove(obj, do_unlink=True)
++        with bpy.data.libraries.load(args.baseline, link=False) as (data_from, data_to):
++            data_to.objects = [camera_name] + light_names
++            data_to.worlds = [original_state['world']['name']]
++        for obj in data_to.objects:
++            scene.collection.objects.link(obj)
++            if obj.type == 'CAMERA':scene.camera = obj
++        scene.world = data_to.worlds[0]
+     for name in ('view_transform','look','exposure','gamma'):
+         setattr(scene.view_settings, name, original_state['render'][name])
+     scene.render.engine = 'CYCLES'
+--- source_at_formal_run/analysis/exploration_state_changes.py
++++ final_source/analysis/exploration_state_changes.py
+@@ -0,0 +1,61 @@
++"""Describe changes within a common checkpoint coordinate frame, not GT error."""
++import json
++from pathlib import Path
++
++ROOT=Path(__file__).resolve().parents[1]
++EXP=ROOT/'experiments/experiment_02_teacher_guided_exploration'
++OLD=ROOT/'experiments/experiment_01_natural_trajectories'
++
++
++def changes(before,after,fields):
++    return {key:{'before':before.get(key),'after':after.get(key)}
++            for key in fields if before.get(key)!=after.get(key)}
++
++
++def main():
++    cases={r['scene']:r for r in json.loads((EXP/'configs/cases.json').read_text())}
++    results=[]
++    for run in sorted((EXP/'runs').iterdir()):
++        path=run/'analysis/technical/capture/final_state.json'
++        if not path.exists():continue
++        baseline=json.loads((OLD/'runs'/cases[run.name[:3]]['source_run']/'analysis/technical/capture/final_state.json').read_text())
++        final=json.loads(path.read_text())
++        initial_objects={o['name']:o for o in baseline['objects']};final_objects={o['name']:o for o in final['objects']}
++        matched=[]
++        for name in initial_objects.keys()&final_objects.keys():
++            before,after=initial_objects[name],final_objects[name]
++            delta=changes(before,after,['type','parent','location','world_location','rotation_euler','scale','dimensions','materials','modifiers','camera','light','hide_render'])
++            if delta:matched.append({'name':name,'type':after['type'],'changes':delta})
++        materials=[]
++        for m in final['materials']:
++            materials.append({'name':m['name'],'node_types':[n['type'] for n in m['nodes']],
++                              'image_nodes':[n for n in m['nodes'] if n['type']=='ShaderNodeTexImage'],
++                              'mapping_nodes':[n for n in m['nodes'] if n['type']=='ShaderNodeMapping'],
++                              'color_ramps':[n for n in m['nodes'] if n['type']=='ShaderNodeValToRGB'],
++                              'links':m['links']})
++        def comparable(material):
++            return {'diffuse_color':material['diffuse_color'],'roughness':material['roughness'],
++                    'metallic':material['metallic'],'links':material['links'],
++                    'nodes':[{k:node.get(k) for k in ('name','type','inputs','image','node_group')}
++                             for node in material['nodes']]}
++        before_materials={m['name']:m for m in baseline['materials']}
++        after_materials={m['name']:m for m in final['materials']}
++        changed_materials=[name for name in before_materials.keys()&after_materials.keys()
++                           if comparable(before_materials[name])!=comparable(after_materials[name])]
++        row={'run':run.name,'matched_name_changes':sorted(matched,key=lambda x:x['name']),
++             'names_only_in_final':sorted(final_objects.keys()-initial_objects.keys()),
++             'names_only_in_initial':sorted(initial_objects.keys()-final_objects.keys()),
++             'camera_or_light_changed':any(x['type'] in ('CAMERA','LIGHT') for x in matched),
++             'world_changed':baseline['world']!=final['world'],
++             'render_changed':changes(baseline['render'],final['render'],list(baseline['render'])),
++             'actual_final_materials':materials,'images':final['images'],
++             'named_materials_changed_in_comparable_fields':sorted(changed_materials),
++             'material_comparison_limit':'Original state extraction lacks the new ColorRamp/operation properties; absent old properties are unknown, not changes. Actual source and new state retain their evidence.',
++             'scope':'Within copied checkpoint frame, exact named correspondences only. Renamed objects are unmatched, not automatically semantic additions/deletions. Not a GT-aligned 3D distance.'}
++        (run/'analysis/state_changes.json').write_text(json.dumps(row,indent=2))
++        results.append(row)
++    (EXP/'analysis/state_changes.json').write_text(json.dumps(results,indent=2))
++    print('Recorded named-object, material, camera and light changes for',len(results),'branches.')
++
++
++if __name__=='__main__':main()
+--- source_at_formal_run/analysis/index_exploration.py
++++ final_source/analysis/index_exploration.py
+@@ -0,0 +1,81 @@
++"""Index scientific assets for later publication; omit credentials and runtime homes."""
++import datetime
++import difflib
++import json
++from pathlib import Path
++import shutil
++
++ROOT=Path(__file__).resolve().parents[1]
++EXP=ROOT/'experiments/experiment_02_teacher_guided_exploration'
++EXCLUDED={'.git','.codex','.agents','.aws','__pycache__','home','backend_home','tmp'}
++
++
++def source_snapshot():
++    initial=json.loads((EXP/'source_origin.json').read_text())
++    initial_changes={r['file']:r['kind'] for r in initial['changes']}
++    records=[];patch=[]
++    for folder in ('sdk','harness','analysis','configs'):
++        for path in sorted((ROOT/folder).rglob('*')):
++            relative=path.relative_to(ROOT)
++            if path.is_symlink() or not path.is_file() or EXCLUDED.intersection(relative.parts):continue
++            if path.suffix not in ('.py','.json','.yaml','.yml','.md','.txt') or path.name=='auth.json':continue
++            target=EXP/'final_source_snapshot'/relative
++            target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(path,target)
++            before=EXP/'source_at_formal_run'/relative
++            old=before.read_text() if before.exists() else ''
++            current=path.read_text()
++            changed=old!=current
++            records.append({'file':str(relative),'initial_increment':initial_changes.get(str(relative),'reused' if before.exists() else 'added_after_formal_start'),
++                            'present_at_formal_start':before.exists(),'changed_after_formal_start':changed})
++            if changed:patch.extend(difflib.unified_diff(old.splitlines(keepends=True),current.splitlines(keepends=True),
++                fromfile='source_at_formal_run/'+str(relative),tofile='final_source/'+str(relative)))
++    for name in ('README.md','.gitignore'):
++        shutil.copy2(ROOT/name,EXP/'final_source_snapshot'/name)
++    patch.extend(difflib.unified_diff((EXP/'shared_README_before.md').read_text().splitlines(keepends=True),
++        (ROOT/'README.md').read_text().splitlines(keepends=True),fromfile='before_experiment_02/README.md',tofile='final_source/README.md'))
++    (EXP/'post_formal_source_changes.diff').write_text(''.join(patch))
++    origin={'created_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'files':records,
++        'initial_increment':'source_origin.json and source_changes.diff preserve the pre-formal increment.',
++        'documentation_changes':'Shared README adds the Experiment 02 index; its original text is preserved in shared_README_before.md. Existing .gitignore is reused unchanged.',
++        'runtime_versions':'Students retain source_at_formal_run/source_at_repeat_start; subsequent analysis and the post-student Bridge fix do not resample or repair student outputs.',
++        'scene_logic':'New checkpoint branch preparation, fixed hint protocol and independent evaluation; no SceneEvolve reconstruction strategy.',
++        'model_backend':'sdk/run_cc_sdk.py remains the original hintrsi SDK loop. Codex Bridge receives the documented post-student agent-disable settings only after all students ended.',
++        'environment':'Existing Python, Blender and data reused in place; no replacement installations or dataset download.'}
++    (EXP/'final_source_origin.json').write_text(json.dumps(origin,ensure_ascii=False,indent=2)+'\n')
++
++
++def main():
++    source_snapshot()
++    paths=[ROOT/'README.md',ROOT/'.gitignore']
++    for folder in ('sdk','harness','analysis','configs'):
++        paths.extend((ROOT/folder).rglob('*'))
++    paths.extend(EXP.rglob('*'))
++    rows=[]
++    for path in sorted(paths):
++        relative=path.relative_to(ROOT)
++        if path.is_symlink() or not path.is_file() or EXCLUDED.intersection(relative.parts):continue
++        if path.suffix=='.pyc' or path.name in ('auth.json','file_index.json','sync_manifest.json'):continue
++        stat=path.stat()
++        rows.append({'path':str(relative),'bytes':stat.st_size,
++                     'modified_utc':datetime.datetime.fromtimestamp(stat.st_mtime,datetime.timezone.utc).isoformat(),
++                     'large_local_asset':stat.st_size>=10*1024**2})
++    reused=[]
++    for scene in json.loads((ROOT/'configs/scenes.json').read_text())['scenes']:
++        reused.append({'scene':scene['id'],'original_gt_directory':scene['evaluation_directory'],
++                       'dataset_source':scene['source_url'],'license':scene['license'],
++                       'storage':'Reused in place from Experiment 01; not downloaded or duplicated.'})
++    index={'created_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
++           'root':str(ROOT),'files':rows,'file_count':len(rows),'bytes':sum(row['bytes'] for row in rows),
++           'reused_ground_truth':reused,'hash_or_checksum_system':False}
++    (EXP/'file_index.json').write_text(json.dumps(index,ensure_ascii=False,indent=2)+'\n')
++    manifest={'scope':'Current source plus complete Experiment 02 scientific record; Experiment 01 originals stay separate.',
++              'source_and_scientific_files':[r['path'] for r in rows if not r['large_local_asset']],
++              'large_local_assets':[{'path':r['path'],'bytes':r['bytes']} for r in rows if r['large_local_asset']],
++              'excluded':'Authentication, runtime homes/session-key stores, temporary files, bytecode and symlinks to installed environments.',
++              'publication_status':'Local results and index only; no new GitHub upload is performed by this experiment task.',
++              'existing_repository':'https://github.com/i025/hintrsi/tree/main/scene-rsi'}
++    (EXP/'sync_manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n')
++    print(len(rows),'files;',round(index['bytes']/1024**2,1),'MiB;',len(manifest['large_local_assets']),'large local assets')
++
++
++if __name__=='__main__':main()
+--- source_at_formal_run/analysis/inspect_scene.py
++++ final_source/analysis/inspect_scene.py
+@@ -64,7 +64,16 @@
+                       if hasattr(socket, 'default_value') and not socket.is_linked}
+             nodes.append({'name': node.name, 'type': node.bl_idname, 'inputs': inputs,
+                           'image': node.image.name if node.type == 'TEX_IMAGE' and node.image else None,
+-                          'node_group': node.node_tree.name if node.type == 'GROUP' and node.node_tree else None})
++                          'node_group': node.node_tree.name if node.type == 'GROUP' and node.node_tree else None,
++                          'properties': {key: value(getattr(node, key)) for key in
++                                         ('operation', 'blend_type', 'vector_type', 'noise_dimensions',
++                                          'noise_type', 'normalize', 'projection', 'projection_blend',
++                                          'interpolation', 'extension', 'distribution') if hasattr(node, key)},
++                          'color_ramp': {'interpolation': node.color_ramp.interpolation,
++                                         'elements': [{'position': e.position, 'color': list(e.color)}
++                                                      for e in node.color_ramp.elements]}
++                                        if node.type == 'VALTORGB' else None,
++                          'coordinate_object': node.object.name if node.type == 'TEX_COORD' and node.object else None})
+         links = [{'from_node': link.from_node.name, 'from_socket': link.from_socket.name,
+                   'to_node': link.to_node.name, 'to_socket': link.to_socket.name} for link in material.node_tree.links]
+     materials.append({'name': material.name, 'diffuse_color': list(material.diffuse_color),
+@@ -76,6 +85,7 @@
+     packed = bool(image.packed_file) or bool(image.packed_files)
+     images.append({'name': image.name, 'source': image.source, 'filepath': image.filepath,
+                    'size': list(image.size), 'packed': packed,
++                   'has_data': image.has_data, 'colorspace': image.colorspace_settings.name,
+                    'missing_external': image.source in ('FILE', 'TILED') and not packed and not Path(absolute).exists()})
+ state = {'file': args.input, 'blender_version': bpy.app.version_string,
+          'camera': scene.camera.name if scene.camera else None,
+--- source_at_formal_run/analysis/make_exploration_review.py
++++ final_source/analysis/make_exploration_review.py
+@@ -0,0 +1,117 @@
++"""Reuse the Experiment 01 offline form with anonymous before/after evidence."""
++import html
++import json
++from pathlib import Path
++
++from PIL import Image, ImageDraw, ImageFont
++
++ROOT=Path(__file__).resolve().parents[1]
++EXP=ROOT/'experiments/experiment_02_teacher_guided_exploration'
++OLD=ROOT/'experiments/experiment_01_natural_trajectories'
++OUTPUT=EXP/'analysis/human_review'
++
++
++def form(identifier):
++    return ('<label>恢复度（1—5）<select name="'+identifier+':score"><option value="">未评分</option>'+
++            ''.join('<option>'+str(i)+'</option>' for i in range(1,6))+'</select></label>'+
++            '<label>可见缺陷<textarea name="'+identifier+':defects"></textarea></label>'+
++            '<label>改进优先级<textarea name="'+identifier+':priority"></textarea></label>')
++
++
++def diagnostic_montages():
++    for kind in ('kitchen_fixed_environment','door_masks'):
++        canvas=Image.new('RGB',(6*400,2*250),'white');draw=ImageDraw.Draw(canvas)
++        for repetition in (1,2):
++            if kind=='kitchen_fixed_environment':
++                sources=[(EXP/'analysis/baselines/S03/capture/target_geometry/fixed_camera_lighting.png','Initial')]
++                scene,file='S03','fixed_camera_lighting.png'
++            else:
++                sources=[(EXP/'analysis/door/gt_door_overlay.png','GT room-door overlay')]
++                scene,file='S02','door_visible_mask.png'
++            for group in range(5):
++                name=scene+'-E'+str(group)+'-R'+str(repetition)
++                sources.append((EXP/'runs'/name/'analysis/technical/capture/target_geometry'/file,name))
++            for column,(path,label) in enumerate(sources):
++                canvas.paste(Image.open(path).convert('RGB').resize((400,225)),(column*400,(repetition-1)*250+25))
++                draw.text((column*400+5,(repetition-1)*250+5),label,fill='black')
++        canvas.save(EXP/'analysis'/(kind+'.png'))
++
++
++def candidate_montages():
++    examples={
++        'S01-E4-R1':['reference.png','candidate_a.png','candidate_b.png','candidate_a_side.png','candidate_b_side.png','final.png'],
++        'S02-E4-R1':['reference.png','candidate_a.png','candidate_b.png','diagnostic_top.png','candidate_d.png','final.png'],
++        'S03-E4-R1':['test_image.png','test_procedural.png','test_roughness.png','test_image_alt.png','test_procedural_alt.png','test_roughness_alt.png'],
++    }
++    for run,names in examples.items():
++        canvas=Image.new('RGB',(3*480,2*295),'white');draw=ImageDraw.Draw(canvas)
++        for i,name in enumerate(names):
++            x,y=i%3*480,i//3*295
++            draw.text((x+5,y+5),name,fill='black')
++            canvas.paste(Image.open(EXP/'runs'/run/'workspace'/name).convert('RGB').resize((480,270)),(x,y+25))
++        canvas.save(EXP/'analysis'/(run+'-actual-candidates.png'))
++
++
++def main():
++    OUTPUT.mkdir(parents=True,exist_ok=True)
++    mapping=[r for r in json.loads((EXP/'configs/blind_order.json').read_text()) if (EXP/'runs'/r['run']).exists()]
++    font=ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',18)
++    rows=[]
++    crops={'S01':(120,130,510,360),'S02':(270,0,490,335),'S03':(320,120,640,360)}
++    for scene in ('S01','S02','S03'):
++        cards=[]
++        for name,source,label in [('reference',EXP/'checkpoints'/scene/'reference.png','参考图'),
++                                  ('initial',EXP/'checkpoints'/scene/'final.png','初始重建')]:
++            image=Image.open(source).convert('RGB').resize((640,360),Image.Resampling.LANCZOS)
++            image.save(OUTPUT/(scene+'-'+name+'.png'))
++            image.crop(crops[scene]).resize((640,360)).save(OUTPUT/(scene+'-'+name+'-crop.png'))
++            cards.append('<article><h3>'+label+'</h3><img src="'+scene+'-'+name+'.png">'+
++                         (form(scene+'-initial') if name=='initial' else '')+'</article>')
++        for record in mapping:
++            if not record['run'].startswith(scene):continue
++            ident=record['anonymous_id'];run=EXP/'runs'/record['run']
++            image=Image.open(run/'workspace/final.png').convert('RGB').resize((640,360),Image.Resampling.LANCZOS)
++            image.save(OUTPUT/(ident+'.png'));image.crop(crops[scene]).resize((640,360)).save(OUTPUT/(ident+'-crop.png'))
++            links='<a href="'+ident+'-crop.png">固定图像区域局部</a>'
++            for angle in (-15,15):
++                source=run/'analysis/technical/capture'/('view_'+str(angle)+'.png')
++                if source.exists():
++                    Image.open(source).save(OUTPUT/(ident+'-view-'+str(angle)+'.png'))
++                    links+=' · <a href="'+ident+'-view-'+str(angle)+'.png">补充视角 '+str(angle)+'°</a>'
++            fixed=run/'analysis/technical/capture/target_geometry/fixed_camera_lighting.png'
++            if fixed.exists():
++                Image.open(fixed).save(OUTPUT/(ident+'-fixed.png'))
++                links+=' · <a href="'+ident+'-fixed.png">初始相机与光照下的辅助图</a>'
++            for chair in (1,2):
++                support=run/'analysis/technical/capture/target_geometry'/('chair_'+str(chair)+'_support.png')
++                if support.exists():
++                    Image.open(support).save(OUTPUT/(ident+'-chair-'+str(chair)+'.png'))
++                    links+=' · <a href="'+ident+'-chair-'+str(chair)+'.png">椅子 '+str(chair)+' 支撑诊断视角</a>'
++            cards.append('<article><h3>'+ident+'</h3><img src="'+ident+'.png"><p>'+links+'</p>'+form(ident)+'</article>')
++        rows.append('<section><h2>'+scene+'</h2><div class="grid">'+''.join(cards)+'</div>'+
++                    '<label>哪些匿名结果更好，为什么？<textarea name="'+scene+':comparison"></textarea></label></section>')
++    page=(OLD/'analysis/human_review/index.html').read_text()
++    start=page.index('<form id="review">')+len('<form id="review">');end=page.index('</form>',start)
++    page=page[:start]+''.join(rows)+page[end:]
++    page=page.replace('自然重建轨迹：人工评价','场景改进：匿名人工评价')
++    page=page.replace('比较参考图与三次独立重建。','比较参考图、初始重建与匿名改进结果。结果顺序已随机化，不显示实验组别。')
++    page=page.replace('repeat(4,1fr)','repeat(3,1fr)').replace("a.download='human-review.json'","a.download='experiment02-human-review.json'")
++    (OUTPUT/'index.html').write_text(page)
++    (OUTPUT/'README.txt').write_text('复用 Experiment 01 评价表及本地导出逻辑。全部人工评分为空，不包含实验组名称或教师 Hint。局部图使用固定图像区域，未作语义或三维对齐。补充视角和固定相机光照图仅供辅助检查。')
++    (EXP/'analysis/human_ratings.json').write_text(json.dumps([{'anonymous_id':r['anonymous_id'],'human_rating':None,'human_feedback':None} for r in mapping],indent=2))
++    for repetition in (1,2):
++        if not (EXP/'runs'/('S01-E0-R'+str(repetition))).exists():continue
++        montage=Image.new('RGB',(7*480,3*300),'white');draw=ImageDraw.Draw(montage)
++        for row,scene in enumerate(('S01','S02','S03')):
++            sources=[('Reference',EXP/'checkpoints'/scene/'reference.png'),('Initial',EXP/'checkpoints'/scene/'final.png')]
++            sources += [('E'+str(group),EXP/'runs'/(scene+'-E'+str(group)+'-R'+str(repetition))/'workspace/final.png') for group in range(5)]
++            for col,(label,path) in enumerate(sources):
++                draw.text((col*480+8,row*300+5),scene+' '+label,fill='black',font=font)
++                if path.exists():montage.paste(Image.open(path).convert('RGB').resize((480,270),Image.Resampling.LANCZOS),(col*480,row*300+30))
++        montage.save(EXP/'analysis'/('comparison_'+('core' if repetition==1 else 'repeat')+'.png'))
++    diagnostic_montages()
++    candidate_montages()
++    print('Anonymous offline form and actual result montages:',OUTPUT)
++
++
++if __name__=='__main__':main()
+--- source_at_formal_run/analysis/review_exploration.py
++++ final_source/analysis/review_exploration.py
+@@ -0,0 +1,133 @@
++"""Blinded visual reviews and evidence-linked trajectory annotations via the same SDK."""
++import argparse
++import json
++from pathlib import Path
++import random
++import shutil
++import sys
++
++ROOT=Path(__file__).resolve().parents[1]
++EXP=ROOT/'experiments/experiment_02_teacher_guided_exploration'
++sys.path.insert(0,str(ROOT/'harness'))
++sys.path.insert(0,str(ROOT/'analysis'))
++from run_exploration import batch, student_jobs, write
++from summarize_run import summarize
++
++VISUAL_PROMPT='''You are an independent automated visual evaluator, not a human rater. You receive three real images: the reference, the current reconstruction (the candidate), and the initial reconstruction before additional execution. The labels explicitly identify them. Read the images themselves. No experimental group, teacher hint, preferred outcome, or other candidate is provided.
++
++Describe this candidate independently. Do not assume it improved, or that every scene has the same defect. Compare visible object geometry, spatial layout and occlusion, materials/texture, viewpoint and lighting. Pay attention to visible chair support and connections in office scenes, the door leaf silhouette and foreground occlusion in bedroom scenes, and the right countertop texture in kitchen scenes. RGB alone cannot establish true mesh contact, collision, hidden geometry, or long-term learned capability. Do not turn invisible differences into errors.
++
++Write /app/visual_evaluation.json as English JSON with keys: annotation_kind (automated_model), scene_description, initial_target_observations, candidate_target_observations, target_resolution (resolved/partial/unresolved/unknown), target_change (improved/unchanged/worse/unknown), overall_visual_change (improved/unchanged/worse/mixed/unknown), geometric_plausibility_observations, new_visible_defects, other_changes, evidence (an array of descriptions with image label and normalized image region [left,top,right,bottom]), uncertainty, and human_rating (null). Explain partial or unknown judgments. Do not produce an aggregate numeric score. Finish after writing the file.
++'''
++
++TECHNICAL_PROMPT='''You are an automated evidence annotator analyzing a completed Blender checkpoint branch. This is posthoc analysis, not a teacher interaction. Never change reconstruction files. Inspect /app/evidence/index.json, sdk_events.json, baseline_build.py, the delivered source under final_source/, the actual executed code captures under executions/, saved scene states under scene_states/, and target_geometry.json when available. The teacher diagnosis and exact received guidance are in evidence/teacher_diagnosis.json and received_guidance.txt; distinguish prior suggestions from techniques actually adopted. The reference and final render are real image inputs; initial.png is also available. No GT hidden geometry is provided.
++
++The scene_states/ files and target_geometry.json are independent evaluator outputs, not student actions. They may establish final geometry/material facts but do not show that the student measured contact, cast floor rays, extracted state, regenerated independently, or performed a controlled render. Credit a student check or technique only from its actual SDK events and executed source in executions/. Never attribute the controller's evaluation code or measurements to student discovery.
++
++Files under evidence/temporary_artifacts/ are actual student-generated temporary files recovered after session end, with their original paths recorded in temporary_artifact_provenance.json. They are not evaluator renders; correlate them with the real SDK tool events before assigning an observation/check label.
++
++Distinguish (a) visible proposals, (b) code written, (c) code actually executed, (d) observations/verification actually performed, and (e) methods retained in the final scene. Cite concrete bundle paths, SDK event indices/tool call IDs, code lines or object/node names. An execution exit alone is not proof every helper or branch ran; use source reachability and saved scene state. Do not invent hidden reasoning. A technique mentioned in a hint is not an executed strategy. Inherited code technique is different from a new action in this branch. Do not inherit the previous run's render-inspection/camera-revision behavior just because its final checkpoint is supplied.
++
++Blender may return exit code zero after a Python traceback. Inspect execution stdout/stderr, actual saved artifacts and subsequent recovery; do not call an exception-producing candidate successful from its exit code alone.
++
++Multiple candidate files alone show generation, not comparison. An actual_comparison claim needs student-visible renders or measurements plus observable comparison/selection evidence in the SDK trace. If the evidence is insufficient, mark unknown rather than infer hidden reasoning. Local image texture mapping on a real object is not automatically a 2D shortcut; separately flag a full-reference image plane only when actual code/scene evidence shows it replaces scene reconstruction.
++
++Use these generic labels where actually supported: parameterized_helpers, primitive_mesh_assembly, bevel_edges, weighted_normals, constant_principled_materials, explicit_world_coordinates, relative_part_coordinates, loop_repetition, perspective_look_at_camera, area_lighting, cycles_denoising, geometry_surface_patterns. Additional semantic labels may describe actual material nodes/mapping, assembly alignment, wheel reorientation, support geometry, hinge/doorway changes, geometry checking, visibility tests, controlled comparisons and distinct verification methods. Reuse a common label for semantically equivalent techniques. Numeric parameter changes alone are not a new modeling technology. Unknown is not absence.
++
++Use the preferred semantic names and definitions in /app/evidence/strategy_vocabulary.json. Add a new label only for an evidence-supported technique not covered there, with an explicit definition. Do not assign a listed label merely because it appears in the vocabulary or teacher hint.
++
++Write /app/trajectory_annotation.json as English JSON with:
++- observable_diagnosis: evidence of error discovery/measurement, or unknown, without claims about hidden knowledge.
++- actions: an array of {label, description, phase: proposed/written/executed/verified/retained/unknown, evidence}.
++- strategies: an array of {label, scope: generic/scene/target, status: executed/retained/unknown, inherited_from_checkpoint: boolean, evidence}. Only executed/retained labels will enter overlap metrics.
++- candidates: an array of {hypothesis, code_paths, technique_difference: numeric_parameter/execution_order/modeling_technique/executable_check/verification_mechanism/unknown, actually_executed, actual_comparison, retained, evidence, observed_result, side_effects, knowledge_origin: teacher_prior/natural_checkpoint/branch_discovery/unverified_hypothesis/unknown, unvalidated_parts}. Include actual rejected/abandoned variants; do not invent candidates that were only requested.
++- exploration_assessment: {distinct_executed_technical_paths, actual_comparison, new_validation_method, explanation, evidence}. Do not count trace length or repeated failure as valuable exploration.
++- failure_or_stopping_observations: actual errors, lack of verification, unchanged outputs, or unknown.
++- candidate_knowledge: an array of {problem, observed_defect, cause_hypothesis, executed_method, evidence, applicability, verification, side_effects, unvalidated, origin, reusable_snippet_path}. A full scene program is not a general skill; leave snippet null if none exists. Cross-scene transfer is untested.
++- limitations.
++
++Keep claims concise and grounded. Do not infer strategy success from a condition name or the teacher's expectations. Finish after saving the JSON.
++'''
++
++
++def freeze_blind_order():
++    ids=[j['id'] for rep in (1,2) for j in student_jobs(rep)]
++    random.Random(20261128).shuffle(ids)
++    write(EXP/'configs/blind_order.json',[{'anonymous_id':'V'+str(i+1).zfill(3),'run':run}
++                                         for i,run in enumerate(ids)])
++
++
++def visual_jobs():
++    jobs=[]
++    for row in json.loads((EXP/'configs/blind_order.json').read_text()):
++        run=EXP/'runs'/row['run']
++        if not run.exists():continue
++        seed=EXP/'review_inputs/visual'/row['anonymous_id']
++        seed.mkdir(parents=True)
++        for name in ('reference.png','final.png'):shutil.copyfile(run/'workspace'/name,seed/name)
++        shutil.copyfile(EXP/'checkpoints'/run.name[:3]/'final.png',seed/'initial.png')
++        prompt=EXP/'prompts/visual_review.txt'
++        prompt.write_text(VISUAL_PROMPT)
++        config=EXP/'configs/visual_review.json'
++        write(config,{'role':'visual_evaluator','tools':['Read','Write'],'hint_enabled':False,
++                     'additional_images':[{'path':'/app/initial.png','label':'Initial reconstruction before additional execution'}]})
++        jobs.append({'id':row['anonymous_id'],'checkpoint':str(seed),'image':str(seed/'reference.png'),
++                     'prompt':str(prompt),'session':str(config)})
++    return jobs
++
++
++def technical_jobs():
++    cases={c['scene']:c for c in json.loads((EXP/'configs/cases.json').read_text())}
++    jobs=[]
++    for job in student_jobs(1)+student_jobs(2):
++        run=EXP/'runs'/job['id']
++        summarize(run)
++        seed=EXP/'review_inputs/technical'/run.name
++        evidence=seed/'evidence'
++        evidence.mkdir(parents=True)
++        for name in ('reference.png','final.png'):shutil.copyfile(run/'workspace'/name,seed/name)
++        shutil.copyfile(EXP/'checkpoints'/run.name[:3]/'final.png',seed/'initial.png')
++        shutil.copyfile(EXP/'checkpoints'/run.name[:3]/'build.py',evidence/'baseline_build.py')
++        shutil.copyfile(run/'analysis/sdk_events.json',evidence/'sdk_events.json')
++        shutil.copyfile(run/'analysis/evidence_index.json',evidence/'index.json')
++        shutil.copyfile(EXP/'analysis/strategy_vocabulary.json',evidence/'strategy_vocabulary.json')
++        shutil.copyfile(run/'capture/temporary_artifact_provenance.json',evidence/'temporary_artifact_provenance.json')
++        if (run/'capture/temporary_artifacts').exists():
++            shutil.copytree(run/'capture/temporary_artifacts',evidence/'temporary_artifacts')
++        final=evidence/'final_source'
++        final.mkdir()
++        for path in (run/'workspace').rglob('*'):
++            if path.is_file() and '.git' not in path.parts and path.suffix not in ('.blend','.blend1','.blend2'):
++                target=final/path.relative_to(run/'workspace');target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(path,target)
++        executions=evidence/'executions'
++        for capture in sorted((run/'capture').glob('blender_*')):
++            target=executions/capture.name;target.mkdir(parents=True)
++            for name in ('command.json','result.json','python_expr.txt','stdout.log','stderr.log'):
++                if (capture/name).exists():shutil.copyfile(capture/name,target/name)
++            if (capture/'code').exists():shutil.copytree(capture/'code',target/'code')
++            for image in (capture/'artifacts').rglob('*.png'):
++                dest=target/'images'/image.relative_to(capture/'artifacts');dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(image,dest)
++        states=run/'analysis/technical/capture'
++        dest=evidence/'scene_states';dest.mkdir()
++        for name in ('final_state.json','regenerated_state.json','state_open_results.json'):
++            if (states/name).exists():shutil.copy2(states/name,dest/name)
++        if (states/'states').exists():shutil.copytree(states/'states',dest/'checkpoints')
++        geometry=states/'target_geometry/geometry.json'
++        if geometry.exists():shutil.copy2(geometry,evidence/'target_geometry.json')
++        diagnosis=EXP/'teachers'/run.name[:3]/'workspace/teacher_diagnosis.json'
++        shutil.copyfile(diagnosis,evidence/'teacher_diagnosis.json')
++        hints=json.loads((EXP/'hints'/(run.name[:3]+'.json')).read_text())['hints']
++        (evidence/'received_guidance.txt').write_text(hints[run.name.split('-')[1]] or 'No additional guidance.')
++        prompt=EXP/'prompts/technical_review.txt';prompt.write_text(TECHNICAL_PROMPT)
++        config=EXP/'configs/technical_review.json';write(config,{'role':'trajectory_annotator','tools':['Read','Glob','Grep','Write'],'hint_enabled':False})
++        jobs.append({'id':run.name,'checkpoint':str(seed),'image':str(seed/'reference.png'),
++                     'prompt':str(prompt),'session':str(config)})
++    return jobs
++
++
++if __name__=='__main__':
++    parser=argparse.ArgumentParser();parser.add_argument('stage',choices=['freeze','visual','technical'])
++    args=parser.parse_args()
++    if args.stage=='freeze':freeze_blind_order()
++    elif args.stage=='visual':batch(visual_jobs(),'visual_reviews',EXP/'visual_reviews',600,30)
++    else:batch(technical_jobs(),'technical_reviews',EXP/'technical_reviews',900,50)
+--- source_at_formal_run/analysis/summarize_exploration.py
++++ final_source/analysis/summarize_exploration.py
+@@ -0,0 +1,186 @@
++"""Descriptive metrics, costs and evidence indexes for the completed branches."""
++from collections import Counter
++from copy import deepcopy
++import csv
++from itertools import combinations
++import json
++from pathlib import Path
++import re
++from PIL import Image
++
++from compare_trajectories import jaccard
++from image_metrics import metrics
++from summarize_run import summarize
++from usage_summary import summarize as usage_record
++
++ROOT=Path(__file__).resolve().parents[1]
++EXP=ROOT/'experiments/experiment_02_teacher_guided_exploration'
++OLD=ROOT/'experiments/experiment_01_natural_trajectories'
++
++
++def write(path,value):
++    path.parent.mkdir(parents=True,exist_ok=True)
++    path.write_text(json.dumps(value,ensure_ascii=False,indent=2)+'\n')
++
++
++def output_connected_nodes(material):
++    names={n['name'] for n in material['nodes'] if n['type']=='ShaderNodeOutputMaterial'}
++    while True:
++        upstream=names|{link['from_node'] for link in material['links'] if link['to_node'] in names}
++        if upstream==names:break
++        names=upstream
++    return [n['type'] for n in material['nodes'] if n['name'] in names]
++
++
++def main():
++    rows=[];annotations={};raw_annotations={};costs=[]
++    audit=json.loads((EXP/'analysis/annotation_audit.json').read_text())
++    blind={r['run']:r['anonymous_id'] for r in json.loads((EXP/'configs/blind_order.json').read_text())}
++    state_changes={r['run']:r for r in json.loads((EXP/'analysis/state_changes.json').read_text())}
++    door_metrics={r['run']:r for r in json.loads((EXP/'analysis/door/metrics.json').read_text())['runs']}
++    natural=json.loads((OLD/'analysis/annotations.json').read_text())['runs']
++    common=set.intersection(*(set(r['strategies']) for r in natural.values()))
++    initial_metrics={scene:metrics(EXP/'checkpoints'/scene/'reference.png',EXP/'checkpoints'/scene/'final.png')
++                     for scene in ('S01','S02','S03')}
++    for run in sorted((EXP/'runs').iterdir()):
++        index=summarize(run)
++        scene,condition,repetition=run.name.split('-')
++        row={'run':run.name,'scene':scene,'condition':condition,'repetition':int(repetition[1:]),
++             'status':index['status']['status'],'model_requests':index['model_requests'],
++             'blender_executions':len(index['blender_executions']),
++             'blender_nonzero_exits':sum(x['result'] is not None and x['result']['exit_code']!=0 for x in index['blender_executions']),
++             'blender_python_traceback_captures':sum(bool(x['python_traceback_logs']) for x in index['blender_executions']),
++             'model_errors':len(index['model_errors']),
++             'sdk_seconds':json.loads((run/'capture/trajs.json').read_text())['metadata']['wall_seconds'],
++             'code_changed':(run/'workspace/build.py').read_bytes()!=(EXP/'checkpoints'/scene/'build.py').read_bytes(),
++             'image_metrics':{'reference_vs_final':metrics(run/'workspace/reference.png',run/'workspace/final.png'),
++                              'reference_vs_initial':initial_metrics[scene],
++                              'initial_vs_final':metrics(EXP/'checkpoints'/scene/'final.png',run/'workspace/final.png')},
++             'human_rating':None}
++        row['final_image_resolution']=list(Image.open(run/'workspace/final.png').size)
++        events=json.loads((run/'analysis/sdk_events.json').read_text())
++        row['sdk_tool_errors']=[{'event_index':e['event_index'],'tool_use_id':b.get('tool_use_id'),
++                                'message':str(b.get('content'))[:600]}
++                               for e in events for b in e['message'].get('content',[])
++                               if isinstance(b,dict) and b.get('is_error')]
++        row['required_final_resolution_met']=row['final_image_resolution']==[640,360]
++        technical=run/'analysis/technical/result.json'
++        if technical.exists():
++            row['technical']=json.loads(technical.read_text())
++            regenerated=run/'analysis/technical/replica/final.png'
++            if regenerated.exists():row['image_metrics']['original_vs_regenerated']=metrics(run/'workspace/final.png',regenerated)
++        visual=EXP/'visual_reviews'/blind[run.name]/'workspace/visual_evaluation.json'
++        if visual.exists():row['automated_visual_evaluation']=json.loads(visual.read_text())
++        annotation=EXP/'technical_reviews'/run.name/'workspace/trajectory_annotation.json'
++        if annotation.exists():
++            raw_annotations[run.name]=json.loads(annotation.read_text())
++            annotations[run.name]=deepcopy(raw_annotations[run.name])
++            for strategy in annotations[run.name]['strategies']:
++                strategy['label']=audit['label_aliases'].get(strategy['label'],strategy['label'])
++            for correction in audit['comparison_overrides']:
++                if correction['run']!=run.name:continue
++                value=correction['value']
++                annotations[run.name]['exploration_assessment']['actual_comparison']=value
++                for candidate in annotations[run.name]['candidates']:candidate['actual_comparison']=value
++                for strategy in annotations[run.name]['strategies']:
++                    if strategy['label']=='candidate_comparison':strategy['status']='executed' if value is True else 'unknown'
++                if value is True and not any(s['label']=='candidate_comparison' for s in annotations[run.name]['strategies']):
++                    annotations[run.name]['strategies'].append({'label':'candidate_comparison','scope':'target','status':'executed',
++                        'inherited_from_checkpoint':False,'evidence':correction['evidence']})
++            for correction in audit['candidate_comparison_overrides']:
++                if correction['run']==run.name:
++                    annotations[run.name]['candidates'][correction['candidate_index']]['actual_comparison']='unknown'
++        geometry=run/'analysis/technical/capture/target_geometry/geometry.json'
++        if geometry.exists():
++            state=json.loads(geometry.read_text())
++            if scene=='S01':
++                row['chairs']=[{'chair':c['chair'],'gap':c['lowest_part_support']['minimum_signed_gap'] if c['lowest_part_support'] else None,
++                                'normalized_gap':c['normalized_lowest_gap'],
++                                'wheel_gaps':[w['minimum_signed_gap'] for w in c['wheel_support']],
++                                'wheels_with_below_floor_samples':sum(w['vertices_below_local_floor_top'] for w in c['wheel_support']),
++                                'wheel_axis_abs_z':[abs(part['local_z_world_axis'][2]) for part in c['parts'] if re.search(r'wheel|tyre|tire',part['name'],re.I)],
++                                'post_base_seat_connections':c['post_base_seat_connections'],
++                                'wheel_base_disconnections_sampled':[x for x in c['wheel_base_connections'] if x['surface_intersection_pairs']==0 and x['sampled_surface_distance']>0.0001]}
++                               for c in state['chairs']]
++            if scene=='S02':row['door_projection_evidence']=state.get('door_objects',[])
++        if scene=='S02':row['door_mask_comparison']=door_metrics[run.name]
++        if scene=='S03':
++            final_state=json.loads((run/'analysis/technical/capture/final_state.json').read_text())
++            target=next(o for o in final_state['objects'] if o['name']=='right marble counter')
++            materials=[m for m in final_state['materials'] if m['name'] in target['materials']]
++            changes=state_changes[run.name]
++            row['countertop']={'target':target['name'],'bound_materials':target['materials'],
++                'nodes':{m['name']:[n['type'] for n in m['nodes']] for m in materials},
++                'output_connected_nodes':{m['name']:output_connected_nodes(m) for m in materials},
++                'geometric_vein_objects':sum('marble vein' in o['name'] for o in final_state['objects']),
++                'camera_or_light_changed':changes['camera_or_light_changed'],'world_changed':changes['world_changed'],
++                'display_changes':changes['render_changed'],
++                'fixed_environment_image':str((run/'analysis/technical/capture/target_geometry/fixed_camera_lighting.png').relative_to(EXP)),
++                'scope':'Actual final scene state and bound shader; execution and comparison claims require the SDK trajectory.'}
++        rows.append(row)
++        costs.append(usage_record(run,'core' if repetition=='R1' else 'extra_repeat'))
++    for directory,scope in [('teachers','teacher_diagnosis'),('visual_reviews','automated_visual_evaluation'),('technical_reviews','trajectory_annotation')]:
++        for run in sorted((EXP/directory).iterdir()):costs.append(usage_record(run,scope))
++    costs.append(usage_record(EXP/'preflight/student','engineering_preflight'))
++    costs.append(usage_record(EXP/'preflight/native_agent_fix/session','engineering_preflight'))
++    grouped={}
++    for scope in sorted({r['scope'] for r in costs}):
++        records=[r for r in costs if r['scope']==scope];tokens=Counter()
++        for r in records:tokens.update(r['reported_tokens'])
++        grouped[scope]={'sessions':len(records),'requests':sum(r['requests'] for r in records),
++                        'usage_records':sum(r['usage_records'] for r in records),'known_tokens':dict(tokens),
++                        'missing_usage_requests':sum(len(r['requests_without_usage']) for r in records),
++                        'sdk_seconds':sum(r.get('sdk_wall_seconds',0) for r in records),
++                        'reported_local_child_cpu_seconds':sum(r.get('reported_child_cpu_seconds',0) for r in records),
++                        'maximum_sampled_rss_sum_mib':max(r.get('sampled_peak_rss_sum_mib',0) for r in records)}
++    totals=Counter()
++    for scope in grouped.values():totals.update(scope['known_tokens'])
++    errors=[]
++    for record in costs:
++        path=ROOT/record['directory']/'bridge/model_errors.jsonl'
++        if path.exists():
++            errors += [{'run':record['run'],'scope':record['scope'],**json.loads(line)} for line in path.read_text().splitlines()]
++    write(EXP/'analysis/usage_summary.json',{'scopes':grouped,'sessions':costs,'all_known_tokens':dict(totals),'model_errors':errors,
++        'actual_billing_usd':None,'ofox_requests':0,
++        'limitations':['Reported token totals are lower bounds when any requests lack usage.',
++                       'Cached input/reasoning output are subsets; do not add them again.',
++                       'SDK estimated dollar amounts do not represent subscription charges.',
++                       'Teacher role is identified from actual session directories; original teacher bridge route labels were legacy student metadata.',
++                       'Controller conversation and provider compute are not observed.']})
++    write(EXP/'analysis/results.json',{'runs':rows,'human_ratings_collected':0,'independent_reference_tasks':3,
++                                      'scope':'Core and repeat separated; no causal certainty, statistical significance, or long-term capability claim.'})
++    def strategies(name,kind):
++        values=annotations[name]['strategies']
++        selected={s['label'] for s in values if s['status'] in ('executed','retained') and (kind!='target' or s['scope']=='target')}
++        return selected-common if kind=='without_common' else selected
++    pairs=[]
++    for scene in ('S01','S02','S03'):
++        for rep in (1,2):
++            names=[r['run'] for r in rows if r['scene']==scene and r['repetition']==rep and r['run'] in annotations]
++            for left,right in combinations(names,2):
++                pairs.append({'scene':scene,'repetition':rep,'pair_kind':'within_repeat_conditions','left':left,'right':right,
++                              **{kind+'_jaccard':jaccard(strategies(left,kind),strategies(right,kind))
++                                 for kind in ('all','without_common','target')}})
++        for group in range(5):
++            left=scene+'-E'+str(group)+'-R1';right=scene+'-E'+str(group)+'-R2'
++            if left in annotations and right in annotations:
++                pairs.append({'scene':scene,'repetition':None,'pair_kind':'same_condition_repeats','left':left,'right':right,
++                              **{kind+'_jaccard':jaccard(strategies(left,kind),strategies(right,kind))
++                                 for kind in ('all','without_common','target')}})
++    write(EXP/'analysis/strategy_metrics.json',{'common_generic_labels':sorted(common),'pairs':pairs,'raw_annotations':raw_annotations,
++         'metric_annotations':annotations,'annotation_audit':audit,
++         'limitations':'One automated evidence annotator with exploratory label granularity. Unknown labels excluded from sets, not declared absent. Inherited code and new actions are distinguished in raw records. Pairs are not independent reference tasks.'})
++    with (EXP/'analysis/strategy_metrics.csv').open('w') as f:
++        columns=['scene','repetition','pair_kind','left','right','all_jaccard','without_common_jaccard','target_jaccard']
++        writer=csv.DictWriter(f,fieldnames=columns);writer.writeheader();writer.writerows(pairs)
++    knowledge=[{'run':name,'candidate':candidate} for name,a in annotations.items() for candidate in a['candidate_knowledge']]
++    write(EXP/'analysis/candidate_knowledge.json',{'candidates':knowledge,'status':'Evidence candidates only, not learned skills or validated transfer.'})
++    exploration=[{'run':name,**a['exploration_assessment'],'candidates':a['candidates'],
++                  'failure_or_stopping_observations':a['failure_or_stopping_observations']} for name,a in annotations.items()]
++    write(EXP/'analysis/exploration_summary.json',{'runs':exploration,'annotation_audit':audit,
++        'scope':'Evidence-backed proposals, execution attempts, observations and retention are separate. Path counts are automated annotations, not an overall exploration-quality score.'})
++    print('Summarized',len(rows),'branches,',len(pairs),'strategy pairs and',len(knowledge),'candidate knowledge records.')
++    print(json.dumps(grouped,indent=2))
++
++
++if __name__=='__main__':main()
+--- source_at_formal_run/analysis/summarize_run.py
++++ final_source/analysis/summarize_run.py
+@@ -50,6 +50,9 @@
+                            'result': json.loads((capture / 'result.json').read_text()) if (capture / 'result.json').exists() else None,
+                            'code': [str(p.relative_to(directory)) for p in (capture / 'code').rglob('*.py')],
+                            'artifacts': [str(p.relative_to(directory)) for p in (capture / 'artifacts').rglob('*') if p.is_file()]})
++        executions[-1]['python_traceback_logs'] = [str((capture / name).relative_to(directory))
++            for name in ('stdout.log', 'stderr.log') if (capture / name).exists()
++            and 'Traceback (most recent call last)' in (capture / name).read_text(errors='replace')]
+     result = {'run': directory.name, 'status': json.loads((directory / 'status.json').read_text()),
+               'model_requests': len(requests), 'model_responses': len(responses),
+               'model_errors': rows(directory / 'bridge/model_errors.jsonl'),
+--- source_at_formal_run/analysis/write_exploration_report.py
++++ final_source/analysis/write_exploration_report.py
+@@ -0,0 +1,204 @@
++"""Assemble measured tables and the reviewed Chinese interpretation, without invented ratings."""
++import datetime
++import json
++from pathlib import Path
++
++ROOT=Path(__file__).resolve().parents[1]
++EXP=ROOT/'experiments/experiment_02_teacher_guided_exploration'
++
++
++def number(value,digits=3):
++    return '不可用' if value is None else f'{value:.{digits}f}'
++
++
++def table(headers,rows):
++    return '| '+' | '.join(headers)+' |\n| '+' | '.join('---' for _ in headers)+' |\n'+''.join('| '+' | '.join(str(x).replace('|','／').replace('\n',' ') for x in row)+' |\n' for row in rows)+'\n'
++
++
++def main():
++    result=json.loads((EXP/'analysis/results.json').read_text());runs=result['runs']
++    usage=json.loads((EXP/'analysis/usage_summary.json').read_text())
++    strategies=json.loads((EXP/'analysis/strategy_metrics.json').read_text())
++    versions=json.loads((EXP/'runtime_versions.json').read_text())
++    core=json.loads((EXP/'core_finished.json').read_text())
++    repeat=json.loads((EXP/'repeat_finished.json').read_text()) if (EXP/'repeat_finished.json').exists() else None
++    now=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
++    exact=sum(r['image_metrics'].get('original_vs_regenerated',{}).get('pixel_identical',False) for r in runs)
++    valid=sum(r.get('technical',{}).get('regeneration',{}).get('exit_code')==0
++              and r['technical']['regenerated_blend'] and r['technical']['regenerated_render']
++              and r['technical']['original_blend_opened'] and r['required_final_resolution_met'] for r in runs)
++    by_name={r['run']:r for r in runs}
++    matrix=[]
++    for group in range(5):
++        cells=['E'+str(group)]
++        for scene in ('S01','S02','S03'):
++            values=[]
++            for repetition in (1,2):
++                r=by_name[scene+'-E'+str(group)+'-R'+str(repetition)]
++                if scene=='S01':
++                    gaps=[c['gap'] for c in r['chairs']]
++                    value='两椅均在容差内' if all(abs(g)<=.0001 for g in gaps) else ', '.join(number(g,3) for g in gaps)
++                elif scene=='S02':value=number(r['door_mask_comparison']['gt_instance_iou'])
++                else:
++                    v=r['automated_visual_evaluation'];value=v['target_resolution']+'/'+v['target_change']
++                values.append('R'+str(repetition)+': '+value)
++            cells.append('；'.join(values))
++        matrix.append(cells)
++    headline=table(['组别','两椅支撑间隙（Blender 单位）','房门参考视角 IoU','厨房目标盲评'],matrix)
++    doc=f'''# Scene RSI Experiment 02：教师引导的能力诊断与主动探索
++
++报告生成：{now.strftime('%Y-%m-%d %H:%M:%S')}（北京时间）。
++
++本批实际保存 {len(runs)} 次共同检查点分支运行：核心 15 次与额外完整重复分开记录。{valid} 次通过独立执行交付代码及随附资源、生成标准场景/图像并打开原始场景的技术检查，其中 {exact} 次独立再生成图像与交付图逐像素一致。技术完成度不等于目标缺陷解决或视觉恢复成功。
++
++这不是完整 RSI、长期能力学习、教师自演化、Harness Evolution 或模型微调。本次固定教师没有经过真实人工审美对齐，人工评分全部为空。
++
++最直接的结果是：具体指导能够改变本次任务中的建模与验证行为，效果依赖案例，没有呈现 E0→E4 单调改善。下表保留核心 R1 与额外重复 R2 的实际差异；支撑间隙、房门掩码和自动视觉判断是不同证据，不能相加为总分。
++
++{headline}
++椅子近零间隙不等于证明完整机械连接；门板 IoU 高也可能伴随不合理的门轴/墙体关系。具体方法、反例和十个研究问题见第 5 节。
++
++## 1. 研究设计与实际复用
++
++沿用 Experiment 01 的 Claude Agent SDK 执行循环、Codex CLI Bridge、多模态传递、Blender 执行、文件/网络隔离与被动记录。没有使用 Codex 原生 Agent 执行学生的文件工具，也没有继承 SceneEvolve 的重建策略。CLI 是底层模型决策后端，实际 Bash/Read/Write/Edit 及其结果由 SDK 维护。
++
++每组从同一份代码、scene.blend、final.png、参考图和相关资源独立复制。所有会话全新，未恢复原学生对话，因此准确称为“共同场景检查点分支实验”。学生不知道其他组的执行结果，教师和学生都没有 GT 挂载或网络搜索权限；GT 只用于所有学生结束后的评价。
++
++模型统一为 gpt-6.1-terra / low，实际 CLI 参数经过逐请求审计。运行版本：{versions['codex_version']}、Claude Agent SDK {versions['claude_agent_sdk']}、Blender 5.2.2。请求接受与记录的标识不能独立证明服务商内部权重版本。
++
++| 案例 | 初始运行 | 本批共同目标 |
++| --- | --- | --- |
++| S01 | S01-R1 | 两把办公室椅子的支撑、轮子及底座关系 |
++| S02 | S02-R3 | 卧室门板朝向、投影及前景遮挡 |
++| S03 | S03-R2 | 厨房右台面的材质与纹理外观 |
++
++初始检查点来自 Experiment 01，原结果未修改。本批源代码和固定输入分别见 source_at_formal_run、source_at_repeat_start、checkpoints 与 configs/cases.json；新增代码及真实修复另行保存。
++
++## 2. 组别、Prompt、预算与冻结顺序
++
++| 组别 | 实际追加指导 |
++| --- | --- |
++| E0 | 无额外指导，继续自主改善当前重建 |
++| E1 | 通用比较、自检和修复要求，不指明错误物体或技术 |
++| E2 | 教师给出的具体缺陷，不提供修复方法 |
++| E3 | 与 E2 完全相同的缺陷文字，加一种策略和验证方向 |
++| E4 | 与 E2 完全相同的缺陷文字，加至少两种不同假设或方法及比较要求 |
++
++完整英文任务与实际指导保存在 prompts/ 和 hints/。Hint 位于初始用户消息的 Additional guidance 部分；SDK 系统提示保持相同。教师先读取参考图、当前渲染、代码、保存状态、原始轨迹和既有客观证据，再生成诊断与全部指导；未读取 GT .blend、精确坐标或隐藏结构。教师工作区的原始代码/场景/渲染均未被改动。
++
++所有学生同为 1500 秒追加执行、最多 120 次进入 Bridge 的模型请求、120 SDK turn 上限、8 核 CPU、nice 15、每进程 32 GiB 地址空间上限，最终渲染 640×360。两路分别使用 32–39、40–47。允许自主提前结束；相同上限不等于实际消耗相同。没有设置可核验的模型采样 seed，也没有跨会话 Memory、Skill、持久知识或在线教师。
++
++实际每次学生使用 4–21 次 Bridge 请求、66.0–491.8 秒 SDK 墙钟，30 次均以 sdk_exit 正常结束，没有触发时间或调用上限。残留缺陷发生在预算尚未耗尽时；这支持分析自主停止与复核行为，但不能推断强制执行更久就一定能够修复。
++
++核心顺序在正式执行前冻结并交错场景。额外重复严格依据预先记录的时间条件启动，顺序反转，仍从原检查点开始；没有依据评价结果追加某个组。没有运行第二初始检查点或 E5。
++
++各场景 E0–E4 的指导字数分别为：
++
++'''
++    hint_rows=[]
++    for scene in ('S01','S02','S03'):
++        h=json.loads((EXP/'hints'/(scene+'.json')).read_text());hint_rows.append([scene]+[h['word_counts']['E'+str(i)] for i in range(5)])
++    doc+=table(['场景','E0','E1','E2','E3','E4'],hint_rows)
++    doc+='提示长度与具体内容共同变化，不能把本批差异单独归因于“探索”二字或纯知识量。教师准备成本单列，没有假装为零。\n\n'
++    doc+='## 3. 独立评价及证据边界\n\n'
++    scenes=json.loads((ROOT/'configs/scenes.json').read_text())['scenes']
++    doc+='继续使用 Experiment 01 已冻结、已验证的 IDEAL-Scenes 数据，不重新下载或挑选样本。来源与许可沿用其数据清单：\n\n'
++    doc+=table(['匿名案例','原数据场景','记录许可','原始来源'],
++               [[s['id'],Path(s['evaluation_directory']).name,s['license'],'[数据目录]('+s['source_url']+')'] for s in scenes])
++    doc+='GT 的完整本地位置见 ../../configs/scenes.json 与本批 file_index.json 的 reused_ground_truth；原始 GT 保存在独立 data/evaluation_gt，学生和教师都只获得原参考 RGB 与学生检查点资料。\n\n'
++    doc+='所有学生执行结束后，评价端才打开交付文件、独立再生成、提取真实检查点状态并执行几何/图像评价。视觉评价使用匿名随机编号，只看参考图、初始图与单个候选图，不看组别、Hint 或其他候选。视觉评价与轨迹标注都通过同一 SDK/Bridge/模型执行，属于自动评价，不能冒充人工评分。\n\n'
++    visual_completed=sum(r['scope']=='automated_visual_evaluation' and r.get('status')=='completed' for r in usage['sessions'])
++    technical_completed=sum(r['scope']=='trajectory_annotation' and r.get('status')=='completed' for r in usage['sessions'])
++    doc+=f"实际得到 {sum('automated_visual_evaluation' in r for r in runs)} 份有效视觉评价、{len(strategies['raw_annotations'])} 份有效轨迹标注；对应正常结束的评价会话分别为 {visual_completed}、{technical_completed}。原始模型输出、重试与缺失用量均保留。\n\n"
++    doc+='椅子使用实际评估后的世界空间网格，分开识别两把完整组件和局部地板。误差容忍 1e-4 个学生 Blender 单位；正间隙证明分离，近零或包围盒重叠不证明完整物理接触，穿入和组件连接另列。门记录可见/完整投影、门轴和框体；只有语义对应可靠时才计算 GT 辅助重叠。厨房保留初始相机、灯光、World 和显示参数下的辅助图，候选几何仍可能混杂材质判断。SSIM 仅为像素辅助指标。\n\n'
++    doc+='Blender 原始退出码为 0 不一定意味着 Python 没有异常；学生原始日志和异常都保留，独立再生成统一使用 Python 异常退出设置，并核对真实产物。评价端测量不被计为学生实际做过的检查。\n\n'
++    doc+='## 4. 每次运行的实际结果\n\n'
++    for repetition in (1,2):
++        selected=[r for r in runs if r['repetition']==repetition]
++        if not selected:continue
++        doc+='### '+('核心批次' if repetition==1 else '额外完整重复')+'\n\n'
++        data=[]
++        for r in selected:
++            visual=r.get('automated_visual_evaluation',{})
++            data.append([r['run'],r['status'],r['model_requests'],number(r['sdk_seconds']/60,2),
++                         r['blender_python_traceback_captures'],len(r['sdk_tool_errors']),'是' if r['code_changed'] else '否',
++                         visual.get('target_resolution','不可用'),visual.get('target_change','不可用'),
++                         visual.get('overall_visual_change','不可用'),
++                         number(r['image_metrics']['reference_vs_initial']['ssim_rgb_gaussian_auxiliary'])+' → '+number(r['image_metrics']['reference_vs_final']['ssim_rgb_gaussian_auxiliary'])])
++        doc+=table(['运行','SDK 状态','Bridge 请求','SDK 分钟','Blender 日志异常','SDK 工具错误','代码修改','自动目标判定','自动目标变化','自动整体变化','辅助 SSIM 初始→最终'],data)
++    doc+='自动判定保留原始英文类别；resolved/partial/unresolved/unknown 不是人工成功率。每个结果的具体理由和不确定性见 visual_reviews/ 与 analysis/results.json。\n\n'
++    chair_rows=[]
++    for r in runs:
++        if 'chairs' not in r:continue
++        for c in r['chairs']:
++            chair_rows.append([r['run'],c['chair'],number(c['gap'],6),number(c['normalized_gap'],6),
++                               ', '.join(number(v,6) for v in c['wheel_gaps']),c['wheels_with_below_floor_samples'],
++                               number(min(c['wheel_axis_abs_z']))+'–'+number(max(c['wheel_axis_abs_z'])),
++                               len(c['wheel_base_disconnections_sampled'])])
++    doc+='### 两把椅子的局部支撑证据\n\n'+table(['运行','椅子','最小有符号间隙','间隙／椅高','各轮最低间隙','存在低于地板采样的轮子数','轮轴 Z 绝对值范围','轮—底座分离候选数'],chair_rows)
++    doc+='初始两把椅子的间隙分别为 0.014999896、0.014999658；每份结果按当前中心柱位置识别两把完整组件，每把有五个轮子。本例脚轮为圆柱：轮轴 Z 绝对值接近 1 表示轴竖直，接近 0 表示轴水平。轮—底座分离候选指没有表面交叉且顶点到表面最小采样距离大于容差的情况；零候选不是完整物理连接证明。柱体—底座/椅壳和叉架连接的交叉对数及采样距离也分别保留在 results.json 与原始 geometry.json。被隐藏其他物体的诊断视角和原相机外观均保留，不把单一间隙值当作完整成功。\n\n'
++    door=json.loads((EXP/'analysis/door/metrics.json').read_text())
++    doc+='### 房门的参考视角投影\n\n'
++    doc+='GT 提供的实例映射明确将 ID 24 对应到 PanelDoorFactory 房门，可见掩码为 18,209 像素。学生端按源码中 open door hinge 的真实子对象识别木质房门，排除柜子的玻璃门。初始房门掩码与 GT 的 IoU 为 0。统一使用最近邻将 GT 实例掩码缩放为 640×360，学生端以不透明发射材质生成可见投影；不执行三维坐标误差或隐藏结构评分。\n\n'
++    doc+=table(['运行','房门可见像素','完整投影像素','可见／完整投影','GT 房门 IoU','GT 房门召回'],
++               [[r['run'],r['visible']['pixels'],r['amodal']['pixels'],number(r['visible_fraction_of_projected_door']),
++                 number(r['gt_instance_iou']),number(r['gt_recall'])] for r in door['runs']])
++    doc+='掩码重合不能证明门轴/门框合理，也不是整体恢复度。相机和门的同时修改都会影响投影，不能把 IoU 的变化全部归因于门板建模。原始名称规则的误匹配及统一重测记录见 analysis/door_mapping_revision.json；旧测量保留。\n\n'
++    doc+='### 台面真实材质与混杂因素\n\n'
++    doc+=table(['运行','几何纹路线数','实际台面材质节点','相机或灯变化','World 变化','显示参数变化'],
++        [[r['run'],r['countertop']['geometric_vein_objects'],
++          ', '.join(n.removeprefix('ShaderNode') for ns in r['countertop']['output_connected_nodes'].values() for n in ns),
++          r['countertop']['camera_or_light_changed'],r['countertop']['world_changed'],bool(r['countertop']['display_changes'])]
++         for r in runs if 'countertop' in r])
++    doc+='原检查点使用纯色台面和 15 条几何纹路。表中只列与 Material Output 连通的节点，完整节点与绑定仍在 analysis/results.json 和各次 final_state.json。S03-E2-R2 中间确实渲染过 Wave 材质，最终转回 Noise；Wave 节点虽仍留在文件中，已经不接入输出。固定初始相机/照明辅助图见各次 target_geometry/fixed_camera_lighting.png。新材质存在并不等于外观恢复成功。\n\n'
++    doc+='## 5. 研究问题与案例解释\n\n'
++    interpretation=EXP/'analysis/research_interpretation_zh.md'
++    doc+=interpretation.read_text()+'\n\n' if interpretation.exists() else '研究解释尚未完成；此为自动生成草稿，不应作为最终结论。\n\n'
++    doc+='## 6. 技术策略重合度与实际探索\n\n'
++    data=[]
++    for scene in ('S01','S02','S03'):
++        for rep in (1,2):
++            pairs=[p for p in strategies['pairs'] if p['scene']==scene and p['repetition']==rep and p['pair_kind']=='within_repeat_conditions']
++            if not pairs:continue
++            means=[]
++            for key in ('all_jaccard','without_common_jaccard','target_jaccard'):
++                values=[p[key] for p in pairs if p[key] is not None];means.append(number(sum(values)/len(values))+' (n='+str(len(values))+')' if values else '不可用 (n=0)')
++            data.append([scene,rep,len(pairs)]+means)
++    doc+=table(['场景','重复','组间配对数','完整标签均值','去共同标签均值','目标局部标签均值'],data)
++    doc+='每对原始值见 analysis/strategy_metrics.csv；相同组跨重复也单列。n 为该口径下可计算的配对数；两个观测标签集合都为空时不强行定义相似度。命名采用预先给标注者的语义词表，标签需要实际代码、事件和场景证据。对同义垂直渐变材质标签及“仅有读图迭代、没有明确候选比较”的标注做了统一证据复核，原始标注与用于指标的派生标注分开保留，差异见 analysis/annotation_audit.json。未知或未标注不等于实际未采用；本表是已观测标签集合的重合度。完整集合中继承的建模代码会抬高重合度；去掉原实验的 12 个共同标签也不能解决所有粒度问题。这里只有三个独立参考任务，不将配对数当独立样本数，不做显著性或能力上限结论。\n\n'
++    doc+='目标局部口径还受自动标注 scope 边界影响。低重合度也可能来自某些组没有观察到目标动作，不能直接视为有效探索更多。本表不能与 Experiment 01 的自然重建数值直接相减作为处理效应：两批的起始状态、指导条件、追加动作和标注任务不同。实际方法变化需由候选源码、执行与观察证据支持。\n\n'
++    doc+='候选版本、失败、比较行为和最终保留方法分别见 technical_reviews/ 的 trajectory_annotation.json 及 analysis/exploration_summary.json。知识候选位于 analysis/candidate_knowledge.json，区分教师先验、原自然轨迹和本次实际分支发现；没有直接变成 Skill，也没有验证无教师新场景迁移。\n\n'
++    doc+='## 7. Token、时间与资源\n\n'
++    doc+='Token 以每个会话 bridge/token_usage.jsonl 中 CLI 返回的 usage 为准；SDK 自身的别名费用不作为实际账单。\n\n'
++    condition_costs=[]
++    for repetition,scope in [(1,'core'),(2,'extra_repeat')]:
++        for group in range(5):
++            selected=[r for r in usage['sessions'] if r['scope']==scope and '-E'+str(group)+'-' in r['run']]
++            condition_costs.append(['核心' if repetition==1 else '额外重复','E'+str(group),len(selected),
++                sum(r['requests'] for r in selected),sum(r['reported_tokens'].get('input_tokens',0) for r in selected),
++                sum(r['reported_tokens'].get('output_tokens',0) for r in selected),
++                number(sum(r.get('sdk_wall_seconds',0) for r in selected)/60,2)])
++    doc+=table(['批次','组别','场景数','Bridge 请求','已报告输入','已报告输出','SDK 分钟之和'],condition_costs)
++    doc+='这是每组三个场景的消耗之和，核心与额外重复分列；不是单位成功率的费用，也未把教师准备成本隐去或随意分摊。\n\n'
++    data=[]
++    for scope,row in usage['scopes'].items():
++        tokens=row['known_tokens'];data.append([scope,row['sessions'],row['requests'],tokens.get('input_tokens',0),tokens.get('output_tokens',0),row['missing_usage_requests'],number(row['sdk_seconds']/60,2),number(row['reported_local_child_cpu_seconds'],2),number(row['maximum_sampled_rss_sum_mib'],1)])
++    doc+=table(['范围','会话','Bridge 请求','已报告输入','已报告输出','用量缺失请求','SDK 分钟之和','已报告本地子进程 CPU 秒','最大抽样 RSS 和 MiB'],data)
++    total=usage['all_known_tokens'];doc+=f"全部执行器已报告输入 {total.get('input_tokens',0)}、输出 {total.get('output_tokens',0)}，合计 {total.get('input_tokens',0)+total.get('output_tokens',0)} Token。其中缓存输入 {total.get('cached_input_tokens',0)}、推理输出 {total.get('reasoning_output_tokens',0)}，均为对应输入/输出的子集，不能重复相加。输入统计包含多次携带历史上下文与图像的请求，不能当成独立新文本量；存在缺失请求时总量仅为下界。没有调用 Ofox，Codex 实际美元费用不可从执行器核验，SDK 别名估价不当作账单。控制器聊天和服务商计算资源不在此计数内。\n\n"
++    doc+=f"核心墙钟 {core['seconds']/60:.2f} 分钟；"+(f"额外重复墙钟 {repeat['seconds']/60:.2f} 分钟。" if repeat else '没有额外重复。')+'每次资源抽样、CPU 亲和性和子进程 OS 计时均保留。RSS 求和可能重复计算共享页。全部本地渲染为 CPU，没有占用 GPU；评价阶段两路各八线程，CPU 集合 48–55、56–63。\n\n'
++    if (EXP/'completion.json').exists():
++        completion=json.loads((EXP/'completion.json').read_text())
++        doc+=f"从源码检查开始至本批完成记录共 {completion['elapsed_seconds']/60:.2f} 分钟，在六小时预算内。完整起止时间见 completion.json。各会话 SDK 分钟之和包含并行重叠，不能作为总体墙钟。上表子进程 CPU 为操作系统已报告值，未覆盖控制器全部活动及服务商计算，不冒充整台服务器的精确资源账单。\n\n"
++    doc+='## 8. 工程变化、真实限制与人工材料\n\n'
++    doc+='完整修复与受影响范围见 ENGINEERING_LOG.md。正式学生保留各自冻结源码；评价端的脚本异常识别、局部网格测量、材质状态扩展及图像对照单列。30 次学生共观察到 13 次 CLI 内部空 wait（核心 4、重复 9），没有非空接收者、其他 Agent、主机文件操作或跨会话结果的证据；原始事件保留，不能声称 native-tool-free 或完全等价于直接 API。全部学生结束后才部署 agents.enabled=false 与 multi_agent_v2=false，真实三图预检正确，后续评价使用该版本，没有重采样学生。Bridge 请求预算也不等于可独立观测的全部提供商内部往返。\n\n'
++    doc+='文件/网络命名空间隔离了 GT、其他学生结果和实际 Hint 文件；原 Harness 的只读 /sdk、/harness 运行库源码仍可见，其中包括通用调度与提示模板。590 次实际工具请求未观察到对运行库/诊断源码路径的显式读取，但字符串路径审计不是所有间接访问均不存在的证明。本批没有额外缩小这部分源码挂载范围，详情见 analysis/runtime_access_audit.json。\n\n'
++    doc+='其他限制包括：样本小；标签由单一自动模型辅助形成，未进行人工复核/标注一致性验证；教师、学生与自动评估使用同一基础模型，会话和输入隔离不等于判断误差相互独立；提示长度和实际成本不同；单图遮挡与三维结构不可辨识；名字对应与网格表面采样不等于完整碰撞/物理求解；厨房的几何与光照联动可能妨碍单独归因；新场景无教师迁移、长期学习与 Human-Aligned Teacher 均未验证。\n\n'
++    doc+='匿名人工页面复用了 Experiment 01 的布局和本地导出逻辑，提供参考、初始、匿名结果、局部图及辅助视角。全部评分为空，不要求人类看代码或提供 Blender 技术方案。\n\n'
++    doc+='![核心结果：参考图、初始场景、E0–E4](analysis/comparison_core.png)\n\n'
++    if repeat:doc+='![额外重复：参考图、初始场景、E0–E4](analysis/comparison_repeat.png)\n\n'
++    doc+='## 9. 复查入口\n\n- [冻结协议](PROTOCOL.md)、[实际设计](configs/frozen_design.json)、[追加依据](repeat_decision.json)。\n- [初始检查点](checkpoints)、[教师输入](teacher_inputs)、[真实诊断与完整会话](teachers)、[固定 Hint](hints)、[全部 Prompt](prompts)。\n- [学生原始记录与交付](runs)、[逐次结果](analysis/results.json)、[成本记录](analysis/usage_summary.json)、[策略逐对结果](analysis/strategy_metrics.csv)。\n- [正式启动时增量](source_changes.diff)、[最终源码来源](final_source_origin.json)、[后续源码增量](post_formal_source_changes.diff)、[工程修复](ENGINEERING_LOG.md)、[正式启动快照](source_at_formal_run)、[重复启动快照](source_at_repeat_start)。\n- [匿名人工评价页面](analysis/human_review/index.html)：下载后本地打开，未收集人工评分。\n'
++    (EXP/'REPORT_DRAFT_ZH.md').write_text(doc)
++    print('Wrote measured draft; complete the reviewed interpretation before final publication.')
++
++
++if __name__=='__main__':main()
+--- before_experiment_02/README.md
++++ final_source/README.md
+@@ -1,6 +1,6 @@
+-# Scene RSI：自然重建轨迹实验 01
++# Scene RSI
+ 
+-这是独立的图像到可编辑 Blender 场景实验。学生沿用 hintrsi 的 Claude Agent SDK 执行循环，Codex CLI Bridge 仅调用 `gpt-6.1-terra`（low）返回模型决策，工具由 SDK 执行。本次没有教师、Hint、Skill、持久知识或旧 Memory，也没有进行完整 RSI。
++这是独立的图像到可编辑 Blender 场景工程。学生沿用 hintrsi 的 Claude Agent SDK 执行循环，Codex CLI Bridge 调用 `gpt-6.1-terra`（low）返回模型决策，工具由 SDK 执行。实验 01 研究无教师的自然重建轨迹；实验 02 研究固定教师 Hint 对共同检查点分支的影响。两批均没有进行完整 RSI、模型微调、长期能力学习或真实人工审美对齐。
+ 
+ - `sdk/`：复用 trajectory-to-capability 的 SDK、Bridge、消息转换与日志代码；多模态改动见实验目录的 `sdk_changes.diff`。
+ - `harness/`：新建的文件与网络隔离、SDK 入口、透明 Blender 记录器及两路调度。没有 SceneEvolve 建模策略。
+@@ -8,11 +8,16 @@
+ - `data/`：IDEAL-Scenes 的少量候选资料，以及只对评价端开放的三个完整 GT。
+ - `analysis/`：实验结束后的场景提取、复现、轨迹比较和人工评价材料生成。
+ - `experiments/experiment_01_natural_trajectories/`：真实预检、工程中断、九次正式执行及报告。
++- `experiments/experiment_02_teacher_guided_exploration/`：三个共同检查点、E0–E4 五组、核心 15 次与额外完整重复 15 次，以及独立评价和候选知识。
+ 
+-正式场景为办公室、卧室、厨房，各独立重建三次。学生只能访问匿名 RGB 图片；GT、其他结果、已有 Scene 工程与互联网均不在学生可访问范围内。每次预算为 25 分钟、120 次模型请求、8 个 CPU 核，要求 640×360 最终渲染。
++正式场景为办公室、卧室、厨房。实验 01 每场景独立重建三次，仅提供匿名 RGB。实验 02 从指定自然检查点开始，各组使用相同代码、场景、初始渲染与参考 RGB，采用全新 SDK 会话。GT 和其他结果不挂载给学生；实验 02 教师也没有 GT。每次学生预算为 25 分钟、120 次模型请求、8 个 CPU 核，要求 640×360 最终渲染。运行库源码可见范围、实际工具访问与其他限制分别记录在各批报告。
+ 
+-实验协议见 `experiments/experiment_01_natural_trajectories/PROTOCOL.md`，实际工程问题见 `ENGINEERING_LOG.md`，完成后研究报告保存在同一目录。SDK 自报的美元费用不是 Codex 实际账单；实际记录请求数、Token 和耗时。
++实验协议、实际工程修复、源码快照和中文报告保存在各自实验目录。SDK 自报的美元费用不是 Codex 实际账单；实际记录请求数、Token 和耗时。
+ 
+ 数据来源：[IDEAL-Scenes](https://huggingface.co/datasets/IDEAL-Benchmark/IDEAL-Scenes)，CC BY 4.0。[项目主页](https://ideal3d.github.io/)。仅复用数据，没有复用其 Agent 或重建 Harness。
+ 
+-已完成：九次正式重建、九次独立再生成与事后分析。详见 [中文研究报告](experiments/experiment_01_natural_trajectories/REPORT_ZH.md) 和 [人工评价页面](experiments/experiment_01_natural_trajectories/analysis/human_review/index.html)。正式源码快照在 source_at_formal_run；当前 Bridge 还包含全部运行结束后修复的后端超时回收，未与正式结果混用。
++实验 01 已完成九次正式重建、九次独立再生成与事后分析。详见 [实验 01 报告](experiments/experiment_01_natural_trajectories/REPORT_ZH.md) 和 [人工评价页面](experiments/experiment_01_natural_trajectories/analysis/human_review/index.html)。
++
++实验 02 已完成 30 次学生分支、30 次独立再生成、30 份匿名自动视觉评价和 30 份轨迹标注，保存 75 个策略配对与 39 条候选知识。详见 [实验 02 报告](experiments/experiment_02_teacher_guided_exploration/REPORT_ZH.md)、[结果对照](experiments/experiment_02_teacher_guided_exploration/analysis/comparison_core.png)、[匿名人工评价页面](experiments/experiment_02_teacher_guided_exploration/analysis/human_review/index.html)。没有收集真实人工评分，没有验证无教师新场景迁移。
++
++当前源码还包含运行结束后的接入修复；各批实际运行版本、受影响角色和未重采样范围均有单独记录。大型科学文件保留在本地，以各批 file_index.json、sync_manifest.json 定位；实验 02 当前尚未另行上传 GitHub。

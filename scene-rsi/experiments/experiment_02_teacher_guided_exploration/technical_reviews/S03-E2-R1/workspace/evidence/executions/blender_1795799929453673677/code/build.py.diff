@@ -1,0 +1,18 @@
+--- previous/build.py
++++ build.py
+@@ -53,7 +53,7 @@
+ links.new(tex.outputs['Generated'],mapping.inputs[0])
+ noise=nodes.new('ShaderNodeTexNoise'); noise.inputs['Scale'].default_value=3.8; noise.inputs['Detail'].default_value=3.0; noise.inputs['Roughness'].default_value=.65; noise.inputs['Distortion'].default_value=3.0
+ links.new(mapping.outputs[0],noise.inputs['Vector'])
+-ramp=nodes.new('ShaderNodeValToRGB'); ramp.color_ramp.elements[0].position=.29; ramp.color_ramp.elements[0].color=(.56,.58,.57,1); ramp.color_ramp.elements[1].position=.73; ramp.color_ramp.elements[1].color=(.90,.91,.90,1)
++ramp=nodes.new('ShaderNodeValToRGB'); ramp.color_ramp.elements[0].position=.29; ramp.color_ramp.elements[0].color=(.43,.45,.44,1); ramp.color_ramp.elements[1].position=.73; ramp.color_ramp.elements[1].color=(.90,.91,.90,1)
+ links.new(noise.outputs['Fac'],ramp.inputs[0]); links.new(ramp.outputs['Color'],bs.inputs['Base Color'])
+ # faces on inward x side
+ for j,y in enumerate([-.58,.22,1.02,1.82,2.62]):
+@@ -100,5 +100,5 @@
+ bpy.ops.object.camera_add(location=(0,-1.6,2.05)); cam=bpy.context.object; cam.rotation_euler=(Vector((0,2.0,1.0))-cam.location).to_track_quat('-Z','Y').to_euler(); cam.data.lens=22; bpy.context.scene.camera=cam
+ scene=bpy.context.scene; scene.render.engine='CYCLES'; scene.cycles.samples=32; scene.cycles.use_denoising=True; scene.render.threads_mode='FIXED'; scene.render.threads=8
+ scene.render.resolution_x=640; scene.render.resolution_y=360; scene.render.resolution_percentage=100
+-scene.view_settings.view_transform='AgX'; scene.render.image_settings.file_format='PNG'; scene.render.filepath='/app/final.png'
++scene.view_settings.view_transform='AgX'; scene.view_settings.exposure=-0.6; scene.render.image_settings.file_format='PNG'; scene.render.filepath='/app/final.png'
+ bpy.ops.wm.save_as_mainfile(filepath='/app/scene.blend'); bpy.ops.render.render(write_still=True)

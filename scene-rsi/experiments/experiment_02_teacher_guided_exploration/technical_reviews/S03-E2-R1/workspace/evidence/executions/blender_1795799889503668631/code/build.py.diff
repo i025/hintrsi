@@ -1,0 +1,24 @@
+--- previous/build.py
++++ build.py
+@@ -15,10 +15,21 @@
+  bpy.ops.mesh.primitive_cylinder_add(vertices=verts, radius=r, depth=depth, location=loc, rotation=rot); o=bpy.context.object; o.name=n; o.data.materials.append(ma); o.modifiers.new('edge normals','WEIGHTED_NORMAL'); return o
+ def rod(n,a,b,r,ma):
+  d=Vector(b)-Vector(a); o=cyl(n,(Vector(a)+Vector(b))/2,r,d.length,ma); o.rotation_euler=d.to_track_quat('Z','Y').to_euler(); return o
++# Subtle long grain in the pale timber floor.
++for material in [wood]:
++ nt=material.node_tree; ns=nt.nodes; lk=nt.links
++ coord=ns.new('ShaderNodeTexCoord'); scale=ns.new('ShaderNodeVectorMath'); scale.operation='MULTIPLY'; scale.inputs[1].default_value=(28,1.4,2)
++ lk.new(coord.outputs['Generated'],scale.inputs[0]); noise=ns.new('ShaderNodeTexNoise'); noise.inputs['Scale'].default_value=4; noise.inputs['Detail'].default_value=3; noise.inputs['Roughness'].default_value=.7; lk.new(scale.outputs[0],noise.inputs['Vector'])
++ ramp=ns.new('ShaderNodeValToRGB'); ramp.color_ramp.elements[0].color=(.43,.34,.27,1); ramp.color_ramp.elements[1].color=(.74,.65,.56,1); lk.new(noise.outputs['Fac'],ramp.inputs[0]); lk.new(ramp.outputs['Color'],ns.get('Principled BSDF').inputs['Base Color'])
+ # room floor and wall
+ cube('floor',(0,1.2,-.055),(4.5,7,.1),wood)
+ # individual pale plank floor with seams
+ planks=[mat('oak tone '+str(i),(0.66+i*.018,0.60+i*.017,0.53+i*.016)) for i in range(4)]
++for material in planks:
++ nt=material.node_tree; ns=nt.nodes; lk=nt.links
++ coord=ns.new('ShaderNodeTexCoord'); scale=ns.new('ShaderNodeVectorMath'); scale.operation='MULTIPLY'; scale.inputs[1].default_value=(10,1,2); lk.new(coord.outputs['Generated'],scale.inputs[0])
++ noise=ns.new('ShaderNodeTexNoise'); noise.inputs['Scale'].default_value=3; noise.inputs['Detail'].default_value=3; noise.inputs['Roughness'].default_value=.7; lk.new(scale.outputs[0],noise.inputs['Vector'])
++ ramp=ns.new('ShaderNodeValToRGB'); ramp.color_ramp.elements[0].color=(.48,.42,.36,1); ramp.color_ramp.elements[1].color=(.76,.69,.62,1); lk.new(noise.outputs['Fac'],ramp.inputs[0]); lk.new(ramp.outputs['Color'],ns.get('Principled BSDF').inputs['Base Color'])
+ for i in range(14):
+  x=-2.1+i*.32
+  cube('floor plank',(x,1.4,.002),(.315,6.8,.012),planks[i%4])

@@ -11,12 +11,21 @@ PYTHON = Path('/srv/lab-disks/disk2/users/xymo/hint-baseline-run/python/cpython-
 ENVIRONMENT = Path('/srv/lab-disks/disk2/users/xymo/hint-baseline-run/env')
 
 
-def prepare(directory, image, prompt):
+def prepare(directory, image, prompt, checkpoint=None, session=None):
     directory = Path(directory).resolve()
     for name in ('workspace', 'home', 'capture', 'tmp', 'inputs'):
         (directory / name).mkdir(parents=True, exist_ok=True)
+    if checkpoint:
+        shutil.copytree(checkpoint, directory / 'workspace', dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns('.git', '__pycache__', '*.pyc'))
     shutil.copyfile(image, directory / 'workspace/reference.png')
     (directory / 'inputs/prompt.txt').write_text(prompt)
+    (directory / 'inputs/session.json').write_text(json.dumps(session or {}, indent=2))
+    images = [{'path': '/app/reference.png', 'label': 'Reference image'}]
+    if checkpoint:
+        images.append({'path': '/app/final.png', 'label': 'Current reconstruction image'})
+    images += (session or {}).get('additional_images', [])
+    (directory / 'inputs/images.json').write_text(json.dumps(images, indent=2))
     return directory
 
 

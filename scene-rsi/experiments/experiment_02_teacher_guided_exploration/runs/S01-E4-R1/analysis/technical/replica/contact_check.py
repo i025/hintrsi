@@ -1,0 +1,23 @@
+import bpy, math
+from mathutils import Vector
+from mathutils.bvhtree import BVHTree
+scene=bpy.context.scene
+dg=bpy.context.evaluated_depsgraph_get()
+floors=[o for o in scene.objects if o.name.startswith('individual oak floor plank') or o.name=='floor slab']
+def bounds(o):
+ e=o.evaluated_get(dg); m=e.to_mesh(); vs=[e.matrix_world@v.co for v in m.vertices]; e.to_mesh_clear(); return vs
+for wheel in sorted([o for o in scene.objects if o.name.startswith('caster wheel')],key=lambda o:o.name):
+ vs=bounds(wheel); low=min(v.z for v in vs); bottom=[v for v in vs if v.z<low+0.001]; hits=[]
+ for v in bottom:
+  for f in floors:
+   e=f.evaluated_get(dg); inv=e.matrix_world.inverted(); origin=inv@Vector((v.x,v.y,1)); direction=(inv.to_3x3()@Vector((0,0,-1))).normalized(); ok,loc,n,idx=e.ray_cast(origin,direction)
+   if ok: hits.append((e.matrix_world@loc).z)
+ floor=max(hits) if hits else float('nan'); print(wheel.name,'bottom',round(low,5),'floor',round(floor,5),'gap',round(low-floor,5))
+for obj in scene.objects:
+ if obj.name.startswith('chair central post') or obj.name.startswith('curved grey office chair shell'):
+  vs=bounds(obj); print(obj.name,'zrange',round(min(v.z for v in vs),4),round(max(v.z for v in vs),4))
+# Orthographic side diagnostic, retaining all chair and floor geometry
+for o in scene.objects:
+ if not (o.name.startswith(('caster wheel','caster fork','five star chair base','chair central post','curved grey office chair shell','individual oak floor plank','floor slab')) or o.type in {'LIGHT','CAMERA'}): o.hide_render=True
+cam=scene.camera; cam.location=(0,-9,1.0); cam.rotation_euler=(Vector((0,0,0.8))-cam.location).to_track_quat('-Z','Y').to_euler(); cam.data.type='ORTHO'; cam.data.ortho_scale=4.8
+scene.render.filepath='/app/'+bpy.path.basename(bpy.data.filepath).replace('.blend','_side.png'); scene.cycles.samples=16; bpy.ops.render.render(write_still=True)

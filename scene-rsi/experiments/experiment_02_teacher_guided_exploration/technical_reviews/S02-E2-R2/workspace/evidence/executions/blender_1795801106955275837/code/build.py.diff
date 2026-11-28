@@ -1,0 +1,10 @@
+--- previous/build.py
++++ build.py
+@@ -49,6 +49,7 @@
+ def lamp(x,y,height):
+  cyl('floor lamp round base',(x,y,.025),.19,.04,dark);cyl('floor lamp slender stem',(x,y,height/2),.014,height,dark);cone('white fabric tapered lampshade',(x,y,height-.10),.20,.15,.34,shade);point('lamp warm glow',(x,y,height-.10),45,(1,.78,.50))
+ lamp(-2.05,.65,1.65);lamp(.47,1.77,1.67)
++point('warm wall illumination from rear lamp',(.47,1.98,1.55),75,(1,.68,.38))
+ # rug on floor
+ rugobj=cube('beige area rug',(.30,.52,.012),(1.8,1.75,.018),rug,.05)
+ nt=rug.node_tree; p=nt.nodes.get('Principled BSDF'); noise=nt.nodes.new('ShaderNodeTexNoise'); noise.inputs['Scale'].default_value=5; noise.inputs['Detail'].default_value=3; ramp=nt.nodes.new('ShaderNodeValToRGB'); ramp.color_ramp.elements[0].color=(.43,.33,.24,1); ramp.color_ramp.elements[1].color=(.76,.67,.55,1); nt.links.new(noise.outputs['Fac'],ramp.inputs[0]); nt.links.new(ramp.outputs[0],p.inputs['Base Color'])

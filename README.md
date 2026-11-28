@@ -2,6 +2,12 @@
 
 这里整理了原始 Hint 实验交接包、Ofox 补充 baseline，以及后续通过 Codex CLI 运行的各版代码、配置、测试、实验成绩和诊断记录。上传整理时间：2026-11-24。原始实验目录保留，仓库是独立的脱敏副本。
 
+## 2026-11-28：Scene 教师诊断与主动探索实验
+
+新增 [Scene 实验 02](scene-rsi/experiments/experiment_02_teacher_guided_exploration/README.md)：三个共同检查点、E0–E4 五组、每组两次，共 30 次学生重建；全部完成独立再生成且交付渲染逐像素一致。教师 Hint 改变了部分策略和缺陷，但主动探索并非始终优于其他组；这不代表完成了 RSI 或可迁移能力学习。
+
+入口：[中文研究报告](scene-rsi/experiments/experiment_02_teacher_guided_exploration/REPORT_ZH.md)、[核心对照图](scene-rsi/experiments/experiment_02_teacher_guided_exploration/analysis/comparison_core.png)、[重复实验对照图](scene-rsi/experiments/experiment_02_teacher_guided_exploration/analysis/comparison_repeat.png)。源码、分析、学生交付和人工评价材料可在仓库浏览；完整原始模型请求、工具轨迹和场景记录见 [GitHub Release](https://github.com/i025/hintrsi/releases/tag/scene-rsi-experiment-02)，具体范围见 [上传记录](scene-rsi/experiments/experiment_02_teacher_guided_exploration/publication.json)。历史实验保持独立。
+
 ## 2026-11-27：Scene 自然重建轨迹实验
 
 新增独立 [Scene 工程](scene-rsi/README.md)：复用代码题的 Claude Agent SDK 与 Codex CLI Bridge，建立独立的 Blender 重建 Harness。办公室、卧室、厨房各独立运行三次；九次均完成可编辑场景交付和独立再生成。这里是自然轨迹分析，没有教师指导或完整 RSI，也不把技术完成度当作视觉质量成功率。

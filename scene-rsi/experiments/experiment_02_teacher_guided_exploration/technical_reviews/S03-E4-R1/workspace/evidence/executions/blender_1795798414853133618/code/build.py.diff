@@ -1,0 +1,11 @@
+--- previous/build.py
++++ build.py
+@@ -45,7 +45,7 @@
+  links.new(coord.outputs['Generated'],tex.inputs['Vector']); links.new(tex.outputs['Color'],bs.inputs['Base Color'])
+ elif mode == 'procedural':
+  mapping=nodes.new('ShaderNodeVectorMath'); mapping.operation='MULTIPLY'; mapping.inputs[1].default_value=(4.0,0.8,1.0); links.new(coord.outputs['Generated'],mapping.inputs[0])
+- noise=nodes.new('ShaderNodeTexNoise'); noise.inputs['Scale'].default_value=2.7; noise.inputs['Detail'].default_value=3; noise.inputs['Roughness'].default_value=.56; links.new(mapping.outputs[0],noise.inputs['Vector'])
++ noise=nodes.new('ShaderNodeTexNoise'); noise.inputs['Scale'].default_value=2.7; noise.inputs['Distortion'].default_value=.65; noise.inputs['Detail'].default_value=3; noise.inputs['Roughness'].default_value=.56; links.new(mapping.outputs[0],noise.inputs['Vector'])
+  ramp=nodes.new('ShaderNodeValToRGB'); ramp.color_ramp.elements[0].position=.28; ramp.color_ramp.elements[0].color=(.60,.62,.61,1); ramp.color_ramp.elements[1].position=.72; ramp.color_ramp.elements[1].color=(.90,.91,.89,1); links.new(noise.outputs['Fac'],ramp.inputs[0]); links.new(ramp.outputs[0],bs.inputs['Base Color'])
+ else:
+  noise=nodes.new('ShaderNodeTexNoise'); noise.inputs['Scale'].default_value=5; links.new(coord.outputs['Generated'],noise.inputs['Vector']); ramp=nodes.new('ShaderNodeMapRange'); ramp.inputs['To Min'].default_value=.14; ramp.inputs['To Max'].default_value=.65; links.new(noise.outputs['Fac'],ramp.inputs['Value']); links.new(ramp.outputs[0],bs.inputs['Roughness'])

@@ -1,0 +1,2353 @@
+{
+  "runs": [
+    {
+      "run": "S01-E0-R1",
+      "distinct_executed_technical_paths": "Scene-layout/camera adjustments and procedural material construction; no distinct chair-support repair path.",
+      "actual_comparison": "unknown",
+      "new_validation_method": "Camera-view render inspection; no new contact-specific validation.",
+      "explanation": "Six executions and successive image reads demonstrate iterative revisions, but no explicit comparative judgment or controlled comparison is visible. Different scene factors often changed together. No alternative caster repair candidates were executed.",
+      "evidence": "evidence/index.json:121-313; evidence/sdk_events.json events 10-51; execution diffs.",
+      "candidates": [
+        {
+          "hypothesis": "A perpendicular window wall and revised framing better represent the room corner.",
+          "code_paths": [
+            "evidence/executions/blender_1795799259761279690/code/build.py",
+            "evidence/executions/blender_1795799305893521169/code/build.py",
+            "evidence/executions/blender_1795799351424079508/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "partially: wall relocation and final viewpoint retained; earlier camera settings replaced",
+          "evidence": "SDK events 4-15 and 20-29; camera diffs in captures 1795799305893521169 and 1795799351424079508; final_source/build.py:82-89,117.",
+          "observed_result": "Renders saved and read; explicit comparative judgment is not recorded.",
+          "side_effects": "Camera, wall height and material values changed together in the third candidate.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Geometric correctness and chair contact."
+        },
+        {
+          "hypothesis": "Widen furniture and move door and planter to improve composition.",
+          "code_paths": [
+            "evidence/executions/blender_1795799401961085149/code/build.py",
+            "evidence/executions/blender_1795799497156916156/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "partially: door shift revised from 1.15 to 1.8; other transforms retained",
+          "evidence": "capture 1795799401961085149/code/build.py.diff:7-15; capture 1795799497156916156/code/build.py.diff:21-28; SDK events 30-35,42-51.",
+          "observed_result": "Both versions rendered; render reads are recorded, but no explicit selection rationale or isolated comparison is visible.",
+          "side_effects": "Several objects change together; door translation is not hinge articulation.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Door visibility, clearances and floor contact."
+        },
+        {
+          "hypothesis": "Procedural grain adds editable surface variation without image assets.",
+          "code_paths": [
+            "evidence/executions/blender_1795799450961615675/code/build.py",
+            "evidence/executions/blender_1795799497156916156/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "capture 1795799450961615675/code/build.py.diff:7-19; final_source/build.py:99-108; SDK events 36-41,48-51.",
+          "observed_result": "Render and scene saved; student read the render. A lamp move occurred in the same candidate.",
+          "side_effects": "Noise affects color and bump on floor, oak and desktop; final floor colors also changed.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "An isolated texture-quality comparison or material-binding check is not recorded."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "All six captured stdout logs report saving a scene and image; index.json reports no Python traceback for these executions. This does not verify geometry correctness.",
+        "Final chair construction is unchanged from baseline: vertical caster cylinders centered at z=0.075 with depth 0.09; floor boards have top z=0.015. No chair alignment, caster reorientation, local floor query or side-view check is recorded (baseline_build.py:19-26,55-75; final_source/build.py:19-26,55-75).",
+        "Student stopped after the final camera-view render read and reported successful build/render; no contact-specific verification is visible. Independent target_geometry.json is evaluator output, not a student action."
+      ]
+    },
+    {
+      "run": "S01-E0-R2",
+      "distinct_executed_technical_paths": "Multiple scene-composition and camera-parameter iterations plus one added procedural shader path; zero distinct chair-contact repair paths.",
+      "actual_comparison": "unknown",
+      "new_validation_method": "Camera-render inspection in this branch; no new geometric contact validation.",
+      "explanation": "Distinct renders were read and subsequent revisions made, but no explicit comparison or selection rationale is recorded. Camera variations are numeric trials, not separate contact technologies; simultaneous edits confound isolated effects.",
+      "evidence": "sdk_events.json events 4-31; execution diffs; evidence/received_guidance.txt",
+      "candidates": [
+        {
+          "hypothesis": "Reconfigure room and use a camera from the opposite side to improve composition.",
+          "code_paths": [
+            "evidence/executions/blender_1795800542416085299/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "partially",
+          "evidence": "sdk_events.json events 4-7; first capture stdout.log and saved scene; subsequent captures revise camera, wall and placements",
+          "observed_result": "Render saved and read; later iterations changed the viewpoint and placement.",
+          "side_effects": "Chair positions changed horizontally but caster heights and axes did not.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "Per-caster floor contact and door opening"
+        },
+        {
+          "hypothesis": "Improve framing by changing camera position, aim and focal length.",
+          "code_paths": [
+            "evidence/executions/blender_1795800586899001586/code/build.py",
+            "evidence/executions/blender_1795800651911752822/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "sdk_events.json events 8-19; corresponding build.py.diff files; rendered images read at events 12 and 18",
+          "observed_result": "30 mm and 32 mm viewpoints were rendered and read; later replaced by a 24 mm camera.",
+          "side_effects": "Changes framing and perspective; no contact repair.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "No explicit comparative judgment or controlled contact evaluation recorded."
+        },
+        {
+          "hypothesis": "Use a closer wide-angle camera with enlarged walls, rotated chair shells and darker door.",
+          "code_paths": [
+            "evidence/executions/blender_1795800696946859022/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "partially",
+          "evidence": "sdk_events.json events 20-25; capture build.py.diff; final_source/build.py:27, 75, 94",
+          "observed_result": "Saved render read; camera, wall sizes, chair yaw and door darkness retained while further changes followed.",
+          "side_effects": "Several factors changed simultaneously; chair yaw does not reorient the cylinders.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "Individual contribution of each simultaneous change and caster support."
+        },
+        {
+          "hypothesis": "Refine furniture placement and add procedural variation to floor and plaster.",
+          "code_paths": [
+            "evidence/executions/blender_1795800753945448002/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "sdk_events.json events 26-31; capture build.py:82-88; final_source/render.log:5-9; final_state.json noise nodes",
+          "observed_result": "Final scene and render saved and render read. Noise and ColorRamp nodes retained.",
+          "side_effects": "Door, desk and planter were moved and chair/desktop colors changed at the same time, preventing isolation of texture effects.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "Contact, component connectivity, and visual effect of texture in isolation."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "All five captured stdout logs report saved renders and index.json reports no traceback; final render.log reports Blender quit after save with deprecation warnings.",
+        "No student-visible evaluated wheel support, local floor query, side view, or caster-to-spoke connectivity check is recorded.",
+        "Final chair wheel construction remains the baseline unrotated cylinder at Z 0.075 with depth 0.09; floor plank tops are Z 0.015, so the cylinder bottom is Z 0.030. This source-derived separation is not a student measurement and local support varies at seams (final_source/build.py:19-26, 72-75).",
+        "The final scene is delivered after render reads, not after contact verification. No teacher hint was received."
+      ]
+    },
+    {
+      "run": "S01-E1-R1",
+      "distinct_executed_technical_paths": "Two broad scene approaches: numeric composition/geometry adjustment and a new procedural floor shader; no target-contact repair path.",
+      "actual_comparison": "Camera variants were rendered and read, with later revisions and reversions; explicit selection rationale is absent. Shader and furniture changes were confounded, so isolated comparisons are unknown.",
+      "new_validation_method": "No new geometric or controlled verification method; iterative camera-view render inspection only.",
+      "explanation": "Nine executions are not nine distinct techniques. Chair yaw changes affect shell coordinates, not caster axis or support height.",
+      "evidence": "sdk_events.json events 12-83; baseline_build.py:55-75; final_source/build.py:63-83",
+      "candidates": [
+        {
+          "hypothesis": "Alter camera position and lens to improve composition.",
+          "code_paths": [
+            "evidence/executions/blender_1795798402192200719/code/build.py",
+            "evidence/executions/blender_1795798442211931779/code/build.py",
+            "evidence/executions/blender_1795798622676526917/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "sdk_events.json events 14-21, 32-36, 46-54; opposite-side and close views were rendered and read before later camera revisions.",
+          "observed_result": "Multiple images were shown; opposite-side and close positions were superseded; final uses (1.3,-5.8,4.1), lens 38.",
+          "side_effects": "Framing changes confound scene comparison.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "No explicit quality metric or documented preference rationale."
+        },
+        {
+          "hypothesis": "Relocate and enlarge door and adjust desk and chair angles for composition.",
+          "code_paths": [
+            "evidence/executions/blender_1795798497305275049/code/build.py",
+            "evidence/executions/blender_1795798545925517872/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "partial",
+          "evidence": "sdk_events.json events 22-36, 55, 72; final_source/build.py:43-47,59-61,83",
+          "observed_result": "Enlarged door and altered chair shell yaw retained; door X and desk X restored. Chair base and caster geometry unchanged.",
+          "side_effects": "Multiple simultaneous edits prevent isolating individual effects.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Floor contact, geometry intersections and physical door opening were not tested."
+        },
+        {
+          "hypothesis": "Noise-based directional color variation gives floor planks a more varied wood appearance.",
+          "code_paths": [
+            "evidence/executions/blender_1795798731921943929/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "sdk_events.json events 65-71; final_source/build.py:21-34; execution stdout.log records saved scene and render.",
+          "observed_result": "Shader was rendered and image read; camera target changed in the same trial, so its isolated contribution was not established.",
+          "side_effects": "Generated coordinates and shared material pattern may repeat; visual fidelity not independently measured.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "Controlled floor-only comparison and cross-scene transfer."
+        },
+        {
+          "hypothesis": "Restore desk position and move planter, soil and grass together.",
+          "code_paths": [
+            "evidence/executions/blender_1795798781640801226/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "sdk_events.json events 70-83; final_source/build.py:59-61,85-89",
+          "observed_result": "Final image was read; coordinated planter coordinates are retained.",
+          "side_effects": "Desk and planter changed together.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Individual effects and intersections not measured."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "All nine capture stdout logs report saved render and scene; index.json lists no Python traceback logs. Logs contain Blender node deprecation warnings.",
+        "No student floor-ray, evaluated mesh, side-view or per-caster contact check is evidenced. Final wheel construction is unchanged from baseline: cylinder center Z 0.075 and depth 0.09; plank top Z 0.015 (baseline_build.py:26,74; final_source/build.py:34,82).",
+        "The independently reported 0.015 aggregate baseline separation is not student discovery; final geometry remains unchanged for these wheel and floor elevations, but local contact and intersections were not independently established here.",
+        "The last final render was read and delivered without an explicit improvement assessment (sdk_events.json events 82-84)."
+      ]
+    },
+    {
+      "run": "S01-E1-R2",
+      "distinct_executed_technical_paths": "Camera/material parameter revisions, scene-object placement adjustments, and a procedural anisotropic noise material; no chair-support alternative was executed.",
+      "actual_comparison": "unknown",
+      "new_validation_method": "Ordinary generated-render inspection; no evidence of a new geometric validation method.",
+      "explanation": "Five successive saved renders were read and parameters were iterated, including a lens-only last change. The record does not state comparative judgments or a controlled selection, and the substantive material/window and desk/window revisions bundle multiple changes. The teacher's two contact-repair alternatives were not supplied as guidance or attempted.",
+      "evidence": "evidence/sdk_events.json events 10-59; evidence/received_guidance.txt; evidence/executions/*/code/build.py.diff.",
+      "candidates": [
+        {
+          "hypothesis": "A changed viewpoint and darker door and desk may improve the overall image match.",
+          "code_paths": [
+            "evidence/executions/blender_1795801414430072353/code/build.py",
+            "evidence/executions/blender_1795801459194143702/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "partly: second look-at and darker materials retained; lens later changed",
+          "evidence": "SDK events 4-16 and both captures; second capture diff changes the look-at only.",
+          "observed_result": "Both renders were read; no explicit comparative judgment is recorded.",
+          "side_effects": "Framing and material colors change together in the first candidate.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Independent contribution of each simultaneous change."
+        },
+        {
+          "hypothesis": "Lower window, darker chair and directional timber texture may improve visual correspondence.",
+          "code_paths": [
+            "evidence/executions/blender_1795801504717469966/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "shader and chair color retained; window height revised",
+          "evidence": "SDK events 20-27; capture 1504717469966 diff; subsequent window edit events 38-41.",
+          "observed_result": "Rendered and read; the window was later raised from 1.98 to 2.13 center height.",
+          "side_effects": "Multiple simultaneous changes prevent isolating the shader or window effect.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "No independent shader quality or geometry-contact test."
+        },
+        {
+          "hypothesis": "Raising the window partway and shifting the desk may improve placement.",
+          "code_paths": [
+            "evidence/executions/blender_1795801563577799893/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "SDK events 36-50; capture 1563577799893 diff; final_source/build.py:30-33,51-53.",
+          "observed_result": "Saved and render read; retained in final source.",
+          "side_effects": "Desk placement and window height changed together; clearance was not measured.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Desk-chair clearances and individual contribution of each edit."
+        },
+        {
+          "hypothesis": "A wider 35 mm view may improve framing versus 43 mm.",
+          "code_paths": [
+            "evidence/executions/blender_1795801563577799893/code/build.py",
+            "evidence/executions/blender_1795801593930742619/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "SDK events 50-59; final capture diff changes lens alone, and both renders were read.",
+          "observed_result": "Wider view saved and delivered; no explicit comparative selection rationale is recorded.",
+          "side_effects": "Alters perspective framing rather than object geometry.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Improvement relative to reference is not quantitatively established."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "SDK event 37's desk-leg edit used a mismatching search string; event 48 supplies the corrected edit before the next execution.",
+        "All five capture stdout logs report saved scene and render, with no traceback reported in evidence/index.json:121-280; Blender deprecation warnings appear in SDK event 11.",
+        "Caster wheel orientation, height and complete chair construction remain unchanged from checkpoint; no student floor rays, evaluated mesh contact measurements or side-view tests are recorded.",
+        "No full-reference image plane is present in the executed scene-building source; the new texture is procedural, not an image texture."
+      ]
+    },
+    {
+      "run": "S01-E2-R1",
+      "distinct_executed_technical_paths": "Two successive target treatments: altered spoke/post heights with unchanged wheel axes, then reoriented and repositioned wheels. Additional procedural-material and scene-composition edits were executed.",
+      "actual_comparison": "unknown",
+      "new_validation_method": false,
+      "explanation": "Three intermediate camera images were read, but there is no observable explicit comparison or selection of contact candidates. The final wheel revision was rendered but not read. No side view, evaluated mesh check, local floor query, or controlled test is shown.",
+      "evidence": "evidence/sdk_events.json events 5–7, 12–13, 19–25, 34–40; evidence/executions/blender_1795798299704685304/code/build.py",
+      "candidates": [
+        {
+          "hypothesis": "Adjust chair post and lower spokes while leaving existing vertical cylinders unchanged.",
+          "code_paths": [
+            "evidence/executions/blender_1795798147927339371/code/build.py",
+            "evidence/executions/blender_1795798211874463269/code/build.py",
+            "evidence/executions/blender_1795798255688156968/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "evidence/sdk_events.json events 5–7, 12–13, 34–36; first capture code:72–75",
+          "observed_result": "Intermediate renders were read, but there is no explicit contact comparison or selection rationale. The unchanged wheel center and vertical depth leave the original wheel bottom at 0.030.",
+          "side_effects": "Spoke and post geometry changed; camera and later scene materials also changed.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Local floor contact, spoke junctions and post-seat connections were not measured."
+        },
+        {
+          "hypothesis": "Rotate casters to upright wheel discs and place their lowest points near the floor while retaining seat height.",
+          "code_paths": [
+            "evidence/executions/blender_1795798299704685304/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "evidence/sdk_events.json events 36–40; evidence/executions/blender_1795798299704685304/stdout.log; evidence/final_source/build.py:72–75",
+          "observed_result": "Final build and image were saved; no final image Read or student contact check is recorded. Nominal wheel bottom is 0.09 minus 0.075 = 0.015, matching plank top height but not proving local surface contact.",
+          "side_effects": "Wheel silhouette and spoke elevations changed; wheel-floor and wheel-spoke intersections or gaps remain unverified by the student.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Per-wheel local support, penetration, actual spoke junctions, and reference silhouette."
+        },
+        {
+          "hypothesis": "Add directional procedural grain and change camera and furniture placement for the room appearance.",
+          "code_paths": [
+            "evidence/executions/blender_1795798211874463269/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "evidence/sdk_events.json events 14–25; evidence/final_source/build.py:51–53,75,82–86,92",
+          "observed_result": "An intermediate render was read after the bundled changes; isolated effects were not tested.",
+          "side_effects": "Camera, desk position and chair yaw changed together with the material graph.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Whether the grain or individual composition changes independently improved reference similarity."
+        },
+        {
+          "hypothesis": "Darken room materials and enlarge the door assembly.",
+          "code_paths": [
+            "evidence/executions/blender_1795798255688156968/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "evidence/sdk_events.json events 26–35; evidence/executions/blender_1795798255688156968/code/build.py.diff",
+          "observed_result": "A render of the combined revisions was read before the final wheel edit.",
+          "side_effects": "Several material colors and door dimensions changed simultaneously.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Independent effect of each change and actual doorway opening geometry."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "All four execution logs report saved scene and render; logs show deprecation warnings, not Python tracebacks. The student stopped after the final build without reading its render (evidence/sdk_events.json events 36–40; evidence/executions/*/stdout.log and stderr.log).",
+        "The first support adjustment left caster wheel placement and orientation unchanged; its original wheel-floor separation therefore was not resolved by that edit (evidence/baseline_build.py:72–75; evidence/executions/blender_1795798147927339371/code/build.py:72–75).",
+        "Final exact contact and connectivity are not student-verified. Evaluator outputs are independent posthoc evidence, not student checks (evidence/target_geometry.json; evidence/scene_states/state_open_results.json)."
+      ]
+    },
+    {
+      "run": "S01-E2-R2",
+      "distinct_executed_technical_paths": "One target approach: numeric wheel sizing/placement, followed by a numeric raising variant; no whole-assembly alignment or physical axle reorientation was executed. Separate scene work includes procedural floor shading and camera/room revisions.",
+      "actual_comparison": "unknown",
+      "new_validation_method": false,
+      "explanation": "Several intermediate camera renders were read and later edited, but there is no explicit comparison or selection based on observed wheel contact; the final raised-base variant was not read. Camera and scene changes confound the variants.",
+      "evidence": "sdk_events.json events 4-7, 14-20, 24-27, 30-41; executions 1832128587257, 2011813480657, 2053835635764.",
+      "candidates": [
+        {
+          "hypothesis": "Set wheel bottoms to the nominal plank top by changing cylinder height and center while retaining the chair body height.",
+          "code_paths": [
+            "evidence/executions/blender_1795801832128587257/code/build.py",
+            "evidence/executions/blender_1795802011813480657/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "sdk_events.json event 4 and execution captures; event 34-35 observes a camera render of the later version.",
+          "observed_result": "Nominal wheel bottom is .065 - .10/2 = .015; no local evaluated contact check is shown.",
+          "side_effects": "Room, camera, and chair locations changed concurrently; wheel axes remain vertical.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "All per-wheel local contact, penetration, and wheel/spoke connections."
+        },
+        {
+          "hypothesis": "Raise bases and wheels by .08 with seat and central post unchanged.",
+          "code_paths": [
+            "evidence/executions/blender_1795802053835635764/code/build.py",
+            "evidence/executions/blender_1795802076358243270/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "sdk_events.json events 36-41; execution 2053835635764 code diff; final_state.json; target_geometry.json.",
+          "observed_result": "Final wheel bottom is nominally .095, above even the highest listed plank top .015, so at least .08 vertical separation remains; this is a posthoc geometry conclusion, not a student measurement.",
+          "side_effects": "Raises spokes relative to the unchanged post and seat; wheel/spoke and post/seat connectivity was not checked.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "No student Read of this final variant, side view, contact or connection measurements."
+        },
+        {
+          "hypothesis": "Try a wider 32 mm camera viewpoint, then return lens to 43 mm while changing chair yaw.",
+          "code_paths": [
+            "evidence/executions/blender_1795801954606995332/code/build.py",
+            "evidence/executions/blender_1795802011813480657/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "sdk_events.json events 20, 24-27, 30, 34-35; 1954606995332 and 2011813480657 diffs.",
+          "observed_result": "Both rendered views were read; 32 mm was replaced by 43 mm, with chair yaw also changed. No explicit comparison rationale is recorded.",
+          "side_effects": "Camera is not fixed and chair yaw changes confound isolated framing comparison.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "Relative visual quality and effect on floor contact."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "Final wheels are raised to a nominal bottom z=.095 versus plank top z=.015 and slab top z=0; the floor-contact defect remains by source and independent geometry evidence, not a student check (final_source/build.py:19,33,81; target_geometry.json:7-30).",
+        "No student-visible final render inspection after the raised-base edit; no evaluated support, local floor ray, distance, or orthographic side check appears in sdk_events.json.",
+        "Captured runs report saved artifacts and no tracebacks in evidence/index.json:121-313; logged deprecation warnings do not establish a failed run. The last two runs use identical source (execution 2076358243270 code diff is empty)."
+      ]
+    },
+    {
+      "run": "S01-E3-R1",
+      "distinct_executed_technical_paths": 1,
+      "actual_comparison": false,
+      "new_validation_method": true,
+      "explanation": "One combined modeling candidate was built. The student added evaluated-wheel minima, local center rays and a side-view inspection, but did not execute a separate whole-assembly repair or compare alternative reconstructions. A failed and corrected ray expression are verification attempts, not distinct modeling paths. Camera and door changes confound visual before/after attribution.",
+      "evidence": "evidence/sdk_events.json events 4-24; evidence/executions/blender_1795799652247214359/code/build.py:72-78; evidence/received_guidance.txt",
+      "candidates": [
+        {
+          "hypothesis": "Reorient wheels and revise the spokes/forks while keeping the chair body at its original height; choose wheel bottom at the nominal plank top.",
+          "code_paths": [
+            "evidence/executions/blender_1795799652247214359/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": false,
+          "retained": true,
+          "evidence": "evidence/sdk_events.json events 5,7,9,11-15,18-24; evidence/final_source/build.py:72-78",
+          "observed_result": "Rebuilt scene and render saved; all ten evaluated minima and center-based floor ray heights print 0.015. A side render was read. Independent evaluator geometry also records tiny support gaps within its 0.0001 tolerance, not a student measurement (evidence/target_geometry.json:8458-8635).",
+          "side_effects": "Spoke elevation and wheel silhouette changed; camera framing and door color also changed in the same build. Seat and post source heights stayed fixed.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "No controlled comparison against whole-assembly alignment, no mesh-distance test for all wheel/fork and post/shell connections, and no proof of absence of all penetration from one center ray per wheel."
+        },
+        {
+          "hypothesis": "A compact one-line ray-cast expression can test support beneath every wheel.",
+          "code_paths": [
+            "evidence/executions/blender_1795799699991182445/python_expr.txt"
+          ],
+          "technique_difference": "verification_mechanism",
+          "actually_executed": true,
+          "actual_comparison": false,
+          "retained": false,
+          "evidence": "evidence/sdk_events.json events 16-17; evidence/executions/blender_1795799699991182445/stderr.log:1-4",
+          "observed_result": "SyntaxError before the expression ran despite Blender exit code zero; no contacts printed.",
+          "side_effects": "No saved scene changes.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "This variant produced no ray measurements; it was replaced by a multiline check."
+        },
+        {
+          "hypothesis": "A multiline downward ray at each wheel center can sample local support height.",
+          "code_paths": [
+            "evidence/executions/blender_1795799717516542165/python_expr.txt"
+          ],
+          "technique_difference": "verification_mechanism",
+          "actually_executed": true,
+          "actual_comparison": false,
+          "retained": false,
+          "evidence": "evidence/sdk_events.json events 18-19; evidence/executions/blender_1795799717516542165/stdout.log:2-11",
+          "observed_result": "Ten bottom/support pairs print 0.015 after rounding.",
+          "side_effects": "No saved scene changes.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Hit object and full wheel footprint are not reported; wheel bottom is computed from the known radius rather than sampled at the ray hit."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "First floor-ray expression failed with a mismatched parenthesis despite exit code zero; the later multiline expression produced results (evidence/sdk_events.json events 16-19; evidence/executions/blender_1795799699991182445/stderr.log:1-4).",
+        "The side image was read but the trace records no detailed finding about individual junctions; the final claim of all connections being inspected is not equivalent to a measured junction test (events 20-24).",
+        "The evaluator's regenerated and checkpoint scene states are independent outputs, not student regeneration or verification (evidence/scene_states/state_open_results.json)."
+      ]
+    },
+    {
+      "run": "S01-E3-R2",
+      "distinct_executed_technical_paths": 1,
+      "actual_comparison": false,
+      "new_validation_method": true,
+      "explanation": "One target repair path, caster reorientation plus connector construction, was executed and retained. Two camera/color configurations were rendered and read, but no observable comparison or selection between distinct contact repairs is recorded. New post-repair checks include evaluated wheel vertices, approximate local plank support lookup, and a read side-view render.",
+      "evidence": "SDK events 4–13, 14–29; evidence/executions/blender_1795800357178453486/python_expr.txt; evidence/received_guidance.txt.",
+      "candidates": [
+        {
+          "hypothesis": "Upright casters with revised supports can meet the floor without moving chair bodies.",
+          "code_paths": [
+            "evidence/baseline_build.py:72–75",
+            "evidence/executions/blender_1795800251200600331/code/build.py:72–77",
+            "evidence/final_source/build.py:72–77"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": false,
+          "retained": true,
+          "evidence": "SDK events 4, 6–13, 25–29; final_state.json caster wheel/fork objects.",
+          "observed_result": "All ten evaluated wheel minima and selected plank bounding-box tops print 0.015; side render was read.",
+          "side_effects": "Wheel orientation, segments and spoke ends change; forks are added, while shell and post heights are unchanged.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "No pre-repair student measurement, mesh-to-mesh intersection, explicit spoke/fork or post/seat connection test, or controlled comparison with whole-assembly alignment. Received guidance suggested alignment conditionally, not the specific caster redesign."
+        },
+        {
+          "hypothesis": "Alter camera framing and darken door and desktop in the final view.",
+          "code_paths": [
+            "evidence/executions/blender_1795800251200600331/code/build.py:8,89",
+            "evidence/executions/blender_1795800303303946381/code/build.py.diff:3–17"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "SDK events 10–12, 14–23; both renders were read, but no explicit comparison or selection rationale is recorded.",
+          "observed_result": "Second scene and final render were saved and read; camera and colors changed together.",
+          "side_effects": "Camera and multiple material constants changed simultaneously, preventing isolated attribution.",
+          "knowledge_origin": "unknown",
+          "unvalidated_parts": "No controlled camera-only or material-only comparison."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "No traceback is reported for the captured executions; build logs include Blender deprecation warnings (SDK event 9).",
+        "The final claim of contact is supported by equal rounded height outputs at wheel centers, not by full mesh intersection or penetration testing.",
+        "No whole-chair alignment candidate, pre-repair floor check, connection-distance check, or isolated comparison is evidenced.",
+        "Student stopped after reading the side view and reporting deliverables (SDK events 28–30)."
+      ]
+    },
+    {
+      "run": "S01-E4-R1",
+      "distinct_executed_technical_paths": 2,
+      "actual_comparison": true,
+      "new_validation_method": "Evaluated world-space caster vertex minima, local downward floor ray casts and orthographic side renders, applied to both candidates and the final scene.",
+      "explanation": "Two teacher-proposed modeling paths were rendered and inspected with the same initial camera, accompanied by printed measurements and an explicit selection. The subsequent 0.001 refinement and camera edit are not additional modeling paths. The final side image was generated but no Read of it is recorded.",
+      "evidence": "evidence/sdk_events.json events 5, 8-17, 18-26; evidence/final_source/contact_check.py:4-23",
+      "candidates": [
+        {
+          "hypothesis": "Lowering the complete original chairs can close the floor gap while preserving internal relative placement.",
+          "code_paths": [
+            "evidence/executions/blender_1795798869951102618/code/candidate_a.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "SDK events 5, 8-17, 26; candidate_a.py:74-76; contact_a.log:3-16",
+          "observed_result": "All ten reported gaps -0.001; shell and post ranges were 0.016 lower than B.",
+          "side_effects": "Seat and post moved down relative to the desk; small reported floor penetration.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "No exact wheel-to-spoke or post-to-seat surface-distance measurement; desk clearance not numerically measured."
+        },
+        {
+          "hypothesis": "Upright caster discs and a connector can reach the floor without lowering chair bodies.",
+          "code_paths": [
+            "evidence/executions/blender_1795798877376635814/code/candidate_b.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "SDK events 4-17, 26; contact_b.log:3-16",
+          "observed_result": "All ten reported gaps -0.001; student selected this construction over A.",
+          "side_effects": "Changes wheel orientation, polygon count and connector; initial 0.001 penetration reported.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Side images do not establish exact connector intersections; true reference geometry unavailable."
+        },
+        {
+          "hypothesis": "Raising revised casters 0.001 removes the measured penetration.",
+          "code_paths": [
+            "evidence/executions/blender_1795798948538876263/code/build.py",
+            "evidence/executions/blender_1795798971027035547/code/contact_check.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": true,
+          "evidence": "SDK events 18-25; final_source/contact_final.log:3-16; final_source/build.py:74",
+          "observed_result": "All ten sampled bottom-to-floor gaps rounded to zero at five decimals. Final camera also changed, so the final render is not a controlled visual comparison with B.",
+          "side_effects": "Camera framing changed at the same time; connector endpoints shifted with the wheels.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "No mesh intersection test of wheel/fork/spoke or shell/post; floor check samples low vertices and highest hits rather than complete surfaces."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "Both first candidates showed a -0.001 sampled floor gap for every wheel (SDK event 13).",
+        "Final check rounded all ten gaps to zero (event 25); this is not proof of exact contact over the full mesh or mechanical connectivity.",
+        "The final side render was generated but no student Read is recorded; only candidate side renders were read.",
+        "No mesh-distance calculation, per-connection intersection test, or quantitative desk clearance test is shown. The student reported inspecting connections, but the recorded visual inspection alone does not prove them sound.",
+        "No captured Blender Python traceback is listed in evidence/index.json:121-318; saved renders and scene artifacts exist."
+      ]
+    },
+    {
+      "run": "S01-E4-R2",
+      "distinct_executed_technical_paths": 2,
+      "actual_comparison": true,
+      "new_validation_method": true,
+      "explanation": "Two distinct teacher-suggested chair repair paths were executed under the same initial camera; the student read their camera renders, independent side views and per-wheel ray logs, then reported selection. A new student-written evaluated-mesh/BVH local-floor test was applied to both; subsequent camera/color edits are numerical scene refinements, not a third chair repair method.",
+      "evidence": "sdk_events.json events 12–29 and 46; final_source/check_chairs.py:7-28; execution captures blender_1795800964677501274 and blender_1795800972068954169",
+      "candidates": [
+        {
+          "hypothesis": "Lowering the complete chair by 0.015 can place the original flat-axis casters on the floor.",
+          "code_paths": [
+            "evidence/executions/blender_1795800964677501274/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "sdk_events.json events 6–7, 12, 14–15, 22–29, 46; final_source/whole_check.log",
+          "observed_result": "All ten sampled wheel minima had gaps rounded to zero; shell and post ranges are 0.015 below the caster version.",
+          "side_effects": "Seat and all chair components moved down; original flat-axis caster silhouette remains.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Fixed offset is not computed from local floor; wheel-spoke and post-shell mesh connectivity and desk clearance were not quantified."
+        },
+        {
+          "hypothesis": "Reorient and resize casters, adding fork bars, to contact the floor while preserving body height.",
+          "code_paths": [
+            "evidence/executions/blender_1795800972068954169/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": true,
+          "evidence": "sdk_events.json events 7, 12, 14–15, 22–29, 46; final_source/caster_check.log; scene_states/final_state.json",
+          "observed_result": "Ten sampled wheel minima had gaps rounded to zero; student selected this candidate and stated it had a rounder silhouette. Independent target_geometry.json:2528-2550 and 8469-8635 corroborates wheel height and near-zero sampled gaps, not student discovery.",
+          "side_effects": "Changes disc geometry and introduces intersecting fork geometry; chair body height is unchanged.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "No student mesh-distance or intersection computation for spoke/fork/wheel or post/shell; lowest-vertex floor rays do not prove every surface avoids penetration."
+        },
+        {
+          "hypothesis": "A revised view and darker door and tabletop may improve scene framing and appearance.",
+          "code_paths": [
+            "evidence/executions/blender_1795801060974491598/code/build.py",
+            "evidence/executions/blender_1795801105134598791/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "sdk_events.json events 30–33, 38–45; corresponding build.py.diff files",
+          "observed_result": "First revised render was read, followed by a second lens/target adjustment and final render read; the latter camera and dark colors remain.",
+          "side_effects": "First revision changes camera and materials together, so their individual visual effects are not isolated.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "No controlled separate material comparison or explicit quantified framing assessment."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "No traceback is reported in evidence/index.json execution records; execution logs show saved renders.",
+        "The original checkpoint was not run through the new check before repair; the original contact defect came from received guidance.",
+        "The student sampled only lowest wheel vertices against the floor and printed shell/post Z ranges; these do not establish full surface nonpenetration or structural connectivity. The final per-wheel check was not rerun after later scene rebuilds, although the chair code remained unchanged.",
+        "The selected candidate is the default in final_source/build.py:57; the alternate whole-chair code remains available but is not the delivered scene.",
+        "No separate reusable general-purpose snippet was delivered; check_chairs.py is scene-specific."
+      ]
+    },
+    {
+      "run": "S02-E0-R1",
+      "distinct_executed_technical_paths": 1,
+      "actual_comparison": "unknown",
+      "new_validation_method": "render inspection only; no new geometric diagnostic",
+      "explanation": "Two executed angle settings follow the same hinge-rotation path; the second simultaneously changes camera aim. Both renders were viewed and the latter delivered, but no explicit comparative judgment or selection rationale is recorded. The first run also bundles shader, color and light edits.",
+      "evidence": "SDK events 4-24; execution code captures and diff; evidence/temporary_artifact_provenance.json is empty",
+      "candidates": [
+        {
+          "hypothesis": "Reverse hinge swing to expose the door, together with lighter wood, rug variation and added warm light; the student's explicit rationale is unknown.",
+          "code_paths": [
+            "evidence/executions/blender_1795798148972534201/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "SDK events 4-15; execution stdout.log reports scene and image saved; first image was read.",
+          "observed_result": "First rendered image shows a narrow door edge and dark opening, not the broad reference leaf. The +53-degree setting was subsequently replaced.",
+          "side_effects": "Color, rug shader and lighting changed together, so their effects are confounded.",
+          "knowledge_origin": "natural_checkpoint",
+          "unvalidated_parts": "No top view, visibility isolation or collision check; no explicit comparison judgment recorded."
+        },
+        {
+          "hypothesis": "Adjust hinge angle and camera aim after first render; precise causal rationale is unknown.",
+          "code_paths": [
+            "evidence/executions/blender_1795798191647292022/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "SDK events 14-24; execution diff:3-17; second stdout.log; final_state.json:9046,9096",
+          "observed_result": "Saved and read final render; evaluator geometry records a 20-degree parented door at target_geometry.json:1160-1170,1974-2015. The reference-scale foreground silhouette is not established by the trace.",
+          "side_effects": "Camera aim and hinge changed together; the inherited shared wood material also colors the bed base.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "No explicit candidate preference or controlled comparison, alternate placement, visibility or intersection testing."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "Both execution stdout logs report saved renders and scenes; stderr logs show only the Material.use_nodes deprecation warning, not a traceback.",
+        "The student stopped after reading the second render, without recorded top/side view, door visibility test or collision measurement.",
+        "No different hinge placement or doorway geometry candidate was executed. Teacher suggestions were not received guidance.",
+        "The first candidate image still shows a narrow door edge rather than the reference's broad foreground panel."
+      ]
+    },
+    {
+      "run": "S02-E0-R2",
+      "distinct_executed_technical_paths": "One doorway-and-hinge remodeling path with two numerical hinge settings, plus a bundled appearance/framing refinement; three executed builds.",
+      "actual_comparison": "unknown",
+      "new_validation_method": "Render reads were performed, but no diagnostic visibility, top/side view, or geometric measurement is evidenced.",
+      "explanation": "The student viewed successive candidates and revised the scene, but the trace does not explicitly compare their results or record selection reasoning. Camera changed together with hinge angle in the second candidate, so this is not a fixed-camera controlled trial.",
+      "evidence": "SDK events 10, 18–23, 27–39; execution diffs; evidence/temporary_artifact_provenance.json is empty.",
+      "candidates": [
+        {
+          "hypothesis": "Expose the door by opening the wall and reversing its hinge swing.",
+          "code_paths": [
+            "evidence/executions/blender_1795801686581128663/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "SDK events 4–10, 18–19; first execution stdout.log; baseline_build.py:22,64",
+          "observed_result": "A render was saved and read; the +53-degree angle was subsequently replaced. The door and wall edits were bundled with a bed shift.",
+          "side_effects": "Bed position and wall, joints, and baseboard changed simultaneously.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "No isolated wall-occlusion or collision test; the angle was not retained."
+        },
+        {
+          "hypothesis": "A shallower hinge angle and tighter reframing may improve the reconstruction.",
+          "code_paths": [
+            "evidence/executions/blender_1795801734449875280/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "second execution build.py.diff:3–17; SDK events 20–23, 27; final_source/build.py:75,85",
+          "observed_result": "The 5-degree hinge survived in the final build. The second render was read, but no explicit comparison or selection rationale is recorded. The final supplied image shows a small door near the back wall, not the reference's broad foreground occluder.",
+          "side_effects": "Camera aim and lens also changed, confounding attribution.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "No top/side inspection, doorway contact or wall/furniture intersection measurement; no independent hinge-placement candidate."
+        },
+        {
+          "hypothesis": "Refine framing, cabinet appearance, rug mottling and lamp glow together.",
+          "code_paths": [
+            "evidence/executions/blender_1795801775618757732/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "third execution build.py.diff:3–33; SDK events 28–39; final_state.json Noise Texture",
+          "observed_result": "The final render was saved and read; changes remain in final source and scene.",
+          "side_effects": "Multiple appearance, geometry, lighting and camera changes were bundled.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "No controlled material or lighting comparison; visual fidelity and physical plausibility are not established."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "All three stdout logs report saved final.png and Blender quit; index.json reports no Python traceback. Exit code alone was not used as proof.",
+        "The final image still shows a much smaller, back-wall door than the reference foreground door. No recorded top/side diagnostic, collision check or independent hinge translation appears in the SDK trace.",
+        "The student stopped after reading the final render and reporting delivered files; no explicit final quality assessment is recorded."
+      ]
+    },
+    {
+      "run": "S02-E1-R1",
+      "distinct_executed_technical_paths": "Two door configuration approaches: swing reversal at original hinge, then relocated hinge with mirrored child positions and subsequent angle tuning; additional camera, lighting and cabinet variants.",
+      "actual_comparison": "unknown",
+      "new_validation_method": "Render inspection only; no new geometric or diagnostic validation evidenced.",
+      "explanation": "Six sequential candidate renders were read and subsequent edits made, but there is no explicit comparison or selection judgment. The first swing trial also changed camera and lighting, and the later angle change also changed camera and lighting; no controlled fixed-camera door comparison is established.",
+      "evidence": "SDK events 4-55; evidence/executions/*/code/build.py.diff; evidence/temporary_artifact_provenance.json is empty.",
+      "candidates": [
+        {
+          "hypothesis": "Reverse original hinge swing; also change framing and lamp intensity.",
+          "code_paths": [
+            "evidence/executions/blender_1795799714293246395/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "SDK events 4-13; execution stdout reports saved image and blend.",
+          "observed_result": "Rendered image was read; no explicit comparative judgment recorded.",
+          "side_effects": "Camera lens and light power changed concurrently.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "Door-wall intersection and isolated effect of swing."
+        },
+        {
+          "hypothesis": "Move hinge to opposite side and reverse child local offsets while restoring -53 degree swing.",
+          "code_paths": [
+            "evidence/executions/blender_1795799761259907314/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "modified",
+          "evidence": "SDK events 14-21; code/build.py.diff:3-19.",
+          "observed_result": "Rendered and read; pivot and mirrored offsets retained with a later different angle.",
+          "side_effects": "Opening itself was not remodeled; attachment and collisions were not measured.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "Physical hinge attachment and wall/furniture clearance."
+        },
+        {
+          "hypothesis": "Reframe using lens 38 and horizontal shift -0.23.",
+          "code_paths": [
+            "evidence/executions/blender_1795799800695515418/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "SDK events 22-27; code/build.py.diff:3-8.",
+          "observed_result": "Rendered and read; later replaced.",
+          "side_effects": "Entire scene framing changes.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Reference alignment and landmark degradation."
+        },
+        {
+          "hypothesis": "Move camera closer and higher, restore lens 27.",
+          "code_paths": [
+            "evidence/executions/blender_1795799846595173741/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "SDK events 28-33; code/build.py.diff:3-8.",
+          "observed_result": "Rendered and read; camera later replaced.",
+          "side_effects": "Changes all scene projections.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Landmark and silhouette fidelity."
+        },
+        {
+          "hypothesis": "Reduce relocated hinge swing to -25 degrees while adjusting camera and adding warm lights.",
+          "code_paths": [
+            "evidence/executions/blender_1795799889030560227/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "partially",
+          "evidence": "SDK events 34-45; code/build.py.diff:3-26.",
+          "observed_result": "Rendered and read; hinge and added lights retained, camera later changed.",
+          "side_effects": "Door, camera and lighting changed together, preventing isolated causal attribution.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "Door clearance, attachment, and isolated contribution of angle."
+        },
+        {
+          "hypothesis": "Use a more distant elevated camera and expose cabinet shelves by removing pane meshes.",
+          "code_paths": [
+            "evidence/executions/blender_1795799926127918214/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "SDK events 46-55; execution diff:3-21; final_source/build.py:41-47,76.",
+          "observed_result": "Final render and scene saved and final image read; panes are removed, not transparent glazing.",
+          "side_effects": "Lost actual cabinet pane geometry and changed whole-image framing.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "Cabinet material realism and independent visual improvement."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "All six execution stdout logs report saved render and scene; index.json reports no Python traceback logs. Material.use_nodes deprecation warning is present, not a fatal error.",
+        "The first hinge orientation and several camera variants were superseded; no recorded reason for their rejection.",
+        "No student top/side view, visibility mask, geometric distance test, contact measurement, or explicit collision check appears in the trace.",
+        "Final response reported delivery without a written assessment of improvement or side effects."
+      ]
+    },
+    {
+      "run": "S02-E1-R2",
+      "distinct_executed_technical_paths": "Door hinge rotation and later translation; face-side geometry revision; camera and lighting revisions; procedural rug shader; cabinet/furniture geometry changes. Five sequential builds are not five independent technical methods.",
+      "actual_comparison": "unknown",
+      "new_validation_method": false,
+      "explanation": "The student viewed successive render outputs and iteratively edited them, but the trace contains no explicit comparative judgment or selection and multiple factors change together. No diagnostic top/side view, mesh contact measurement, visibility test, or controlled comparison is evidenced. Camera stayed fixed in later revisions but this alone is not a fixed-camera controlled trial.",
+      "evidence": "evidence/sdk_events.json events 4–55; execution diffs; evidence/temporary_artifact_provenance.json is empty",
+      "candidates": [
+        {
+          "hypothesis": "Reverse the hinge swing to expose the leaf; simultaneously brighten both lamps.",
+          "code_paths": [
+            "evidence/executions/blender_1795800071882236693/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "SDK events 4–11; stdout.log records render and scene save",
+          "observed_result": "Student read the render; no explicit comparison or selection rationale is recorded.",
+          "side_effects": "Lamp energy changed concurrently; next candidate replaces the angle.",
+          "knowledge_origin": "natural_checkpoint",
+          "unvalidated_parts": "Door attachment, wall and furniture intersections, and isolated contribution of the swing."
+        },
+        {
+          "hypothesis": "Use a 125-degree swing with a tighter, re-aimed camera.",
+          "code_paths": [
+            "evidence/executions/blender_1795800118619731622/code/build.py.diff"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "partially",
+          "evidence": "SDK events 12–21; execution stdout and image read call-5b9d38f790f04d9992dbefeed9d09389",
+          "observed_result": "Rendered and read; angle and camera persist, but later geometry and position change.",
+          "side_effects": "Camera and hinge changed together, preventing an isolated angle comparison.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "Causal attribution and geometry contacts."
+        },
+        {
+          "hypothesis": "Put door panel detailing on the other face and introduce rug mottling and a wall wash.",
+          "code_paths": [
+            "evidence/executions/blender_1795800173327729999/code/build.py.diff"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "partially",
+          "evidence": "SDK events 22–33; Noise and ColorRamp graph and flipped local panel offsets in execution diff",
+          "observed_result": "Rendered and read. Material graph and door-face offsets persist; wall wash parameters were subsequently revised.",
+          "side_effects": "Simultaneous lighting and rug changes confound evaluation of door detailing.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "Independent contribution of each edit and physical door clearances."
+        },
+        {
+          "hypothesis": "Reveal cabinet interior and alter furniture framing while revising wall wash.",
+          "code_paths": [
+            "evidence/executions/blender_1795800240729486782/code/build.py.diff"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "partially",
+          "evidence": "SDK events 34–47; execution diff and render read call-2f21180ee7fe486cabb017758a30de0c",
+          "observed_result": "Rendered and read; cabinet and bed changes persist, foreground panel was moved again.",
+          "side_effects": "Cabinet is an open aperture rather than an actual transparent pane; several scene changes are bundled.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "Separate visual effects and cabinet glass realism."
+        },
+        {
+          "hypothesis": "Bring the parented door assembly forward and reposition the foreground panel.",
+          "code_paths": [
+            "evidence/executions/blender_1795800285979679651/code/build.py.diff",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "SDK events 48–55; final_state.json:9098–9150; target_geometry.json:1148–1170, 1974–2030",
+          "observed_result": "Final render read; evaluator state places hinge at y=1.25 and dark opening near y=2.12. The door is visibly present in the final image, but a reference-accurate repair is not established.",
+          "side_effects": "Hinge is displaced 0.8 units from its earlier y position while the opening stays fixed, leaving an attachment gap; panel also moved.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "Doorway attachment, collisions, and isolated improvement over prior variant."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "All five execution stdout logs report scene and image saves; evidence/index.json records no Python tracebacks. Logs show a Material.use_nodes deprecation warning, not a Python failure.",
+        "The final hinge was moved independently of the opening. Evaluator geometry places hinge at y=1.25 and opening at y=2.1075–2.1325, so the modeled hinge is detached from the opening; this is posthoc evidence, not a student measurement.",
+        "The final render was read, but no explicit final quality assessment or geometric clearance verification is recorded. The student ended with a deliverables statement."
+      ]
+    },
+    {
+      "run": "S02-E2-R1",
+      "distinct_executed_technical_paths": 2,
+      "actual_comparison": "unknown",
+      "new_validation_method": "Camera-render reads; no diagnostic top/side view, geometry measurement or special visibility test is evidenced.",
+      "explanation": "Two door approaches were executed: swing-only and translation plus swing, followed by numeric refinements. Several renders were observed and subsequently edited, but no explicit comparative judgment or selection rationale is recorded, so actual comparison and fixed-camera trial are unknown. Later runs also changed lighting and materials.",
+      "evidence": "SDK events 4-55; execution code diffs; final_source/build.py:49-79.",
+      "candidates": [
+        {
+          "hypothesis": "Reverse the hinge swing at the original pivot to expose the door.",
+          "code_paths": [
+            "evidence/executions/blender_1795798908433764144/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "SDK events 4, 8-11; +53 degrees; also changed wood colors.",
+          "observed_result": "Render saved and read; subsequent angle edit replaces this setting. Specific student assessment is not recorded.",
+          "side_effects": "Wood and inset colors changed concurrently.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Wall contact and attachment were not diagnosed."
+        },
+        {
+          "hypothesis": "Use a 5-degree hinge angle at the original pivot for a broader face.",
+          "code_paths": [
+            "evidence/executions/blender_1795798943169558775/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "SDK events 12-17; rendered and image returned; the render description expresses the intended broader face.",
+          "observed_result": "Subsequently replaced by a translated and rotated hinge; no explicit comparative assessment is recorded.",
+          "side_effects": "Wood color remains changed.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Projected breadth and physical contact not measured."
+        },
+        {
+          "hypothesis": "Translate and rotate the hinge toward the right side and then nearer the foreground.",
+          "code_paths": [
+            "evidence/executions/blender_1795798972833406974/code/build.py",
+            "evidence/executions/blender_1795799023282868529/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "SDK events 18-29; pivots (2.3,1.25) and (2.3,0.05), both -35 degrees; saved and read renders.",
+          "observed_result": "Both were superseded by later placements; no explicit selection rationale is visible.",
+          "side_effects": "Leaf moves relative to the unchanged opening.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Hinge alignment and collisions."
+        },
+        {
+          "hypothesis": "Place the door at (1.95,-0.40), -35 degrees, and shift and narrow the dark opening.",
+          "code_paths": [
+            "evidence/executions/blender_1795799061052126789/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "SDK events 30-37 and capture diff; rendered and read.",
+          "observed_result": "Opening revision retained, hinge placement superseded.",
+          "side_effects": "Opening cube is not a cut in the back wall.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Doorway alignment and physical plausibility."
+        },
+        {
+          "hypothesis": "Move hinge to (1.65,-0.65), rotate -20 degrees, and add rug variation and stronger lamp lighting.",
+          "code_paths": [
+            "evidence/executions/blender_1795799106000918270/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "SDK events 38-47 and capture diff; render read.",
+          "observed_result": "Rug shader, lighting and angle retained; hinge location superseded.",
+          "side_effects": "Lighting, material and geometry changes were bundled, preventing isolated attribution.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Independent contribution of each change."
+        },
+        {
+          "hypothesis": "Move the -20-degree hinge to (1.30,-0.65) and darken cabinet glass.",
+          "code_paths": [
+            "evidence/executions/blender_1795799148131055385/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "SDK events 48-55; final capture diff; target_geometry.json:1915-2015.",
+          "observed_result": "Final render read; supplied final image visibly contains a broad paneled foreground door. Independent evaluator geometry places the hinge well away from the opening.",
+          "side_effects": "Cabinet color changed simultaneously; hinge is at y=-0.65 while opening is at y=2.12, so it is not attached to that opening.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Physical attachment, intersections and reference geometry."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "All seven execution logs report scene and image saved; no traceback appears in captured logs. Each stderr contains a Material.use_nodes deprecation warning.",
+        "No top or side view, geometry intersection check, diagnostic visibility render, or student measurement is documented. The final image was read before the student stopped.",
+        "Evaluator output target_geometry.json:1974-2030 places the final hinge at y=-0.65 and the opening at y=2.12; this is an independent posthoc geometry fact, not a student discovery."
+      ]
+    },
+    {
+      "run": "S02-E2-R2",
+      "distinct_executed_technical_paths": "Two door intervention types: swing revision and hinge translation; panel-face/opening revisions and rug shader are additional edits, not independent controlled door paths.",
+      "actual_comparison": "unknown",
+      "new_validation_method": "Successive camera-render reads, but no diagnostic top/side view, geometry measurement, or controlled visibility test is evidenced.",
+      "explanation": "The student rendered and viewed distinct candidates at the same camera settings, and iteratively changed them. No explicit comparative judgment or selection rationale is recorded, so comparison and a fixed-camera comparison cannot be credited solely from sequential images. Several edits were bundled.",
+      "evidence": "sdk_events.json events 4-58; executions/*/code/build.py.diff; evidence/temporary_artifact_provenance.json is empty",
+      "candidates": [
+        {
+          "hypothesis": "Reverse hinge swing to expose door; also lighten wood.",
+          "code_paths": [
+            "evidence/executions/blender_1795800856511427461/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "sdk_events.json events 4-11; stdout.log records render and save",
+          "observed_result": "Render was read; student did not state a result. The wood colors remain in final source, but this 53-degree swing does not.",
+          "side_effects": "Shared wood material also colors the bed base.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": [
+            "isolated effect of swing versus wood color",
+            "wall and furniture clearance"
+          ]
+        },
+        {
+          "hypothesis": "Use 120-degree hinge swing at original location.",
+          "code_paths": [
+            "evidence/executions/blender_1795800907244130932/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "partially",
+          "evidence": "sdk_events.json events 12-17; code/build.py.diff; render read call-03662823d1574a03bd2ab8e31aa83485",
+          "observed_result": "Rendered and read; 120-degree rotation survives but location subsequently changes.",
+          "side_effects": "Panel face and attachment not separately verified.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": [
+            "cause of initial invisibility",
+            "clearance"
+          ]
+        },
+        {
+          "hypothesis": "Translate hinge and place panels on opposite face.",
+          "code_paths": [
+            "evidence/executions/blender_1795800961449015772/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "partially",
+          "evidence": "sdk_events.json events 18-25; code/build.py.diff; rendered image read",
+          "observed_result": "A render was read; opposite panel face remains, hinge position was replaced.",
+          "side_effects": "Two changes confound their separate effects.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": [
+            "physical attachment and occlusion"
+          ]
+        },
+        {
+          "hypothesis": "Move the hinge toward the foreground in successive steps.",
+          "code_paths": [
+            "evidence/executions/blender_1795800999525846626/code/build.py",
+            "evidence/executions/blender_1795801026438961274/code/build.py",
+            "evidence/executions/blender_1795801049121724008/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "sdk_events.json events 26-45; respective build.py.diff and stdout.log files; candidate renders read",
+          "observed_result": "Positions (1.72,1.55), (1.72,0.85), and (1.30,0.30) were rendered and superseded. The last also narrows and moves the dark opening, which is retained.",
+          "side_effects": "Foreground displacement may detach the leaf from the opening; last candidate also changes the opening.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": [
+            "opening attachment",
+            "collision and floor contact"
+          ]
+        },
+        {
+          "hypothesis": "Move hinge further left and add mottled rug material.",
+          "code_paths": [
+            "evidence/executions/blender_1795801079564355973/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "sdk_events.json events 46-53; code/build.py.diff; final_source/build.py:54-55, 66",
+          "observed_result": "Render read and hinge/rug edits retained in final source.",
+          "side_effects": "Door and rug changes are bundled; final hinge is far in front of the opening.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": [
+            "isolated rug effect",
+            "physical hinge attachment"
+          ]
+        },
+        {
+          "hypothesis": "Add warm illumination near rear lamp.",
+          "code_paths": [
+            "evidence/executions/blender_1795801106955275837/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": false,
+          "retained": true,
+          "evidence": "sdk_events.json events 54-58; final_source/build.py:52; stdout.log records save and render",
+          "observed_result": "Final scene and render saved; no subsequent student render Read is recorded.",
+          "side_effects": "Lighting changes appearance beyond the door.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": [
+            "visual effect of final lighting"
+          ]
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "All eight captured stdout logs report scene and PNG saves, and index.json records no Python tracebacks; logs show a Blender Material.use_nodes deprecation warning.",
+        "No student-visible final render read follows the last lighting revision.",
+        "Final image shows a broad paneled door, but physical attachment is not established: evaluator target_geometry.json:1974-1988 places the hinge at (0.95, 0.30), while the opening is near y=2.12 at lines 2018-2043. The back wall remains a solid cube in final_source/build.py:22.",
+        "No top or side view or intersection check is recorded; the cause of the original mismatch remains unproved.",
+        "Student reported completion in evidence/index.json:84; this is not independent validation of geometric fidelity."
+      ]
+    },
+    {
+      "run": "S02-E3-R1",
+      "distinct_executed_technical_paths": 2,
+      "actual_comparison": "unknown",
+      "new_validation_method": false,
+      "explanation": "Two broad paths were exercised: angle-only trials and combined relocation/reconfiguration of the parented door. Four variants were rendered and read with the same camera; their sequential edits and final reference comparison support qualitative iteration, not a documented formal ranking or isolated attribution of combined changes. No new diagnostic geometry or visibility test was performed.",
+      "evidence": "SDK events 4-32; execution diffs; final_source/build.py:62-75",
+      "candidates": [
+        {
+          "hypothesis": "Reverse hinge swing at original location to expose the door.",
+          "code_paths": [
+            "evidence/executions/blender_1795798477147234616/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "SDK events 4-9; code line 64 and captured render",
+          "observed_result": "Rendered view shows dark opening and only a very narrow leaf edge; followed by another angle edit.",
+          "side_effects": "Wall and furniture intersections not checked.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Exact visibility cause and physical attachment."
+        },
+        {
+          "hypothesis": "A 10-degree swing at the same hinge may expose a wider face.",
+          "code_paths": [
+            "evidence/executions/blender_1795798513092895233/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "SDK events 10-15; capture diff line 8 and visible render",
+          "observed_result": "Paneled face appears but is narrow and far from the foreground footprint; followed by repositioning.",
+          "side_effects": "Contact and wall clearance unknown.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Physical plausibility and reference match."
+        },
+        {
+          "hypothesis": "Move hinge and dark doorway proxy to the right with a 25-degree swing.",
+          "code_paths": [
+            "evidence/executions/blender_1795798558509684151/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "SDK events 16-23; capture diff lines 7-11",
+          "observed_result": "A narrow angled door appears beside a dark opening; student then changed the assembly again.",
+          "side_effects": "Hinge and doorway move together, while the full back wall remains unchanged.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Angle and placement were changed together; their individual effects and clearance are unknown."
+        },
+        {
+          "hypothesis": "Relocate hinge left, reverse leaf to positive local X, widen leaf and panels, and swing -55 degrees.",
+          "code_paths": [
+            "evidence/executions/blender_1795798616253310228/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "SDK events 24-32; capture diff lines 7-19; scene_states/final_state.json:9046-9101",
+          "observed_result": "Student reports more visible face but insufficient silhouette and floor overlap relative to reference; final camera render was read.",
+          "side_effects": "Leaf width, hinge position, swing and local side changed simultaneously; dark proxy remains shifted. Back wall is not cut into a true opening.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "No independent top/side, collision, or hinge-attachment check; effect of each individual parameter is unresolved."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "Final student report acknowledges door silhouette and floor overlap remain too small (SDK event 32).",
+        "The four run results report saved scene and render without Python tracebacks; the last stderr contains a Material.use_nodes deprecation warning (evidence/index.json:121-249; executions/blender_1795798616253310228/stderr.log).",
+        "No student top or side view, visibility mask, mesh collision measurement, or independent regeneration is present in the SDK trace. Evaluator scene states and target_geometry.json are not student checks.",
+        "Final evaluated geometry records the door leaf parented to the hinge and its bounds at target_geometry.json:1160-1170,1914-1972; this establishes geometry, not successful attachment or collision clearance."
+      ]
+    },
+    {
+      "run": "S02-E3-R2",
+      "distinct_executed_technical_paths": 2,
+      "actual_comparison": "unknown",
+      "new_validation_method": "Camera-render inspection of branch candidates; no new geometric diagnostic.",
+      "explanation": "Two door approaches are evidenced: fixed-location swing adjustments and a translated/reversed hinge assembly, followed by return to the original hinge with widened, face-reversed panels. Camera remained fixed in the source. Multiple distinct renders were read and later edits made, but there is no explicit comparison or selection judgment; therefore a fixed-camera comparison is not credited. Repeated 53-degree execution is not a distinct path.",
+      "evidence": "sdk_events.json events 4-43,50-52; evidence/received_guidance.txt:3; executions/*/code/build.py",
+      "candidates": [
+        {
+          "hypothesis": "Reverse hinge swing at the original hinge to expose the leaf.",
+          "code_paths": [
+            "evidence/executions/blender_1795801191124369601/code/build.py",
+            "evidence/executions/blender_1795801223740487484/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "sdk_events.json events 4-15; second execution repeats the same code and image.",
+          "observed_result": "Two rendered images were read; the same 53-degree build was repeated. No explicit comparative judgment is recorded.",
+          "side_effects": "Collision and attachment unknown.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Top-view diagnosis and penetration checks."
+        },
+        {
+          "hypothesis": "A 15-degree swing may show a broader face.",
+          "code_paths": [
+            "evidence/executions/blender_1795801261646339925/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "sdk_events.json events 16-21, then 22-23; render read call-1d40d19fabec4f17be45f0acb6c63ef9.",
+          "observed_result": "Rendered and read, then replaced by the repositioned assembly; no verbal comparison recorded.",
+          "side_effects": "Collision unknown.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Projected silhouette and wall intersection were not measured."
+        },
+        {
+          "hypothesis": "Relocate hinge to the other side and reverse/widen the leaf to alter visibility.",
+          "code_paths": [
+            "evidence/executions/blender_1795801336941108533/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "sdk_events.json events 22-30; render read call-9f43a560e8834ccfb3e5704258ad5fd4.",
+          "observed_result": "A render was read before the hinge and leaf were changed again; no explicit comparative selection rationale is visible.",
+          "side_effects": "Angle, width and hinge location changed together; effects cannot be isolated.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Attachment, wall and furniture clearance."
+        },
+        {
+          "hypothesis": "Restore original hinge position with 75-degree swing and widen the leaf; then widen further and put details on the other face.",
+          "code_paths": [
+            "evidence/executions/blender_1795801394450751035/code/build.py",
+            "evidence/executions/blender_1795801433671412887/code/build.py",
+            "evidence/executions/blender_1795801494018900473/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "sdk_events.json events 30-43,48-52; final_source/build.py:67-74; target_geometry.json:1160-1183,1974-2015.",
+          "observed_result": "Final render read; student reported a visible paneled face. The final code and evaluator state retain a 1.70-wide leaf at 75 degrees.",
+          "side_effects": "Leaf is wider than the .78-wide dark opening; geometry and panel-face changes are confounded.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Top/side inspection, clearance, and reference geometric accuracy."
+        },
+        {
+          "hypothesis": "Add rear lamp glow and make cabinet panes transmissive.",
+          "code_paths": [
+            "evidence/executions/blender_1795801494018900473/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "sdk_events.json events 44-51; final_source/build.py:7,52-54.",
+          "observed_result": "Final combined render was read; separate effects were not tested.",
+          "side_effects": "Lighting and glass changed simultaneously.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Independent material and lighting contributions."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "Seven Blender executions report scene and image saves; logs show a use_nodes deprecation warning, not a traceback (evidence/executions/*/stdout.log and stderr.log).",
+        "The 53-degree candidate was rerun without a code change, with identical image byte counts (sdk_events.json events 8-15; index.json image associations).",
+        "The final report asserts a visible paneled face (sdk_events.json event 52); no explicit collision test, top/side view, visibility diagnostic, or quantitative reference comparison appears in the student trace.",
+        "The independently generated target_geometry.json gives final geometry, not a student measurement."
+      ]
+    },
+    {
+      "run": "S02-E4-R1",
+      "distinct_executed_technical_paths": "Two main modeling paths: hinge swing at original position and relocated hinge/opening, plus panel-face placement variants; multiple numeric refinements are not separate technologies.",
+      "actual_comparison": true,
+      "new_validation_method": "Student-generated top and side orthographic diagnostics and fixed-camera candidate render inspection; these were prompted by prior guidance, not independent discovery.",
+      "explanation": "A and B were rendered and read, followed by C–G and selection; the baseline top diagnostic was made only after A/B, and the final side view was obstructed. No measured intersection check is shown.",
+      "evidence": "evidence/received_guidance.txt; evidence/sdk_events.json events 6–52; evidence/index.json:141-572",
+      "candidates": [
+        {
+          "hypothesis": "A: reverse baseline swing at the original hinge.",
+          "code_paths": [
+            "evidence/executions/blender_1795799292559756100/code/candidate_a.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "sdk_events.json events 6–11; capture saved candidate_a.png and .blend",
+          "observed_result": "Render read; no separate verbal result recorded.",
+          "side_effects": "Unknown.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Wall and furniture intersections."
+        },
+        {
+          "hypothesis": "B: move back-wall hinge and change swing.",
+          "code_paths": [
+            "evidence/executions/blender_1795799298213044075/code/candidate_b.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "sdk_events.json events 6–11; capture saved candidate_b.png and .blend",
+          "observed_result": "Render read; no separate verbal result recorded.",
+          "side_effects": "Unknown.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Attachment and intersections."
+        },
+        {
+          "hypothesis": "C: adjust hinge and put panel details on opposite face.",
+          "code_paths": [
+            "evidence/executions/blender_1795799348114315204/code/candidate_c.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "sdk_events.json events 12, 16–19, 21, 25–27; candidate C capture and top diagnostic",
+          "observed_result": "Camera and top renders read; no specific verbal finding recorded.",
+          "side_effects": "Potential doorway misalignment; unverified.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Actual wall or furniture intersection."
+        },
+        {
+          "hypothesis": "D: move C forward and alter swing.",
+          "code_paths": [
+            "evidence/executions/blender_1795799393631168851/code/candidate_d.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "sdk_events.json events 20, 24, 26; candidate_d.blend and image capture",
+          "observed_result": "Render read; no separate verbal finding.",
+          "side_effects": "Hinge may be detached from original opening; not measured.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Attachment and clearance."
+        },
+        {
+          "hypothesis": "E: move doorway and hinge to right wall with 40-degree swing.",
+          "code_paths": [
+            "evidence/executions/blender_1795799435435622752/code/candidate_e.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "sdk_events.json events 28–31; candidate_e capture",
+          "observed_result": "Render read; no separate verbal finding.",
+          "side_effects": "Dark slab placed over solid right wall.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Actual opening and clearance."
+        },
+        {
+          "hypothesis": "F: rotate E to -20 degrees at the same hinge.",
+          "code_paths": [
+            "evidence/executions/blender_1795799473036195807/code/candidate_f.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "sdk_events.json events 32–35; candidate_f capture",
+          "observed_result": "Render read and followed by opposite panel-face trial.",
+          "side_effects": "Unknown.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Intersections and doorway alignment."
+        },
+        {
+          "hypothesis": "Test final: restore panel details to opposite face of F.",
+          "code_paths": [
+            "evidence/executions/blender_1795799516615632895/code/test_final.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "sdk_events.json events 36–40; test_final capture",
+          "observed_result": "Render read; final derived from it with hinge and opening moved forward.",
+          "side_effects": "Solid wall remains behind opening slab.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Hinge attachment and intersections."
+        },
+        {
+          "hypothesis": "Final: shift test-final right-wall opening and hinge forward together.",
+          "code_paths": [
+            "evidence/executions/blender_1795799567842385059/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": true,
+          "evidence": "sdk_events.json events 40, 44–47, 52; final_state.json:9046-9100; target_geometry.json:1148-1170",
+          "observed_result": "Student reports paneled face visible but placement and doorway differ from reference.",
+          "side_effects": "Opening is a dark slab over an uncut wall; side view obstructed.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "No conclusive clearance or hinge-alignment verification."
+        },
+        {
+          "hypothesis": "G: bring right-wall assembly and dark slab still closer.",
+          "code_paths": [
+            "evidence/executions/blender_1795799620470235379/code/candidate_g.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "sdk_events.json events 48–52; candidate_g capture; final_source/build.py remains earlier placement",
+          "observed_result": "Render read; earlier final remains delivered; specific rejection reason unrecorded.",
+          "side_effects": "Unknown.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Clearance and physical opening."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "Student explicitly reports the final side diagnostic obstructed by the wall, leaving intersections and hinge alignment inconclusive (sdk_events.json event 52).",
+        "The final opening is a dark mesh slab against a continuous wall, not a cut doorway (final_source/build.py:23,62).",
+        "No traceback is listed for the captured Blender executions (evidence/index.json:141-572).",
+        "G was rendered and read after final build, but was not installed in final source; reason unknown."
+      ]
+    },
+    {
+      "run": "S02-E4-R2",
+      "distinct_executed_technical_paths": "Three modeling paths: swing-only, translated hinge with swing, and actual doorway reconstruction; wider-leaf variants additionally change dimensions, not construction technology. Visibility intervention and orthographic views are separate checks.",
+      "actual_comparison": true,
+      "new_validation_method": true,
+      "explanation": "The trace contains generated and student-read candidate renders followed by explicit selection, plus a wall-hide diagnostic and generated/read top and side views. The initial translation candidate changes angle too; later angles are fixed-camera comparisons but differ numerically. No quantitative geometry validation is evidenced.",
+      "evidence": "evidence/sdk_events.json events 4-15, 24-44; evidence/final_source/views.py:76-80",
+      "candidates": [
+        {
+          "hypothesis": "Hiding the back wall reveals whether it occludes the checkpoint leaf.",
+          "code_paths": [
+            "evidence/executions/blender_1795800441868655745/code/diagnostic.py"
+          ],
+          "technique_difference": "verification_mechanism",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "SDK events 4, 6, 9, 44; diagnostic.py:65-76",
+          "observed_result": "Student reported that the back wall hid the leaf.",
+          "side_effects": "Entire back wall is hidden in this diagnostic, not a permanent doorway.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "No per-pixel visibility or independent occlusion measurement."
+        },
+        {
+          "hypothesis": "Changing only hinge swing exposes the leaf.",
+          "code_paths": [
+            "evidence/executions/blender_1795800447063942784/code/swing.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "SDK events 4, 7, 10, 44; swing.py:65",
+          "observed_result": "Rendered and read +50 degree candidate; not selected.",
+          "side_effects": "Original solid wall retained.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Collision and silhouette quality not separately reported."
+        },
+        {
+          "hypothesis": "Move the hinge to another position to change door visibility.",
+          "code_paths": [
+            "evidence/executions/blender_1795800452840734793/code/placement.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "SDK events 4, 8, 11, 44; placement.py:65",
+          "observed_result": "Rendered and read moved candidate; not selected.",
+          "side_effects": "Both location and angle changed; original wall remains.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Independent effect of translation and hinge attachment not established."
+        },
+        {
+          "hypothesis": "Cut a doorway and rotate the leaf into the room.",
+          "code_paths": [
+            "evidence/executions/blender_1795800496886376121/code/build.py",
+            "evidence/final_source/test20.py",
+            "evidence/final_source/test0.py",
+            "evidence/final_source/test35.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": true,
+          "evidence": "SDK events 12-33, 42-44; execution captures 1795800496886376121, 1795800524164551230, 1795800561782074823, 1795800598528588749, 1795800709697261028",
+          "observed_result": "65, 20, 0 and 35 degree images were generated and read; 35 degrees was selected and saved. Student reported a visible but still too narrow leaf.",
+          "side_effects": "Wall, grout and baseboard changed, and hinge moved from y=2.05 to 2.13; these changes are confounded in the initial revision.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Top and side images were read, but no explicit collision or attachment conclusion or measured reference fit is recorded. Final rerender was not read after the final save."
+        },
+        {
+          "hypothesis": "A wider door and resized panels will improve the silhouette.",
+          "code_paths": [
+            "evidence/executions/blender_1795800658694915051/code/wide.py",
+            "evidence/executions/blender_1795800691176948157/code/testbroad.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "SDK events 34-42; wide.py and testbroad.py; final_source/build.py:67-74",
+          "observed_result": "1.40-wide at 35 degrees and 1.20-wide at 10 degrees were rendered and read; original 0.88 width at 35 degrees retained.",
+          "side_effects": "The second wider candidate also changes angle; panel and molding dimensions were revised together.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "No explicit selection rationale or collision findings recorded."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "The student's final report says the visible leaf remains narrower than the reference (evidence/sdk_events.json event 44).",
+        "The last 35-degree build was rendered and saved, but no subsequent Read of that final image is recorded; the same 35-degree candidate image had been read earlier (events 28-31, 42-44).",
+        "Top and side images were read, but a collision-free or hinge-attachment finding is not explicitly recorded.",
+        "Index reports no Python traceback logs for the 11 captures; an exit code alone is not treated as proof of all visual goals."
+      ]
+    },
+    {
+      "run": "S03-E0-R1",
+      "distinct_executed_technical_paths": "Three sequential cumulative scene revisions; no distinct countertop-material candidate path.",
+      "actual_comparison": "unknown",
+      "new_validation_method": "Render inspection only; no controlled comparison or measurement is evidenced.",
+      "explanation": "Multiple rendered stages were read but there is no observable comparison or selection judgment, and simultaneous changes confound attribution. Procedural noise was applied to wood, not the target countertop.",
+      "evidence": "sdk_events.json events 4-24; final_source/build.py:20-24,42-46; evidence/temporary_artifact_provenance.json",
+      "candidates": [
+        {
+          "hypothesis": "Reframe the scene and change the open door and overall brightness/contrast.",
+          "code_paths": [
+            "evidence/executions/blender_1795798706325970282/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "sdk_events.json events 4-9; execution stdout.log; final_source/build.py:38,92-97",
+          "observed_result": "Saved a scene and render, which the student read; no explicit comparative judgment is recorded.",
+          "side_effects": "Camera, door, world and display changed together; handle coordinates did not follow door.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": [
+            "Individual contribution of each change",
+            "Door-handle alignment"
+          ]
+        },
+        {
+          "hypothesis": "Use procedural wood grain and doorway gradient while lengthening range geometry.",
+          "code_paths": [
+            "evidence/executions/blender_1795798763509772353/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "sdk_events.json events 10-15; execution diff and stdout.log; final_source/build.py:20-24,34-37,59-71",
+          "observed_result": "Scene and render saved and student read the render; no isolated or explicit comparative assessment recorded.",
+          "side_effects": "Shared pale timber also colors drawer fronts and plank joints; geometry and multiple materials changed simultaneously.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": [
+            "Wood pattern quality and effects on other users of the material",
+            "Independent impact of range and doorway edits"
+          ]
+        },
+        {
+          "hypothesis": "Add range clock, directional sunlight and change drawer palette.",
+          "code_paths": [
+            "evidence/executions/blender_1795798816663332097/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "sdk_events.json events 16-24; execution diff and stdout.log",
+          "observed_result": "Saved scene and render; student read final image and reported completion.",
+          "side_effects": "Sun alters lighting globally; clock, light and drawer changes were not isolated.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": [
+            "Whether sunlight alone produces the intended strip",
+            "Clock visibility and comparative visual accuracy"
+          ]
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "All three captured stdout logs report saving scene and render; grep found no traceback or error in captured logs. The student stopped after reading the final render and reporting completion.",
+        "The countertop remains the inherited constant white stone and separate straight vein rods; no target-specific material experiment, crop, roughness-only or controlled lighting comparison is recorded.",
+        "No additional guidance was received despite the separately supplied posthoc teacher diagnosis.",
+        "The changed door and its independently fixed handle were not checked for attachment; evaluator bounds alone are not student verification."
+      ]
+    },
+    {
+      "run": "S03-E0-R2",
+      "distinct_executed_technical_paths": "Three branch-specific modeling mechanisms: door-object repositioning, doorway height-gradient shading plus text, and anisotropic procedural wood grain; camera parameter variants and world-color edits also executed. None is a countertop material alternative.",
+      "actual_comparison": "unknown",
+      "new_validation_method": false,
+      "explanation": "The student read three successive scene renders and reverted the camera after the third, but the trace contains no explicit comparison outcome isolating candidates. Multiple coupled changes prevent controlled causal attribution; the fourth render was not read. No countertop crop, alternate light test, or measurement is recorded.",
+      "evidence": "sdk_events.json events 12-13, 18-23, 31-39; execution diffs; final_source/build.py:44-48",
+      "candidates": [
+        {
+          "hypothesis": "Alter door placement, camera and world color to improve scene correspondence; exact student rationale is unknown.",
+          "code_paths": [
+            "evidence/executions/blender_1795801187967706392/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "partially",
+          "evidence": "sdk_events.json events 4-13; execution stdout.log reports scene and image saved",
+          "observed_result": "First revised render was read; the door and world settings and later-restored camera persist.",
+          "side_effects": "Door handle remained at its earlier independent coordinates; changes were bundled.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "No isolated effect of each change or formal visibility check."
+        },
+        {
+          "hypothesis": "Use a height-gradient doorway and add clock text while moving camera closer.",
+          "code_paths": [
+            "evidence/executions/blender_1795801242152611354/code/build.py",
+            "evidence/executions/blender_1795801242152611354/code/build.py.diff"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "partially",
+          "evidence": "sdk_events.json events 14-23; execution stdout.log and captured render",
+          "observed_result": "Rendered and read; gradient and clock retained, camera position later changed.",
+          "side_effects": "Camera, clock and doorway changed simultaneously.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "No isolated gradient or clock assessment recorded."
+        },
+        {
+          "hypothesis": "Add directional procedural wood grain and move camera further forward.",
+          "code_paths": [
+            "evidence/executions/blender_1795801293801394272/code/build.py",
+            "evidence/executions/blender_1795801293801394272/code/build.py.diff"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "partially",
+          "evidence": "sdk_events.json events 24-33; execution stdout.log; final_source/build.py:20-26",
+          "observed_result": "Student read the render; procedural floor grain was retained but this camera placement was abandoned.",
+          "side_effects": "Wood material is also assigned to drawer fronts and plank joints, so its shader change is not floor-exclusive; camera changed at the same time.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "No isolated wood-grain comparison or check of shared-material side effects."
+        },
+        {
+          "hypothesis": "Restore first branch camera and move clock forward while retaining later scene changes.",
+          "code_paths": [
+            "evidence/executions/blender_1795801324493998776/code/build.py",
+            "evidence/executions/blender_1795801324493998776/code/build.py.diff",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "sdk_events.json events 34-39; execution stdout.log; final_state.json range clock and camera",
+          "observed_result": "Scene and render saved. No subsequent final-render Read is recorded.",
+          "side_effects": "Camera and text depth changed together.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Final clock readability and final visual quality were not checked in the trace."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "All four execution logs report saving scene.blend and final.png without a traceback; each has a Material.use_nodes deprecation warning. Exit code alone is not used to establish success.",
+        "The right counter remains assigned white stone with fifteen separate straight marble vein rods; the new procedural shader applies to wood and planks, not the counter (baseline_build.py:36-40; final_source/build.py:20-26,44-48; final_state.json:7135-7170 and 7241 onward).",
+        "The final render was saved but not read by the student after the last execution. No controlled countertop comparison, binding inspection, roughness-only test, or image texture candidate is evidenced.",
+        "No temporary artifacts were recovered (evidence/temporary_artifact_provenance.json)."
+      ]
+    },
+    {
+      "run": "S03-E1-R1",
+      "distinct_executed_technical_paths": "Three new modeling mechanisms were executed: a doorway position gradient, floor noise mapping and text geometry, alongside geometry, lighting and camera parameter changes. Four cumulative scene revisions are not four independent target-material paths.",
+      "actual_comparison": "unknown",
+      "new_validation_method": "Full-render inspection was performed; no new controlled or measurement-based validation is evidenced.",
+      "explanation": "The student read successive actual renders and changed the script afterwards, but did not state a comparison or selection rationale. Camera and floor changed together in one trial; no controlled countertop comparison or alternate target material was executed.",
+      "evidence": "evidence/sdk_events.json events 14–38; evidence/executions/*/code/build.py.diff; evidence/final_source/build.py:20–25,45–51",
+      "candidates": [
+        {
+          "hypothesis": "Reposition and reshape the door, enlarge the fascia, darken illumination and reframe the scene.",
+          "code_paths": [
+            "evidence/executions/blender_1795799050904897486/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "partially",
+          "evidence": "SDK events 4–15; execution stdout.log records saved render and scene",
+          "observed_result": "Generated render was read; no explicit comparison judgment recorded.",
+          "side_effects": "Multiple factors changed together, preventing attribution.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Individual effect of door, panel, light and camera edits."
+        },
+        {
+          "hypothesis": "Add a vertical doorway gradient and digital clock to the first revised scene.",
+          "code_paths": [
+            "evidence/executions/blender_1795799103209326666/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "SDK events 16–23; code/build.py.diff:7–27; final_state.json records material and text object",
+          "observed_result": "Rendered and read; gradient and clock retained in final scene.",
+          "side_effects": "Gradient and clock changed simultaneously.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Independent improvement and door visibility."
+        },
+        {
+          "hypothesis": "Add directional procedural floor grain and shift the camera.",
+          "code_paths": [
+            "evidence/executions/blender_1795799149195581236/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": "partially",
+          "evidence": "SDK events 24–31; code/build.py.diff:7–22",
+          "observed_result": "Rendered and read; floor shader retained, this camera target replaced.",
+          "side_effects": "Floor shader and camera changed together; material affects all four oak tone materials.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Whether floor grain alone improved similarity or introduced repetition."
+        },
+        {
+          "hypothesis": "Aim the revised camera further left while retaining the floor and other changes.",
+          "code_paths": [
+            "evidence/executions/blender_1795799187770657424/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "SDK events 32–38; code/build.py.diff:3–9; evidence/final_source/build.py:97",
+          "observed_result": "Rendered, read, and delivered; no explicit preference or quantified comparison is recorded.",
+          "side_effects": "Changes composition across the image.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Comparative visual improvement and target countertop coverage."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "All four stdout logs report saving final.png, with no traceback found in captured logs; Blender reported a Material.use_nodes deprecation warning (SDK events 13,22,29,35).",
+        "The final countertop remains the inherited constant white stone plus straight rod veins; the new noise shader belongs to the floor, not the countertop (evidence/final_source/build.py:20–25,45–51; evidence/scene_states/final_state.json:7135–7170).",
+        "No explicit comparison judgment, countertop crop, material-binding inspection, roughness-only trial, alternate-light test or independent student regeneration is recorded.",
+        "The student's final response reports delivery rather than explaining whether any discrepancy improved (SDK event 38)."
+      ]
+    },
+    {
+      "run": "S03-E1-R2",
+      "distinct_executed_technical_paths": 2,
+      "actual_comparison": "unknown",
+      "new_validation_method": false,
+      "explanation": "Two sequential full-scene variants were executed and both renders read, with the latter retained. The trace contains no explicit comparison or selection rationale, and simultaneous changes preclude controlled attribution. The second variant adds floor material and scene details, not a countertop material experiment.",
+      "evidence": "evidence/sdk_events.json events 4-20; evidence/executions/*/code/build.py; evidence/received_guidance.txt",
+      "candidates": [
+        {
+          "hypothesis": "Reframe and adjust display contrast/exposure to improve overall reconstruction.",
+          "code_paths": [
+            "evidence/executions/blender_1795800793673044015/code/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "evidence/sdk_events.json events 4-11; first execution stdout.log; final_source/build.py:93-96",
+          "observed_result": "Scene and render saved; student read the render. Camera and display changes were retained in the later candidate.",
+          "side_effects": "Camera and display changed together, so their separate contributions are not isolated.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "No explicit student assessment or measured improvement is recorded."
+        },
+        {
+          "hypothesis": "Add wood-grain variation, stove clock and sunlight, and shift the door leaf to better match the scene.",
+          "code_paths": [
+            "evidence/executions/blender_1795800841924448514/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "evidence/sdk_events.json events 12-20; evidence/executions/blender_1795800841924448514/code/build.py.diff; final_state.json",
+          "observed_result": "Second render and scene saved and the render was read. Floor noise, clock, sun and shifted door appear in executed source and final state.",
+          "side_effects": "Multiple changes are bundled; the separately positioned door handle was not moved with the leaf. The added sun may alter all surfaces.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "No explicit comparison or attribution of improvement, edge inspection, or isolated light test is recorded."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "Both Blender logs report saved scenes and renders; stderr contains only a Material.use_nodes deprecation warning, not a traceback.",
+        "The final countertop still uses the inherited white stone and separate straight vein rods; the new noise shader targets floor planks, not the counter (evidence/final_source/build.py:36-40,77-82; final_state.json:7135-7170).",
+        "The student read both renders but gave no explicit assessment and performed no recorded countertop crop, material binding inspection, or controlled light/roughness comparison.",
+        "Teacher diagnosis and suggested methods were not received: evidence/index.json:21-23 and evidence/received_guidance.txt.",
+        "The student ended after reading the final render (sdk_events.json events 18-20)."
+      ]
+    },
+    {
+      "run": "S03-E2-R1",
+      "distinct_executed_technical_paths": 1,
+      "actual_comparison": "unknown",
+      "new_validation_method": "Full-render inspection of two successive outputs; no controlled diagnostic or measured comparison.",
+      "explanation": "One new target material approach was executed, with a related floor application and a numeric revision. Both intermediate renders were read, but no explicit comparative judgment or selection appears; the final variant was not read. Camera remained unchanged, but world and later exposure changed, so a controlled target comparison is not established.",
+      "evidence": "sdk_events.json events 4–28; execution diffs; evidence/temporary_artifact_provenance.json is empty",
+      "candidates": [
+        {
+          "hypothesis": "Directional distorted procedural color may replace sparse straight veins.",
+          "code_paths": [
+            "evidence/executions/blender_1795799834932251980/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": false,
+          "evidence": "sdk_events.json events 4–11; first execution stdout.log; baseline_build.py:34–40",
+          "observed_result": "Saved first render was read; no explicit assessment recorded. The original ramp was later superseded.",
+          "side_effects": "world.color was also changed, confounding comparison to the checkpoint.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Actual improvement, edge stretching and isolated illumination effects."
+        },
+        {
+          "hypothesis": "Directional noise can also supply floor grain.",
+          "code_paths": [
+            "evidence/executions/blender_1795799889503668631/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "sdk_events.json events 13–21; second execution code/build.py.diff",
+          "observed_result": "Second rendered image was read; no explicit comparison or selection is recorded.",
+          "side_effects": "Shared pale timber material also appears on drawer fronts and plank joints.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Floor fidelity and neighboring material impact."
+        },
+        {
+          "hypothesis": "A darker stone ramp and reduced exposure may improve appearance.",
+          "code_paths": [
+            "evidence/executions/blender_1795799929453673677/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": true,
+          "actual_comparison": "unknown",
+          "retained": true,
+          "evidence": "sdk_events.json events 22–28; third execution code/build.py.diff and stdout.log",
+          "observed_result": "Final scene and image saved; no subsequent student Read of final render.",
+          "side_effects": "Exposure changes the entire image; ramp and exposure changes are confounded.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "Final appearance, reference match, and individual contribution of both changes."
+        },
+        {
+          "hypothesis": "Exposure -0.5 adjustment.",
+          "code_paths": [
+            "evidence/sdk_events.json"
+          ],
+          "technique_difference": "numeric_parameter",
+          "actually_executed": false,
+          "actual_comparison": false,
+          "retained": false,
+          "evidence": "sdk_events.json events 12 and 16: replacement failed because the searched string included trailing whitespace.",
+          "observed_result": "Edit failed; later -0.6 edit succeeded.",
+          "side_effects": "None established.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "The -0.5 setting was never rendered."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "The -0.5 exposure edit failed to match (sdk_events.json event 16); the student later used -0.6.",
+        "All three execution logs report saved renders and scenes and only a Material.use_nodes deprecation warning; no Python traceback is recorded.",
+        "The final render was not read in the student trace. No countertop crop, alternate-light test, roughness-only trial or image texture candidate is recorded.",
+        "The teacher diagnosis proposes procedural, image and controlled-lighting alternatives, but received_guidance.txt contains only the visual defect hint; unreceived detailed suggestions are not student actions."
+      ]
+    },
+    {
+      "run": "S03-E2-R2",
+      "distinct_executed_technical_paths": 2,
+      "actual_comparison": true,
+      "new_validation_method": "Full-frame render inspection was performed in this branch; no crop, numerical check, or controlled lighting comparison is shown.",
+      "explanation": "Two procedural pattern mechanisms, noise and Wave bands, were executed; the third render returns to noise with changed parameters. Each render was read and the Wave-to-noise edit mentions avoiding repeated stripes, but the trace contains no explicit comparison or selection assessment. Camera and revised lighting stayed unchanged among these executions, but clock geometry changed between the first and second, and no controlled comparison is established.",
+      "evidence": "evidence/sdk_events.json events 16-18, 24-31; evidence/executions/blender_1795800130234228033/code/build.py.diff; evidence/executions/blender_1795800171609050828/code/build.py.diff",
+      "candidates": [
+        {
+          "hypothesis": "Mapped distorted noise can replace sparse straight rods with broader stone variation.",
+          "code_paths": [
+            "evidence/executions/blender_1795800082537849383/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "evidence/sdk_events.json events 4, 9, 15-18; first execution stdout.log; initial noise parameters later superseded",
+          "observed_result": "Scene and image saved; the student read the image, then changed the pattern. No explicit evaluation of its appearance is recorded.",
+          "side_effects": "Simultaneous floor, door and lighting edits confound baseline attribution; pale timber is also shared with drawer fronts.",
+          "knowledge_origin": "unverified_hypothesis",
+          "unvalidated_parts": "No isolated baseline comparison, crop, edge or neighboring-material check."
+        },
+        {
+          "hypothesis": "Distorted Wave bands provide a different elongated marble pattern.",
+          "code_paths": [
+            "evidence/executions/blender_1795800130234228033/code/build.py",
+            "evidence/executions/blender_1795800130234228033/code/build.py.diff"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "evidence/sdk_events.json events 18, 20, 23-26; second execution stdout.log",
+          "observed_result": "Wave render saved and read; next edit explicitly favors irregular stretched noise over repeated stripes, but no explicit cross-render comparison is recorded.",
+          "side_effects": "Range clock added in the same iteration; the Wave node remains in final material but is not connected to its output.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "No recorded crop, quantitative comparison, or attribution of repeated stripes to a specific visual observation."
+        },
+        {
+          "hypothesis": "Retuned stretched noise gives softer irregular stone variation rather than repeated stripes.",
+          "code_paths": [
+            "evidence/executions/blender_1795800171609050828/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": true,
+          "evidence": "evidence/sdk_events.json events 26-31; evidence/final_source/build.py:48-66; evidence/scene_states/final_state.json:7135-7170, 16531 onward",
+          "observed_result": "Final scene and render saved; final full image was returned to the student, with no subsequent explicit quality judgment.",
+          "side_effects": "Unused Wave node remains; generated coordinates can stretch on edges and shared timber shader affects other objects.",
+          "knowledge_origin": "branch_discovery",
+          "unvalidated_parts": "Reference fidelity, edge stretching, neighboring materials, and isolation from lighting remain unverified."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "All three execution stdout logs report saving the scene and render; SDK events 15, 23, 30 report Material.use_nodes deprecation warnings, not tracebacks.",
+        "The final report claims a successful build and render but makes no explicit countertop fidelity assessment (evidence/sdk_events.json event 32).",
+        "No image-texture candidate, roughness-only candidate, alternate-light controlled test, or independent student regeneration is recorded. The teacher's fuller suggestions were not the exact received guidance.",
+        "The final Wave node is created but does not feed the material output; it must not be credited as the retained visible pattern (evidence/final_source/build.py:57-66)."
+      ]
+    },
+    {
+      "run": "S03-E3-R1",
+      "distinct_executed_technical_paths": 1,
+      "actual_comparison": false,
+      "new_validation_method": "Full-frame generated render was read, but no distinct controlled comparison or measurement was performed.",
+      "explanation": "One procedural material revision was executed and retained. The baseline image was supplied, but the trace contains no explicit comparison or selection judgment; unchanged camera and lights alone do not establish a fixed-camera trial. Image-texture and roughness alternatives in the diagnosis were not received guidance and were not implemented.",
+      "evidence": "evidence/sdk_events.json events 0-8; evidence/received_guidance.txt; evidence/index.json:121-153; evidence/teacher_diagnosis.json:12-19",
+      "candidates": [
+        {
+          "hypothesis": "An elongated mapped noise color pattern can replace the faint straight countertop veins.",
+          "code_paths": [
+            "evidence/executions/blender_1795799563263485059/code/build.py",
+            "evidence/final_source/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": false,
+          "retained": true,
+          "evidence": "evidence/sdk_events.json events 2-8; execution stdout.log:1-5; evidence/scene_states/final_state.json:15784-15809",
+          "observed_result": "A scene and full-frame render were saved and the render was read. The final saved graph contains the procedural nodes; no explicit visual improvement judgment or crop comparison is recorded.",
+          "side_effects": "Separate vein meshes are removed. Potential edge stretching or neighbor effects were not independently inspected in the trace.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "No explicit coordinate-warp graph despite the source comment; object coordinates are multiplied directly before noise. Continuity, contrast, edge behavior, reference fidelity and alternative explanations remain unvalidated."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "Execution stdout records both image and blend saves; stderr contains a Material.use_nodes deprecation warning, not a traceback (evidence/executions/blender_1795799563263485059/stdout.log and stderr.log).",
+        "The student explicitly reports that a separate countertop crop comparison was not completed (evidence/sdk_events.json event 8).",
+        "No alternate light direction, image texture candidate, roughness-only candidate, or measured edge/neighbor check is recorded. No failed or abandoned implementation is evidenced."
+      ]
+    },
+    {
+      "run": "S03-E3-R2",
+      "distinct_executed_technical_paths": 1,
+      "actual_comparison": "One material candidate was visually compared with the reference, not with another newly executed material candidate.",
+      "new_validation_method": "Blender/NumPy generated target crops read by the student after PIL and command-line cropping attempts failed.",
+      "explanation": "One procedural shader path was executed and retained. Crop generation and inspection provide a focused reference check, not a controlled comparison of multiple alternative reconstruction methods. The inherited camera and lights were unchanged, but no new controlled baseline render or alternate light test is shown.",
+      "evidence": "evidence/sdk_events.json events 4-9 and 10-26; evidence/executions/blender_1795800460719786332/python_expr.txt; evidence/temporary_artifact_provenance.json",
+      "candidates": [
+        {
+          "hypothesis": "Directional softly blended surface color may better approximate the reference than the inherited straight rod veins.",
+          "code_paths": [
+            "evidence/baseline_build.py:34-40",
+            "evidence/executions/blender_1795800368178578948/code/build.py:34-48",
+            "evidence/final_source/build.py:34-48"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": "Reference versus final crops observed; comparison or selection between multiple branch candidates is not evidenced. The baseline image was supplied, but no explicit baseline-versus-final selection is recorded.",
+          "retained": true,
+          "evidence": "evidence/sdk_events.json events 4-9, 20-26; evidence/scene_states/final_state.json:7135-7170,15691-15859",
+          "observed_result": "Student reported soft elongated variation, subtler than the reference's bands; final scene contains the node graph.",
+          "side_effects": "Separate vein rods removed; counter top and edge share object-coordinate mapping. Other visual side effects were not explicitly assessed.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Reference material mechanism, edge stretching, neighboring surfaces, and isolation of illumination from pigment; no alternate material or changed-light trial."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "PIL crop failed with ModuleNotFoundError, and the two immediately requested crop Reads failed because files did not exist (evidence/sdk_events.json events 10-15).",
+        "convert and ffmpeg attempts each returned exit code 1 (events 16-19); Blender cropping subsequently succeeded and both images were read (events 20-25).",
+        "Build emitted a Material.use_nodes deprecation warning but saved final.png and scene.blend (event 7; execution stdout.log).",
+        "Student stopped with remaining reference contrast mismatch and no subsequent revision (event 26)."
+      ]
+    },
+    {
+      "run": "S03-E4-R1",
+      "distinct_executed_technical_paths": 3,
+      "actual_comparison": true,
+      "new_validation_method": "Full-frame fixed-camera material trials at original and moved softbox positions, read before selection.",
+      "explanation": "Three materially distinct shader paths produced observed renders. The student selected the image path after reading all six; no explicit comparative findings or crop measurements are recorded. The final procedural distortion edit was not a fourth executed path.",
+      "evidence": "evidence/sdk_events.json events 6-26; evidence/executions/; evidence/received_guidance.txt:3",
+      "candidates": [
+        {
+          "hypothesis": "An image of soft flowing streaks could improve counter variation.",
+          "code_paths": [
+            "evidence/executions/blender_1795798311684394464/code/build.py",
+            "evidence/executions/blender_1795798326696675011/code/build.py"
+          ],
+          "technique_difference": "execution_order",
+          "actually_executed": true,
+          "actual_comparison": false,
+          "retained": false,
+          "evidence": "Both stderr logs show missing counter_streaks.png after PIL import failed in sdk_events.json event 7.",
+          "observed_result": "Both image attempts stopped before render despite zero exit codes.",
+          "side_effects": "No image candidate produced in these attempts.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Image material and appearance at this stage."
+        },
+        {
+          "hypothesis": "Directional procedural color noise approximates the streaks.",
+          "code_paths": [
+            "evidence/executions/blender_1795798312807930914/code/build.py",
+            "evidence/executions/blender_1795798327741880567/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "Saved and read test_procedural.png and test_procedural_alt.png; sdk_events.json events 6,13,16,19,22,26.",
+          "observed_result": "Rendered under both light positions; image mode selected instead. No detailed preference rationale recorded.",
+          "side_effects": "Possible stretching or contrast issues were not separately documented.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Later distortion=.65 edit was written but not executed in procedural mode."
+        },
+        {
+          "hypothesis": "Roughness variation without color pattern could account for the appearance through highlights.",
+          "code_paths": [
+            "evidence/executions/blender_1795798319824307135/code/build.py",
+            "evidence/executions/blender_1795798334671314548/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "Noise to Map Range to Principled roughness, evidence/final_source/build.py:50-51; renders read in sdk_events.json events 14,17,20,23.",
+          "observed_result": "Rendered under both light positions; image mode selected; no explicit conclusion about moving highlights recorded.",
+          "side_effects": "Alternate softbox also changes scene lighting globally.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Quantitative highlight separation and edge/neighbor side effects."
+        },
+        {
+          "hypothesis": "A generated art-directed streak image on the slab better matches the desired variation.",
+          "code_paths": [
+            "evidence/executions/blender_1795798372479425585/code/build.py",
+            "evidence/executions/blender_1795798379325152592/code/build.py",
+            "evidence/executions/blender_1795798414853133618/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": true,
+          "evidence": "NumPy asset generation event 10, reads events 12,15,18,21 and selection events 24-26 in evidence/sdk_events.json; final_state.json Image Texture bound to white stone.",
+          "observed_result": "Both trial renders and final scene saved; selected after full-frame render reads. Degree of match was not stated or measured.",
+          "side_effects": "External image dependency and potential edge stretching; generated coordinates, not the world coordinates claimed by the source comment.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Crop-based comparison, edge continuity, neighboring effects and independent portability."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "PIL was unavailable, causing image generation to fail; two Blender runs then failed to load the missing PNG while returning exit code zero (evidence/sdk_events.json events 7-9 and two execution stderr logs).",
+        "NumPy generation recovered the asset and later image renders and final save succeeded (events 10, 24-25).",
+        "The student read trial renders but did not read the final render after the last edit; the final default image branch did not execute the newly written procedural distortion (events 24-26).",
+        "No crop comparison, explicit edge or neighboring-surface assessment, quantitative image metric, or stated highlight-motion conclusion is visible.",
+        "The evaluator's regenerated state and controlled-render metadata are not student checks (evidence/scene_states/state_open_results.json; evidence/target_geometry.json:1803-1817)."
+      ]
+    },
+    {
+      "run": "S03-E4-R2",
+      "distinct_executed_technical_paths": 3,
+      "actual_comparison": true,
+      "new_validation_method": "Six full-frame candidate renders under two light setups were read, then the image branch was retained. A crop-sheet attempt failed.",
+      "explanation": "The branch executed three materially different shader paths, not merely parameter changes. Observed comparison consists of individual image Reads followed by selection; no crop-based or numerical comparison or explicit highlight analysis is recorded.",
+      "evidence": "evidence/sdk_events.json events 14–32; evidence/executions/ and evidence/final_source/build.py:39–69,109–123",
+      "candidates": [
+        {
+          "hypothesis": "Generated art-directed flowing color streaks could better match the counter.",
+          "code_paths": [
+            "evidence/executions/blender_1795801627947271845/code/build.py",
+            "evidence/executions/blender_1795801650751147012/code/build.py",
+            "evidence/executions/blender_1795801715708378612/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": true,
+          "evidence": "SDK events 14–25, 26 and 32; final_source/build.py:42–61; final_state.json packed image",
+          "observed_result": "Original and alternate renders were read; image branch selected for final scene. No explicit quantitative quality judgment recorded.",
+          "side_effects": "Planar local XY mapping may stretch on edges; no documented side-effect conclusion.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Detailed edge, neighbor-surface and reference crop assessment; true reference material."
+        },
+        {
+          "hypothesis": "An anisotropically scaled procedural noise color ramp could produce elongated variation.",
+          "code_paths": [
+            "evidence/executions/blender_1795801636956624084/code/build.py",
+            "evidence/executions/blender_1795801659800973143/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "final_source/build.py:62–65; saved procedural renders and SDK image Reads events 20–21; final default is image",
+          "observed_result": "Both lighting variants rendered and were read, but not selected as the final material.",
+          "side_effects": "Noise pattern and edge behavior not separately assessed in trace.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "No separate directional coordinate warp is implemented in this branch; no measured reference match."
+        },
+        {
+          "hypothesis": "Roughness variation and lighting, without added color pattern, could explain the streak appearance.",
+          "code_paths": [
+            "evidence/executions/blender_1795801643900341879/code/build.py",
+            "evidence/executions/blender_1795801666730561909/code/build.py"
+          ],
+          "technique_difference": "modeling_technique",
+          "actually_executed": true,
+          "actual_comparison": true,
+          "retained": false,
+          "evidence": "final_source/build.py:66–69; saved roughness renders and SDK events 22,25,32",
+          "observed_result": "Both lighting variants rendered and were read; final selection was the image branch, with no documented highlight-movement conclusion.",
+          "side_effects": "Changed roughness affects reflections; effect on edge and neighboring surfaces not explicitly documented.",
+          "knowledge_origin": "teacher_prior",
+          "unvalidated_parts": "Whether reference streaks are highlights rather than color remains unknown."
+        }
+      ],
+      "failure_or_stopping_observations": [
+        "Crop sheet creation failed with ModuleNotFoundError: No module named 'PIL' (sdk_events.json event 28); the final Blender render and scene save occurred before that failure (final execution stdout.log).",
+        "The final render itself was not separately read in the trace; the corresponding original-light image candidate was read. File existence and PNG dimensions were checked at events 30–31.",
+        "No documented numerical or crop comparison, edge/stretching assessment, or inference about moving highlights is present.",
+        "The final image texture is generated and mapped to an actual countertop mesh, not a full-reference image plane."
+      ]
+    }
+  ],
+  "annotation_audit": {
+    "annotation_kind": "automated_controller_evidence_review",
+    "human_review": false,
+    "coverage": "30/30 annotation structures, new-label naming and comparison claims checked; targeted strategy/source/state checks are cited. This is automated evidence review, not exhaustive human validation.",
+    "rules": [
+      "Raw model annotations and student outputs are never rewritten.",
+      "Semantically equivalent coordinate-driven vertical gradient shaders share one metric label; original coordinate-frame details remain in the raw annotation and source.",
+      "Sequential render reads and edits establish iteration, but do not alone establish an explicit comparison between distinct candidates.",
+      "An executed method switch with observed candidate renders and an explicit selection rationale in a source comment also supports qualitative comparison; a final chat claim is not required.",
+      "Unknown comparison is not proof that comparison did not occur internally.",
+      "Origin attribution uses the actual received guidance; the complete teacher diagnosis is not evidence that every student received every teacher method."
+    ],
+    "label_aliases": {
+      "vertical_gradient_shader": "coordinate_vertical_gradient_shader",
+      "world_position_gradient_shader": "coordinate_vertical_gradient_shader",
+      "doorway_height_gradient": "coordinate_vertical_gradient_shader"
+    },
+    "alias_evidence": [
+      "S03-E0-R1 workspace/build.py:34-37 maps Generated Z through ColorRamp to surface color.",
+      "S03-E1-R1 workspace/build.py:34-42 maps Position Z through MapRange and ColorRamp to surface color.",
+      "S03-E0-R2 workspace/build.py:37-38 maps Position Z through MapRange and ColorRamp to surface color."
+    ],
+    "comparison_overrides": [
+      {
+        "run": "S02-E3-R1",
+        "value": "unknown",
+        "reason": "The raw annotator credited candidate comparison from four render-read/edit cycles and a final comparison against the reference. The visible final statement only says the door face increased but remains smaller than the reference; no between-candidate comparison or selection rationale is recorded. Retain iteration evidence; comparison status is unknown.",
+        "evidence": "runs/S02-E3-R1/analysis/sdk_events.json events 4-32, especially final visible text at event 32."
+      },
+      {
+        "run": "S03-E2-R2",
+        "value": true,
+        "reason": "Noise, Wave and revised Noise were actually rendered and read. The subsequent Edit explicitly selects irregular stretched noise rather than repeated stripes, and the final output graph uses Noise. This supports qualitative method selection from observable code and renders, without a quantitative crop ranking or hidden-reasoning claim.",
+        "evidence": "runs/S03-E2-R2/analysis/sdk_events.json events 16,18,20,24,26-28; event 26 source comment 'Use irregular, stretched noise ... rather than repeated stripes'; the three captured executed build.py versions and final_state.json shader links."
+      }
+    ],
+    "candidate_comparison_overrides": [
+      {
+        "run": "S01-E1-R1",
+        "candidate_index": 0,
+        "reason": "Camera renders and revisions are observed, but the raw annotator itself notes that explicit selection rationale is absent. Keep the individual candidate's comparison unknown consistently with the overall assessment."
+      },
+      {
+        "run": "S01-E4-R2",
+        "candidate_index": 2,
+        "reason": "The camera/color refinements were executed, but the explicit selection statement concerns the two chair methods. Do not extend that target-method comparison claim to the separate camera/material refinements."
+      }
+    ],
+    "reviewed_runs": [
+      "S01-E0-R1",
+      "S01-E0-R2",
+      "S01-E1-R1",
+      "S01-E1-R2",
+      "S01-E2-R1",
+      "S01-E2-R2",
+      "S01-E3-R1",
+      "S01-E3-R2",
+      "S01-E4-R1",
+      "S01-E4-R2",
+      "S02-E0-R1",
+      "S02-E0-R2",
+      "S02-E1-R1",
+      "S02-E1-R2",
+      "S02-E2-R1",
+      "S02-E2-R2",
+      "S02-E3-R1",
+      "S02-E3-R2",
+      "S02-E4-R1",
+      "S02-E4-R2",
+      "S03-E0-R1",
+      "S03-E0-R2",
+      "S03-E1-R1",
+      "S03-E1-R2",
+      "S03-E2-R1",
+      "S03-E2-R2",
+      "S03-E3-R1",
+      "S03-E3-R2",
+      "S03-E4-R1",
+      "S03-E4-R2"
+    ]
+  },
+  "scope": "Evidence-backed proposals, execution attempts, observations and retention are separate. Path counts are automated annotations, not an overall exploration-quality score."
+}

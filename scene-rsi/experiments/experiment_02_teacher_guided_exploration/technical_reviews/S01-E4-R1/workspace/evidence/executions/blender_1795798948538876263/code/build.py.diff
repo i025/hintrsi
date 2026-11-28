@@ -1,0 +1,18 @@
+--- previous/build.py
++++ build.py
+@@ -71,7 +71,7 @@
+  sub=o.modifiers.new('smooth shell','SUBSURF'); sub.levels=2; sol=o.modifiers.new('shell thickness','SOLIDIFY'); sol.thickness=.045
+  cyl('chair central post',(cx,cy,.38),.045,.57,black)
+  for i in range(5):
+-  a=2*math.pi*i/5; end=(cx+.48*math.cos(a),cy+.48*math.sin(a),.12); bar('five star chair base',(cx,cy,.18),end,.035,black); wheel=cyl('caster wheel',(end[0],end[1],.089),.075,.09,black,32); wheel.rotation_euler=(math.pi/2,0,a); bar('caster fork',(end[0],end[1],.12),(end[0],end[1],.089),.025,black)
++  a=2*math.pi*i/5; end=(cx+.48*math.cos(a),cy+.48*math.sin(a),.12); bar('five star chair base',(cx,cy,.18),end,.035,black); wheel=cyl('caster wheel',(end[0],end[1],.09),.075,.09,black,32); wheel.rotation_euler=(math.pi/2,0,a); bar('caster fork',(end[0],end[1],.12),(end[0],end[1],.09),.025,black)
+ chair(-.85,.70,-.3); chair(1.02,-.68,-.4)
+ # planter foreground right
+ bpy.ops.mesh.primitive_cone_add(vertices=64,radius1=.48,radius2=.63,depth=.52,location=(3,-1.6,.27)); bpy.context.object.name='teal round planter'; bpy.context.object.data.materials.append(teal)
+@@ -84,5 +84,5 @@
+ def area(loc,power,size,target):
+  bpy.ops.object.light_add(type='AREA',location=loc); o=bpy.context.object; o.data.energy=power; o.data.shape='DISK'; o.data.size=size; o.rotation_euler=(Vector(target)-o.location).to_track_quat('-Z','Y').to_euler()
+ area((0,-1,5.8),700,5,(0,1,0)); area((-4,-2,4),400,4,(0,1,1))
+-bpy.ops.object.camera_add(location=(4.5,-7.8,4.0)); cam=bpy.context.object; cam.rotation_euler=(Vector((-.35,1.0,1.15))-cam.location).to_track_quat('-Z','Y').to_euler(); cam.data.type='PERSP'; cam.data.lens=43; bpy.context.scene.camera=cam
++bpy.ops.object.camera_add(location=(3.8,-6.5,4.5)); cam=bpy.context.object; cam.rotation_euler=(Vector((-.35,1.0,1.05))-cam.location).to_track_quat('-Z','Y').to_euler(); cam.data.type='PERSP'; cam.data.lens=43; bpy.context.scene.camera=cam
+ scene=bpy.context.scene; scene.render.engine='CYCLES'; scene.cycles.samples=32; scene.cycles.use_denoising=True; scene.render.resolution_x=640; scene.render.resolution_y=360; scene.render.resolution_percentage=100; scene.render.image_settings.file_format='PNG'; scene.render.filepath='/app/final.png'; scene.world.color=(.8,.8,.8); scene.view_settings.view_transform='AgX'; bpy.ops.wm.save_as_mainfile(filepath='/app/scene.blend'); bpy.ops.render.render(write_still=True)

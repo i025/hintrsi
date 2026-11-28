@@ -1,0 +1,53 @@
+{
+  "target_defect": "The reconstructed bedroom door leaf fails to appear as the broad, angled center-right foreground occluder visible in the reference.",
+  "observations": [
+    {
+      "claim": "The reference shows a large, wood-paneled open leaf projecting into the center-right image, covering part of the floor and wall; the reconstruction instead shows a dark vertical opening with no comparably visible leaf.",
+      "evidence": "Direct comparison of the supplied reference and reconstruction images; objective_evidence.json, door_occlusion_mismatch."
+    },
+    {
+      "claim": "The reconstruction contains a render-enabled door assembly, not merely an absent object.",
+      "evidence": "build.py:60-71 creates 'dark door opening', 'open door hinge', 'wood door leaf', recessed panels and molding; scene_state.json:9046-9127 records the parent-child relationship and render visibility."
+    },
+    {
+      "claim": "The recorded leaf center is behind the back wall in the reconstruction's coordinate system, although the pivot is near its front face.",
+      "evidence": "scene_state.json:9096-9108 records the leaf world location; build.py:22 and scene_state.json:108-137 give the back wall placement and thickness. This is a reconstruction-space observation, not a measurement of the reference."
+    },
+    {
+      "claim": "The observed trajectory changed the camera position after a render, rather than testing a door-specific adjustment.",
+      "evidence": "sdk_events.json indices 4-9 show an image read, camera-position edit and rebuild; index 0 contains the initial door assembly."
+    }
+  ],
+  "technical_hypotheses": [
+    {
+      "hypothesis": "The hinge rotation and negative local leaf offset swing most of the leaf behind the opaque back wall, hiding it from the camera.",
+      "supporting_evidence": "build.py:22, 64-67; scene_state.json:9046-9108 records the hinge rotation and leaf world center beyond the wall; the image lacks the broad wooden face.",
+      "competing_explanation": "A camera-relative nearly edge-on projection or interference from other geometry could also reduce its visible area.",
+      "uncertainty": "The center position supports but does not by itself prove the exact per-pixel occlusion; inspect the assembly from another view or use a diagnostic visibility render."
+    },
+    {
+      "hypothesis": "The camera and door placement together produce insufficient projected leaf area even if the leaf is made visible.",
+      "supporting_evidence": "build.py:64-74 defines the hinge, leaf and perspective camera; the reference and reconstruction differ in overall framing, and sdk_events.json index 6 changed the camera.",
+      "competing_explanation": "Wall occlusion may be the dominant issue, with camera changes unnecessary after the leaf is repositioned or reoriented.",
+      "uncertainty": "A single RGB view cannot uniquely determine the reference camera, hinge or door geometry."
+    }
+  ],
+  "candidate_methods": [
+    {
+      "method": "Test alternate hinge rotations while retaining the parented leaf and panel assembly and holding the camera fixed.",
+      "applicable_conditions": "Useful if a diagnostic view confirms that the leaf swings through or behind the back wall.",
+      "verification": "Compare camera renders against the reference for the visible face, lower edge, silhouette and floor occlusion; inspect a top view for wall penetration and hinge attachment.",
+      "possible_side_effects": "The door may intersect the wall, furniture or floor, expose the wrong face, or leave an implausible doorway gap."
+    },
+    {
+      "method": "Test a different hinge or doorway placement with a coherent leaf assembly, independently of the angle-only candidate.",
+      "applicable_conditions": "Useful if rotation alone cannot create the desired image-space footprint without severe wall intersection.",
+      "verification": "Compare renders and top views using the same camera, checking the leaf boundary against the doorway, rug and bed as well as its visible breadth.",
+      "possible_side_effects": "Moving the assembly can detach it from the opening, change floor coverage or create collisions; changing camera framing instead can disturb all other landmarks."
+    }
+  ],
+  "error_hint": "The reference has a broad angled wooden door leaf occupying the center-right foreground, but the reconstruction shows mainly the dark opening and lacks that leaf's visible floor and wall occlusion.",
+  "strategy_extension": "Inspect the 'open door hinge' and its parented leaf in a top view relative to the back wall, then test a hinge-orientation change while keeping the camera fixed. Compare the rendered leaf silhouette, visible paneled face and lower-edge overlap with the reference, and check that the assembly remains attached to the opening without penetrating the wall or nearby furniture.",
+  "exploration_extension": "Implement and compare at least two candidates: one that changes the hinge swing while preserving its location, and another that tests a different hinge or doorway placement with a coherent leaf assembly. First use a diagnostic view or visibility render to distinguish wall hiding from an edge-on camera projection. Compare each candidate's rendered leaf outline, exposed face and overlap with the floor and doorway against the reference, keeping the camera fixed for the initial comparison. Inspect top and side views for wall or furniture intersections and lost hinge alignment. If neither candidate works, test camera-relative framing separately and check whether the bed and shelving landmarks deteriorate.",
+  "knowledge_origin": "The image mismatch, scene objects and transforms, and camera-only edit are observable in the supplied images, scene_state.json, build.py and sdk_events.json. Wall occlusion as the dominant cause, the proposed hinge and placement tests, and the diagnostic verification steps are technical hypotheses or priors, not observed successful repairs or knowledge of hidden reference geometry."
+}

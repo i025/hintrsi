@@ -1,0 +1,36 @@
+--- previous/build.py
++++ build.py
+@@ -5,7 +5,7 @@
+ 
+ def mat(n,c,rough=.7,metal=0):
+  m=bpy.data.materials.new(n); m.diffuse_color=(*c,1); m.use_nodes=True; p=m.node_tree.nodes.get('Principled BSDF'); p.inputs['Base Color'].default_value=(*c,1); p.inputs['Roughness'].default_value=rough; p.inputs['Metallic'].default_value=metal; return m
+-white=mat('warm white walls',(.78,.78,.76)); trim=mat('white trim',(.91,.91,.88)); oak=mat('pale natural wood',(.68,.46,.33)); oaklight=mat('blind slats',(.78,.58,.46)); dark=mat('charcoal door',(.22,.22,.21)); inset=mat('door inset',(.255,.25,.24)); black=mat('black metal',(.025,.025,.025),.45); gray=mat('chair grey',(.42,.43,.43)); tabletop=mat('desktop charcoal',(.25,.26,.27)); floor=mat('wood floor',(.40,.35,.30)); teal=mat('turquoise planter',(.045,.25,.25),.35); soil=mat('dark potting soil',(.055,.05,.04)); leafm=[mat('grass %d'%i,c) for i,c in enumerate([(.17,.20,.045),(.23,.25,.07),(.30,.29,.08),(.11,.16,.035)])]
++white=mat('warm white walls',(.78,.78,.76)); trim=mat('white trim',(.91,.91,.88)); oak=mat('pale natural wood',(.68,.46,.33)); oaklight=mat('blind slats',(.78,.58,.46)); dark=mat('charcoal door',(.075,.075,.07)); inset=mat('door inset',(.095,.09,.085)); black=mat('black metal',(.025,.025,.025),.45); gray=mat('chair grey',(.42,.43,.43)); tabletop=mat('desktop charcoal',(.25,.26,.27)); floor=mat('wood floor',(.40,.35,.30)); teal=mat('turquoise planter',(.045,.25,.25),.35); soil=mat('dark potting soil',(.055,.05,.04)); leafm=[mat('grass %d'%i,c) for i,c in enumerate([(.17,.20,.045),(.23,.25,.07),(.30,.29,.08),(.11,.16,.035)])]
+ def cube(n,loc,scale,ma,bevel=0):
+  bpy.ops.mesh.primitive_cube_add(size=1, location=loc); o=bpy.context.object; o.name=n; o.dimensions=scale; bpy.ops.object.transform_apply(location=False,rotation=False,scale=True); o.data.materials.append(ma)
+  if bevel:
+@@ -24,7 +24,7 @@
+  for j in range(6):
+   y=-3.5+j*1.36+(i%2)*.68
+   cube('individual oak floor plank',(x,y,.006),(.335,1.35,.018),random.choice(woods))
+-cube('back wall',(-1.7,3.12,1.7),(4.4,.18,3.4),white); cube('right wall',(.5,-.8,1.7),(.18,8,3.4),white)
++cube('back wall',(-2.7,3.12,2.5),(6.4,.18,5),white); cube('right wall',(.5,-.8,2.5),(.18,8,5),white)
+ cube('back baseboard',(-1.7,2.99,.11),(4.4,.08,.20),trim,.01); cube('right baseboard',(.39,-.8,.11),(.08,8,.2),trim,.01)
+ # window and wood frame on rear wall
+ cube('blind backing',(-1.95,2.995,2.23),(2.65,.04,1.38),oaklight)
+@@ -72,7 +72,7 @@
+  cyl('chair central post',(cx,cy,.38),.045,.57,black)
+  for i in range(5):
+   a=2*math.pi*i/5; end=(cx+.48*math.cos(a),cy+.48*math.sin(a),.12); bar('five star chair base',(cx,cy,.18),end,.035,black); cyl('caster wheel',(end[0],end[1],.075),.075,.09,black,20)
+-chair(-1.55,.70,-.3); chair(-.35,-.68,-.4)
++chair(-1.55,.70,-1.5); chair(-.35,-.68,-1.7)
+ # planter foreground right
+ bpy.ops.mesh.primitive_cone_add(vertices=64,radius1=.48,radius2=.63,depth=.52,location=(.0,-3.8,.27)); bpy.context.object.name='teal round planter'; bpy.context.object.data.materials.append(teal)
+ cyl('soil in pot',(.0,-3.8,.54),.60,.035,soil,64)
+@@ -84,5 +84,5 @@
+ def area(loc,power,size,target):
+  bpy.ops.object.light_add(type='AREA',location=loc); o=bpy.context.object; o.data.energy=power; o.data.shape='DISK'; o.data.size=size; o.rotation_euler=(Vector(target)-o.location).to_track_quat('-Z','Y').to_euler()
+ area((0,-1,5.8),700,5,(0,1,0)); area((-4,-2,4),400,4,(0,1,1))
+-bpy.ops.object.camera_add(location=(-5.0,-6.1,4.0)); cam=bpy.context.object; cam.rotation_euler=(Vector((-1.0,1.0,1.15))-cam.location).to_track_quat('-Z','Y').to_euler(); cam.data.type='PERSP'; cam.data.lens=32; bpy.context.scene.camera=cam
++bpy.ops.object.camera_add(location=(-3.4,-3.8,3.4)); cam=bpy.context.object; cam.rotation_euler=(Vector((-1.0,1.0,1.3))-cam.location).to_track_quat('-Z','Y').to_euler(); cam.data.type='PERSP'; cam.data.lens=24; bpy.context.scene.camera=cam
+ scene=bpy.context.scene; scene.render.engine='CYCLES'; scene.cycles.samples=32; scene.cycles.use_denoising=True; scene.render.resolution_x=640; scene.render.resolution_y=360; scene.render.resolution_percentage=100; scene.render.image_settings.file_format='PNG'; scene.render.filepath='/app/final.png'; scene.world.color=(.8,.8,.8); scene.view_settings.view_transform='AgX'; bpy.ops.wm.save_as_mainfile(filepath='/app/scene.blend'); bpy.ops.render.render(write_still=True)
