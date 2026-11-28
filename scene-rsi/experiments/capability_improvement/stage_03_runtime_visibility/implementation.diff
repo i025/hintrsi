@@ -1,0 +1,420 @@
+diff --git a/README.md b/README.md
+index 69f8660..32efaf2 100644
+--- a/README.md
++++ b/README.md
+@@ -2,6 +2,12 @@
+ 
+ 这里整理了原始 Hint 实验交接包、Ofox 补充 baseline，以及后续通过 Codex CLI 运行的各版代码、配置、测试、实验成绩和诊断记录。上传整理时间：2026-11-24。原始实验目录保留，仓库是独立的脱敏副本。
+ 
++## 2026-11-28：Scene 第三阶段源码可见范围审查
++
++[第三阶段审查说明](scene-rsi/docs/STAGE_03_RUNTIME_VISIBILITY_REVIEW.md)记录默认可见的17个运行文件、完整宿主归档与显式历史证据的分离。改进会话不再挂载整个initial目录；历史分析与实验编排源码只能通过原evidence接口显式提供。SDK执行和候选机制保留。
++
++25项回归检查和两种真实隔离预检通过，未调用模型或启动正式重建。详见[验收记录](scene-rsi/experiments/capability_improvement/stage_03_runtime_visibility/preflight/verification.json)与[集中代码差异](scene-rsi/experiments/capability_improvement/stage_03_runtime_visibility/implementation.diff)。工作停止在代码审查阶段。
++
+ ## 2026-11-28：Scene 第二阶段外部输入代码审查
+ 
+ [第二阶段审查说明](scene-rsi/docs/STAGE_02_EXTERNAL_INPUT_REVIEW.md)记录实际差异、完整调用关系、权限边界和验证。改进模块接受独立的起始库、实际反馈、指定证据、可选GT/历史与预算；[配置示例](scene-rsi/configs/improvement_inputs/)覆盖原始A3和已保存候选。03-A仅保留为输入适配器，候选不自动晋升。
+diff --git a/scene-rsi/README.md b/scene-rsi/README.md
+index 3941c79..2df2193 100644
+--- a/scene-rsi/README.md
++++ b/scene-rsi/README.md
+@@ -37,3 +37,5 @@
+ 第一阶段代码修改已增加“评价反馈 → 单次 SDK 改进 Agent → 独立能力库候选”入口，详见 [完整代码审查说明](docs/STAGE_01_FEEDBACK_REVIEW.md)、[调用源码](harness/run_capability_improvement.py)和[完整英文 Prompt](configs/capability_improvement_prompt.txt)。本阶段通过14项单元检查和真实资料的隔离预检，新模型调用与正式学生重建均为0。候选不会自动晋升，03-A结果在后续反馈中作为历史开发经验；未来独立测试须用新留出场景。工作停止在源码审查阶段。
+ 
+ 第二阶段代码修改已将起始能力库与本次知识来源改为独立外部输入，详见 [第二阶段审查说明](docs/STAGE_02_EXTERNAL_INPUT_REVIEW.md) 和 [四份完整配置示例](configs/improvement_inputs/)。通用入口使用 `prepare --input`；03-A 的组名和旧目录逻辑迁入单独适配器。原始库或历史候选均可作为起点，空GT不挂载，候选仍不晋升。通过23项离线检查和三种真实资料隔离预检，模型调用与正式重建均为0；停止在代码审查阶段。
++
++第三阶段代码修改已分离默认运行源码与宿主完整源码归档。改进Agent默认仅可查看17个明确列出的SDK、Bridge、运行接口和共同Prompt；历史研究源码通过原 `evidence` 显式提供。详见 [第三阶段审查说明](docs/STAGE_03_RUNTIME_VISIBILITY_REVIEW.md) 与 [真实隔离验收](experiments/capability_improvement/stage_03_runtime_visibility/preflight/verification.json)。25项离线检查通过，新模型调用和正式重建均为0，停在代码审查阶段。
+diff --git a/scene-rsi/configs/capability_improvement_prompt.txt b/scene-rsi/configs/capability_improvement_prompt.txt
+index 08d9c73..efa6058 100644
+--- a/scene-rsi/configs/capability_improvement_prompt.txt
++++ b/scene-rsi/configs/capability_improvement_prompt.txt
+@@ -2,7 +2,7 @@ You are the development improvement agent for an editable Blender reconstruction
+ 
+ Start with /feedback/feedback.json. It identifies the externally selected initial library, actual recorded feedback, available evidence, optional development GT, optional history, context, and execution budget. Read the actual feedback at recorded_feedback; use its evidence entries as needed. /feedback/evidence_index.json lists the available historical files. Original records may contain host paths: use the explicit source-to-path entries in path_mapping and evidence_index.json to locate files. A path outside those selections is unavailable. For paths inside earlier containers, use historical_container_paths rather than treating an old /app as this candidate workspace. An old inventory is not an access grant. Read the evidence needed for your investigation rather than automatically re-auditing every historical trajectory.
+ 
+-The current library before this attempt is /initial/library. The writable candidate starts as an independent copy at /app/library. The common SDK, student Harness, analysis source and common task prompts are preserved at /initial/system. Historical task manifests and additional configurations are available only if externally selected as evidence. Historical source snapshots describe the versions actually used in earlier runs. Inspect their real contents when relevant; do not infer implementation behavior from a report or README alone.
++The current library before this attempt is /initial/library. The writable candidate starts as an independent copy at /app/library. Only the common SDK, Bridge, execution interfaces and common task prompts listed in components.runtime_source_files are available at /initial/system. The complete system source archive is retained on the host for review and is not mounted here. Historical orchestration, analysis, research findings, task manifests and additional configurations are available only if externally selected as evidence. Historical source snapshots describe the versions actually used in earlier runs. Inspect their accessible real contents when relevant; do not infer implementation behavior from a report or README alone.
+ 
+ You may investigate the library's generation sources and process, validation attempts, actual student SDK messages and tool results, written and executed Blender code, saved scenes, renders, independent evaluations, prior successful or unsuccessful checks, rejected alternatives, and actual costs. The evidence index and feedback record point to these files. You may read images and inspect accessible Blender files using the existing environment. Only the development GT directories explicitly listed in feedback.json are mounted as GT sources. The initial library and permitted knowledge sources are independent inputs. Choosing a library does not grant its generation sources, other libraries, trajectories, or GT. Read only the explicitly selected sources. An empty allowed_development_gt list means no GT source has been mounted; prior knowledge already encoded in the input library or supplied feedback is not removed.
+ 
+diff --git a/scene-rsi/docs/STAGE_03_RUNTIME_VISIBILITY_REVIEW.md b/scene-rsi/docs/STAGE_03_RUNTIME_VISIBILITY_REVIEW.md
+new file mode 100644
+index 0000000..09748f2
+--- /dev/null
++++ b/scene-rsi/docs/STAGE_03_RUNTIME_VISIBILITY_REVIEW.md
+@@ -0,0 +1,121 @@
++# 第三阶段代码审查：运行源码与历史研究知识分离
++
++基于 `442807b`。只修正改进 Agent 的默认源码可见范围，保留外部初始库、反馈、显式证据、单次 SDK 改进和候选保存机制。本次没有模型调用或正式重建，停止在代码审查阶段。
++
++## 实际修改
++
++| 文件 | 作用 |
++|---|---|
++| [harness/run_capability_improvement.py](../harness/run_capability_improvement.py) | 增加17项 `RUNTIME_FILES` 明确清单；保留完整宿主源码快照；另建运行源码视图；不再挂载整个 `initial/`。反馈列出实际默认源码，候选记录保存宿主归档位置。 |
++| [configs/capability_improvement_prompt.txt](../configs/capability_improvement_prompt.txt) | 仅修改源码访问说明：默认运行源码可见，完整归档不挂载，历史源码须显式授权。自主调查、检查、三种决策和准入要求均未改变。 |
++| [tests/test_capability_improvement.py](../tests/test_capability_improvement.py) | 保留原23项回归，增加默认源码范围及显式历史源码访问两项检查，使用真实历史源码作为文件内容。 |
++| [tests/preflight_runtime_visibility.py](../tests/preflight_runtime_visibility.py)（新增） | 在真实隔离环境中分别检查空证据和显式分析文件，验证 SDK/Bridge 导入、客户端构造、只读权限、Bash写入及候选收集。 |
++| [README.md](../README.md)、本说明 | 更新当前审查入口；第一、二阶段说明与历史结果保留原文。 |
++| 仓库顶层 README | 增加第三阶段入口。 |
++| [工程验收记录](../experiments/capability_improvement/stage_03_runtime_visibility/) | 保存实际配置、挂载、反馈、命令、日志、可见源码清单、候选差异和验收结果。 |
++
++集中审查用的[实际差异](../experiments/capability_improvement/stage_03_runtime_visibility/implementation.diff)只包含本次实现、Prompt、测试和文档，不混入工程生成记录。
++
++## 三类内容如何分开
++
++```text
++prepare(外部 input.json)
++  ├─ initial/library/：指定初始库，原路径保持不变
++  ├─ seed/library/：候选工作区起点，原行为保持不变
++  ├─ initial/system/：完整 sdk、harness、analysis 源码快照及三个共同Prompt
++  │                    只保存在宿主机，不自动挂载
++  ├─ runtime/：逐文件复制 RUNTIME_FILES 中的17个运行文件
++  └─ evidence/：按原有外部 evidence 明确选择的历史文件
++        ↓
++只读挂载
++  initial/library/ → /initial/library
++  runtime/         → /initial/system
++  runtime/sdk/     → /sdk
++  inputs/          → /feedback
++  显式证据视图     → /evidence（按原条件存在）
++        ↓
++原 run_sdk_session.execute → Claude Agent SDK → 原 Bridge → gpt-6.1-terra / low
++        ↓
++原 collect：候选库、差异、报告、成本；不晋升、不独立验证、不启动下一轮
++```
++
++关键变化是删除整个 `initial/ → /initial` 的挂载。否则即使另建通用视图，Agent仍可沿旧路径读取完整快照。
++
++现有隔离器本来会把宿主 `sdk/` 挂到 `/sdk`。本次改进会话通过原有 `readonly_mounts` 机制，将该路径覆盖为经过明确选择的 `runtime/sdk/`，因此SDK源码不会经另一个入口整目录开放。没有修改隔离器或学生执行源码，其他实验会话不变。
++
++`components.current_system_snapshot` 仍为 `/initial/system`，现在明确指向通用运行视图；新增 `components.runtime_source_files` 列出17个文件。`candidate.json.host_system_archive` 保存真实宿主归档路径。既有反馈字段、外部配置结构、库路径、预算和收集机制保持不变。
++
++## Agent 默认可见的项目源码
++
++以下为完整的默认运行文件清单，不根据文件内容执行自动分类：
++
++```text
++sdk/run_cc_sdk.py
++sdk/codex_cli_bridge.py
++sdk/codex_model_catalog.json
++sdk/logging_utils.py
++sdk/skills_manager.py
++sdk/litellm_proxy/claude_code_proxy.py
++sdk/litellm_proxy/streaming_fix.py
++harness/run_sdk_session.py
++harness/isolation.py
++harness/sdk_student.py
++harness/bridge_server.py
++harness/proxy_server.py
++harness/socket_tunnel.py
++harness/blender.py
++configs/student_prompt.txt
++configs/formal_prompt.txt
++configs/capability_improvement_prompt.txt
++```
++
++这些文件可在 `/initial/system/` 下查看。七个SDK文件同时用于 `/sdk`；已有 `/harness/sdk_student.py`、`/harness/socket_tunnel.py` 和 `/runtime/bin/blender` 运行别名仍保留相同源码。系统库、Python环境、第三方SDK依赖和Blender继续按原隔离器提供。
++
++没有默认挂载 `analysis/` 中的任何源码，也没有默认挂载历史实验编排源码、实验配置或 `sdk/run_cc_sdk_vs_parallel13.diff`。四个明确验证为不可默认访问的文件是：
++
++- `analysis/annotate_experiment.py`
++- `analysis/write_report.py`
++- `analysis/write_exploration_report.py`
++- `harness/run_exploration.py`
++
++完整宿主归档仍含上述文件及其他当前研究源码。没有修改或删除其中的研究发现、策略、缺陷和技术经验。默认清单不是新的外部配置层，未来新增研究源码不会因为进入 `harness/` 或 `analysis/` 而自动开放。
++
++## 显式访问历史源码
++
++沿用原外部 `evidence` 字段，例如已有输入文件中：
++
++```json
++"evidence": ["/srv/lab-disks/disk2/users/xymo/scene-rsi/analysis/annotate_experiment.py"]
++```
++
++准备后可从 `/evidence/001/annotate_experiment.py` 读取，映射和具体文件仍记录在原 `feedback.json`、`evidence_index.json` 中。不会因此开放同目录的其他分析源码。需要某个完整历史源码目录时，也可按原机制显式选择；目录选择意味着授权其内的研究文件。
++
++输入库、反馈或显式证据本身包含的既有知识不被抹除。本次控制的是因通用运行源码而额外自动开放的内容，不做语义删改或知识清洗。
++
++## 已完成验收
++
++[25项离线回归日志](../experiments/capability_improvement/stage_03_runtime_visibility/unit_tests.log)全部通过。原有用例继续覆盖初始库、历史候选起点、反馈、三种决策、SDK参数派发、异常保存、候选差异、成本与缺失用量；新增两项检查真实历史源码的默认隐藏和显式访问。
++
++[真实隔离预检](../experiments/capability_improvement/stage_03_runtime_visibility/preflight/verification.json)完成两个工程配置：
++
++| 配置 | 证据 | 实际结果 |
++|---|---|---|
++| empty | 空列表 | 四个历史文件及SDK历史差异文件在默认路径均不可见；17个运行文件可读，初始库和运行源码只读。 |
++| explicit_analysis | 仅 `analysis/annotate_experiment.py` | 仅通过显式证据路径读取真实分析源码，字节数匹配且只读；默认运行目录仍不含该文件。没有执行历史分析程序。 |
++
++两种配置均实际导入原 `sdk_student`、`run_cc_sdk`、Bridge及消息转换代码，构造原SDK客户端并核对六种工具配置；**没有连接客户端或发起请求**。实际Bash在独立工作区写入工程标记，再用原 `collect` 保存候选、差异和成本。没有伪造模型报告，`agent_decision=null`、`promotion_status=not_promoted`。
++
++预检逐文件对比宿主源码与新归档，确认全部归档文件仍可复查；原始A3能力库、实际反馈和源码在预检前后内容未变。执行记录和成本沿用既有机制。具体耗时、文件数与每项检查以真实 `verification.json` 为准。
++
++复查命令（需本机完整工程和旧实验文件）：
++
++```bash
++PYTHONDONTWRITEBYTECODE=1 /srv/lab-disks/disk2/users/xymo/hint-baseline-run/env/bin/python -B -m unittest discover -s tests -v
++
++PYTHONDONTWRITEBYTECODE=1 /srv/lab-disks/disk2/users/xymo/hint-baseline-run/env/bin/python -B tests/preflight_runtime_visibility.py \
++  --output experiments/capability_improvement/new_runtime_visibility_check
++```
++
++真实SDK模型驱动的工具往返没有重跑，本次只验证源码可见范围、依赖导入与离线接口。SDK、Bridge、学生执行、知识提取、Hint、准入与评价源码的实际未修改对照另见 [preserved_sources.json](../experiments/capability_improvement/stage_03_runtime_visibility/preserved_sources.json)。新模型调用0，正式重建0。
++
++完整归档和重复运行源码视图留在本机候选目录；GitHub保存实际配置、反馈、命令、日志、候选和结果，当前源码位于仓库 `scene-rsi/`，不重复上传相同源码副本。没有哈希验证、源码内容分类器、新的准入规则、自动晋升或多轮调度。本阶段到此停止，等待源码审查。
+diff --git a/scene-rsi/harness/run_capability_improvement.py b/scene-rsi/harness/run_capability_improvement.py
+index f440a62..2aaedad 100644
+--- a/scene-rsi/harness/run_capability_improvement.py
++++ b/scene-rsi/harness/run_capability_improvement.py
+@@ -17,6 +17,15 @@ sys.path.insert(0, str(ROOT / 'analysis'))
+ from usage_summary import summarize
+ 
+ EXCLUDED = {'.git', '.codex', '.agents', '.aws', '__pycache__', 'home', 'backend_home', 'tmp'}
++RUNTIME_FILES = [
++    'sdk/run_cc_sdk.py', 'sdk/codex_cli_bridge.py', 'sdk/codex_model_catalog.json',
++    'sdk/logging_utils.py', 'sdk/skills_manager.py',
++    'sdk/litellm_proxy/claude_code_proxy.py', 'sdk/litellm_proxy/streaming_fix.py',
++    'harness/run_sdk_session.py', 'harness/isolation.py', 'harness/sdk_student.py',
++    'harness/bridge_server.py', 'harness/proxy_server.py', 'harness/socket_tunnel.py',
++    'harness/blender.py', 'configs/student_prompt.txt', 'configs/formal_prompt.txt',
++    'configs/capability_improvement_prompt.txt',
++]
+ 
+ 
+ def candidate_directory(path):
+@@ -77,14 +86,18 @@ def prepare(directory, input_file):
+     directory.mkdir(parents=True)
+     copy_tree(library, directory / 'initial/library')
+     copy_tree(library, directory / 'seed/library')
+-    # Runtime source is common infrastructure. Historical task manifests and prompts
+-    # are research evidence and must be selected explicitly, not copied with configs/.
++    # Keep the full source archive on the host. Only the reviewed runtime files
++    # below are mounted; historical research source uses the explicit evidence input.
+     for folder in ['sdk', 'harness', 'analysis']:
+         copy_tree(ROOT / folder, directory / 'initial/system' / folder)
+     for name in ['student_prompt.txt', 'formal_prompt.txt', 'capability_improvement_prompt.txt']:
+         destination = directory / 'initial/system/configs' / name
+         destination.parent.mkdir(parents=True, exist_ok=True)
+         shutil.copy2(ROOT / 'configs' / name, destination)
++    for name in RUNTIME_FILES:
++        destination = directory / 'runtime' / name
++        destination.parent.mkdir(parents=True, exist_ok=True)
++        shutil.copy2(ROOT / name, destination)
+     (directory / 'inputs').mkdir()
+     shutil.copy2(input_file, directory / 'inputs/input.json')
+     shutil.copy2(source_feedback, directory / 'inputs/recorded_feedback.json')
+@@ -92,7 +105,9 @@ def prepare(directory, input_file):
+     json.loads((directory / 'inputs/recorded_feedback.json').read_text())
+     selected, files = {}, []
+     mounts = [{'source': str(directory / folder), 'target': target}
+-              for folder, target in [('initial', '/initial'), ('inputs', '/feedback')]]
++              for folder, target in [('initial/library', '/initial/library'),
++                                     ('runtime', '/initial/system'), ('runtime/sdk', '/sdk'),
++                                     ('inputs', '/feedback')]]
+     for key, target in [('evidence', '/evidence'), ('development_gt', '/development_gt'),
+                         ('history', '/candidate_history')]:
+         selected[key], rows = evidence_view(directory, [resolve(path) for path in configuration.get(key, [])], target, key)
+@@ -111,6 +126,7 @@ def prepare(directory, input_file):
+         'feedback_source': str(source_feedback),
+         'components': {'initial_library': '/initial/library', 'writable_candidate': '/app/library',
+                        'current_system_snapshot': '/initial/system', 'editable_scope': 'capability_library_only',
++                       'runtime_source_files': RUNTIME_FILES,
+                        'source_library': str(library)},
+         'context': configuration.get('context', {}),
+         'data_policy': {'used_outcomes': 'historical_development_experience',
+@@ -143,6 +159,7 @@ def prepare(directory, input_file):
+     write(directory / 'candidate.json', {'status': 'prepared',
+           'prepared_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+           'initial_library': str(directory / 'initial/library'), 'source_library': str(library),
++          'host_system_archive': str(directory / 'initial/system'),
+           'input_configuration': str(input_file), 'feedback': str(directory / 'inputs/feedback.json'),
+           'agent_decision': None, 'independent_validation_status': 'not_run', 'promotion_status': 'not_promoted'})
+     return feedback
+diff --git a/scene-rsi/tests/preflight_runtime_visibility.py b/scene-rsi/tests/preflight_runtime_visibility.py
+new file mode 100644
+index 0000000..dad4546
+--- /dev/null
++++ b/scene-rsi/tests/preflight_runtime_visibility.py
+@@ -0,0 +1,129 @@
++"""Check real source visibility in the existing namespace without model requests."""
++import argparse
++import datetime
++import json
++from pathlib import Path
++import socket
++import subprocess
++import sys
++import tempfile
++import time
++
++ROOT = Path(__file__).resolve().parents[1]
++sys.path.insert(0, str(ROOT / 'harness'))
++from run_capability_acquisition import EXP, PYTHON, write
++from run_capability_improvement import prepare, collect, RUNTIME_FILES
++from isolation import prepare as prepare_isolated, command
++
++HISTORICAL = ['analysis/annotate_experiment.py', 'analysis/write_report.py',
++              'analysis/write_exploration_report.py', 'harness/run_exploration.py']
++PROBE = '''import json, os, subprocess, sys
++from pathlib import Path
++feedback = json.loads(Path('/feedback/feedback.json').read_text())
++assert json.loads(Path(feedback['recorded_feedback']).read_text())['runs']
++runtime = Path('/initial/system')
++visible = sorted(str(path.relative_to(runtime)) for path in runtime.rglob('*') if path.is_file())
++assert visible == sorted(feedback['components']['runtime_source_files'])
++hidden = ['analysis/annotate_experiment.py', 'analysis/write_report.py',
++          'analysis/write_exploration_report.py', 'harness/run_exploration.py']
++for name in hidden:
++    assert not (runtime / name).exists()
++    assert not Path('/' + name).exists()
++assert not (runtime / 'sdk/run_cc_sdk_vs_parallel13.diff').exists()
++assert not Path('/sdk/run_cc_sdk_vs_parallel13.diff').exists()
++assert not Path(feedback['components']['source_library']).exists()
++assert not Path(feedback['feedback_source']).exists()
++assert not Path('/development_gt').exists()
++assert not Path('/candidate_history').exists()
++evidence = json.loads(Path('/feedback/evidence_index.json').read_text())['files']
++assert len(evidence) == len(feedback['allowed_evidence'])
++for row in evidence:
++    path = Path(row['path'])
++    assert row['available'] and path.stat().st_size == row['bytes']
++    compile(path.read_text(), str(path), 'exec')  # Read the source; do not run historical analysis.
++    assert 'SEQUENCES' in path.read_text()
++readonly = [Path('/initial/library/SKILL.md'), runtime / 'sdk/run_cc_sdk.py']
++readonly += [Path(row['path']) for row in evidence]
++for path in readonly:
++    try:
++        descriptor = os.open(path, os.O_WRONLY)
++    except OSError:
++        pass
++    else:
++        os.close(descriptor)
++        raise AssertionError('Read-only input is writable: ' + str(path))
++os.environ['LITELLM_LOCAL_MODEL_COST_MAP'] = 'True'
++os.environ['LITELLM_TELEMETRY'] = 'False'
++sys.path.insert(0, '/harness')
++import sdk_student, run_cc_sdk, codex_cli_bridge, claude_code_proxy
++from claude_agent_sdk import ClaudeSDKClient
++assert codex_cli_bridge.MODEL == 'gpt-6.1-terra' and codex_cli_bridge.EFFORT == 'low'
++options = run_cc_sdk.create_agent_options('/app')
++options.tools = json.loads(Path('/inputs/session.json').read_text())['tools']
++assert options.tools == ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep']
++client = ClaudeSDKClient(options=options)  # No connect/query; no agent or model session starts.
++subprocess.run(['/bin/bash', '-c', "printf 'Engineering filesystem probe only.\\n' > /app/library/ENGINEERING_PROBE_03.md"], check=True)
++assert Path('/app/library/ENGINEERING_PROBE_03.md').read_text().startswith('Engineering')
++result = {'runtime_files': visible, 'historical_sources_hidden_by_default': hidden,
++          'explicit_evidence_read': [row['path'] for row in evidence],
++          'readonly_inputs_checked': len(readonly), 'sdk_entry_and_bridge_imported': True,
++          'sdk_client_constructed_without_connecting': True, 'tools': options.tools,
++          'candidate_write_succeeded': True, 'new_model_calls': 0}
++Path('/app/visibility_probe.json').write_text(json.dumps(result, indent=2))
++'''
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('--output', type=Path, required=True)
++    args = parser.parse_args()
++    output = args.output.resolve()
++    output.mkdir(parents=True)
++    started = time.monotonic()
++    sources = [path for folder in ['sdk', 'harness', 'analysis']
++               for path in (ROOT / folder).rglob('*') if path.is_file() and path.suffix != '.pyc']
++    library = EXP / 'libraries/A3'
++    feedback_file = EXP / 'analysis/observed_results.json'
++    preserved = {path: path.read_bytes() for path in sources + list(library.iterdir()) + [feedback_file]}
++    records = []
++    for name, evidence in [('empty', []), ('explicit_analysis', [str(ROOT / HISTORICAL[0])])]:
++        input_file = output / (name + '_input.json')
++        write(input_file, {'initial_library': str(library), 'feedback': str(feedback_file),
++                          'evidence': evidence, 'development_gt': [], 'history': [],
++                          'budget': {'seconds': 60, 'calls': 1, 'cpus': [32, 33], 'port': 19665}})
++        candidate = output / name
++        prepare(candidate, input_file)
++        for path in sources:
++            assert (candidate / 'initial/system' / path.relative_to(ROOT)).read_bytes() == preserved[path]
++        invocation = json.loads((candidate / 'inputs/invocation.json').read_text())
++        prepare_isolated(invocation['directory'], invocation['image'], invocation['prompt'],
++                         invocation['checkpoint'], invocation['session'])
++        with tempfile.TemporaryDirectory(prefix='scene-runtime-probe-') as temporary, socket.socket(socket.AF_UNIX) as channel:
++            channel.bind(str(Path(temporary) / 'proxy.sock'))
++            argv = command(candidate / 'session', Path(temporary) / 'proxy.sock', 1)
++            argv = ['nice', '-n', '15', 'taskset', '-c', '32,33'] + argv[:argv.index('--')] + [
++                    '--', '/opt/python/bin/python3.12', '-c', PROBE]
++            write(output / (name + '_command.json'), argv)
++            with (output / (name + '.log')).open('wb') as log:
++                subprocess.run(argv, stdout=log, stderr=subprocess.STDOUT, timeout=60, check=True)
++        write(candidate / 'session/status.json', {'status': 'offline_visibility_probe', 'model_requests': 0})
++        record = collect(candidate)
++        assert record['file_changes'] == [{'path': 'ENGINEERING_PROBE_03.md', 'kind': 'added'}]
++        assert record['promotion_status'] == 'not_promoted' and record['agent_decision'] is None
++        records.append({'name': name, 'candidate': str(candidate),
++                        'checks': json.loads((candidate / 'session/workspace/visibility_probe.json').read_text()),
++                        'host_archive_files_checked': len(sources), 'collection': record})
++    assert all(path.read_bytes() == content for path, content in preserved.items())
++    result = {'kind': 'offline_runtime_visibility_check_not_research',
++              'finished_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
++              'seconds': time.monotonic() - started, 'attempts': records,
++              'source_library_feedback_bytes_unchanged': True, 'default_runtime_files': RUNTIME_FILES,
++              'new_model_calls': 0, 'new_student_reconstructions': 0,
++              'limits': 'SDK imports and client construction were checked without connecting. Bash and file writes were exercised in the real namespace. No model-guided SDK tool roundtrip or capability improvement was tested.'}
++    write(output / 'verification.json', result)
++    print(json.dumps({'verification': str(output / 'verification.json'), 'seconds': result['seconds'],
++                      'attempts': len(records), 'runtime_files': len(RUNTIME_FILES), 'new_model_calls': 0}))
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scene-rsi/tests/test_capability_improvement.py b/scene-rsi/tests/test_capability_improvement.py
+index 1486261..9eee9f9 100644
+--- a/scene-rsi/tests/test_capability_improvement.py
++++ b/scene-rsi/tests/test_capability_improvement.py
+@@ -37,6 +37,11 @@ class FeedbackCandidates(unittest.TestCase):
+             (self.root / folder / 'source.txt').write_text('Engineering fixture only.\n')
+         for name in ['student_prompt.txt', 'formal_prompt.txt', 'capability_improvement_prompt.txt']:
+             shutil.copy2(ROOT / 'configs' / name, self.root / 'configs' / name)
++        for name in improvement.RUNTIME_FILES + ['analysis/annotate_experiment.py', 'analysis/write_report.py',
++                                                  'analysis/write_exploration_report.py', 'harness/run_exploration.py']:
++            destination = self.root / name
++            destination.parent.mkdir(parents=True, exist_ok=True)
++            shutil.copy2(ROOT / name, destination)
+         shutil.copytree(REAL / 'libraries/A3', self.experiment / 'libraries/A3')
+         frozen = json.loads((REAL / 'configs/frozen_libraries.json').read_text())
+         write(self.experiment / 'configs/frozen_libraries.json', frozen)
+@@ -355,6 +360,33 @@ class FeedbackCandidates(unittest.TestCase):
+             improvement.run(self.candidate)
+         self.assertEqual(json.loads((self.candidate / 'candidate.json').read_text())['file_changes'], [])
+ 
++    def test_default_runtime_does_not_mount_full_source_archive(self):
++        feedback = self.prepare(evidence=[])
++        session = json.loads((self.candidate / 'inputs/session.json').read_text())
++        mounts = {row['target']: row['source'] for row in session['readonly_mounts']}
++        self.assertNotIn('/initial', mounts)
++        self.assertEqual(mounts['/initial/library'], str(self.candidate / 'initial/library'))
++        self.assertEqual(mounts['/initial/system'], str(self.candidate / 'runtime'))
++        self.assertEqual(mounts['/sdk'], str(self.candidate / 'runtime/sdk'))
++        self.assertNotIn(str(self.candidate / 'initial/system'), mounts.values())
++        self.assertEqual(feedback['components']['runtime_source_files'], improvement.RUNTIME_FILES)
++        for name in ['analysis/annotate_experiment.py', 'analysis/write_report.py',
++                     'analysis/write_exploration_report.py', 'harness/run_exploration.py']:
++            self.assertEqual((self.candidate / 'initial/system' / name).read_bytes(), (ROOT / name).read_bytes())
++            self.assertFalse((self.candidate / 'runtime' / name).exists())
++        files = {str(path.relative_to(self.candidate / 'runtime'))
++                 for path in (self.candidate / 'runtime').rglob('*') if path.is_file()}
++        self.assertEqual(files, set(improvement.RUNTIME_FILES))
++
++    def test_historical_analysis_is_available_when_explicitly_selected(self):
++        source = self.root / 'analysis/annotate_experiment.py'
++        feedback = self.prepare(evidence=[source])
++        exposed = self.candidate / 'evidence/001/annotate_experiment.py'
++        self.assertEqual(exposed.read_bytes(), source.read_bytes())
++        self.assertEqual(feedback['allowed_evidence'][0]['path'], '/evidence/001/annotate_experiment.py')
++        self.assertFalse((self.candidate / 'runtime/analysis/annotate_experiment.py').exists())
++        self.assertEqual(feedback['allowed_development_gt'], [])
++
+ 
+ if __name__ == '__main__':
+     unittest.main()

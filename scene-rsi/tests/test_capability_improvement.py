@@ -37,6 +37,11 @@ class FeedbackCandidates(unittest.TestCase):
             (self.root / folder / 'source.txt').write_text('Engineering fixture only.\n')
         for name in ['student_prompt.txt', 'formal_prompt.txt', 'capability_improvement_prompt.txt']:
             shutil.copy2(ROOT / 'configs' / name, self.root / 'configs' / name)
+        for name in improvement.RUNTIME_FILES + ['analysis/annotate_experiment.py', 'analysis/write_report.py',
+                                                  'analysis/write_exploration_report.py', 'harness/run_exploration.py']:
+            destination = self.root / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / name, destination)
         shutil.copytree(REAL / 'libraries/A3', self.experiment / 'libraries/A3')
         frozen = json.loads((REAL / 'configs/frozen_libraries.json').read_text())
         write(self.experiment / 'configs/frozen_libraries.json', frozen)
@@ -354,6 +359,33 @@ class FeedbackCandidates(unittest.TestCase):
         with patch.object(improvement, 'execute', side_effect=sdk_fixture):
             improvement.run(self.candidate)
         self.assertEqual(json.loads((self.candidate / 'candidate.json').read_text())['file_changes'], [])
+
+    def test_default_runtime_does_not_mount_full_source_archive(self):
+        feedback = self.prepare(evidence=[])
+        session = json.loads((self.candidate / 'inputs/session.json').read_text())
+        mounts = {row['target']: row['source'] for row in session['readonly_mounts']}
+        self.assertNotIn('/initial', mounts)
+        self.assertEqual(mounts['/initial/library'], str(self.candidate / 'initial/library'))
+        self.assertEqual(mounts['/initial/system'], str(self.candidate / 'runtime'))
+        self.assertEqual(mounts['/sdk'], str(self.candidate / 'runtime/sdk'))
+        self.assertNotIn(str(self.candidate / 'initial/system'), mounts.values())
+        self.assertEqual(feedback['components']['runtime_source_files'], improvement.RUNTIME_FILES)
+        for name in ['analysis/annotate_experiment.py', 'analysis/write_report.py',
+                     'analysis/write_exploration_report.py', 'harness/run_exploration.py']:
+            self.assertEqual((self.candidate / 'initial/system' / name).read_bytes(), (ROOT / name).read_bytes())
+            self.assertFalse((self.candidate / 'runtime' / name).exists())
+        files = {str(path.relative_to(self.candidate / 'runtime'))
+                 for path in (self.candidate / 'runtime').rglob('*') if path.is_file()}
+        self.assertEqual(files, set(improvement.RUNTIME_FILES))
+
+    def test_historical_analysis_is_available_when_explicitly_selected(self):
+        source = self.root / 'analysis/annotate_experiment.py'
+        feedback = self.prepare(evidence=[source])
+        exposed = self.candidate / 'evidence/001/annotate_experiment.py'
+        self.assertEqual(exposed.read_bytes(), source.read_bytes())
+        self.assertEqual(feedback['allowed_evidence'][0]['path'], '/evidence/001/annotate_experiment.py')
+        self.assertFalse((self.candidate / 'runtime/analysis/annotate_experiment.py').exists())
+        self.assertEqual(feedback['allowed_development_gt'], [])
 
 
 if __name__ == '__main__':

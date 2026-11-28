@@ -17,6 +17,15 @@ sys.path.insert(0, str(ROOT / 'analysis'))
 from usage_summary import summarize
 
 EXCLUDED = {'.git', '.codex', '.agents', '.aws', '__pycache__', 'home', 'backend_home', 'tmp'}
+RUNTIME_FILES = [
+    'sdk/run_cc_sdk.py', 'sdk/codex_cli_bridge.py', 'sdk/codex_model_catalog.json',
+    'sdk/logging_utils.py', 'sdk/skills_manager.py',
+    'sdk/litellm_proxy/claude_code_proxy.py', 'sdk/litellm_proxy/streaming_fix.py',
+    'harness/run_sdk_session.py', 'harness/isolation.py', 'harness/sdk_student.py',
+    'harness/bridge_server.py', 'harness/proxy_server.py', 'harness/socket_tunnel.py',
+    'harness/blender.py', 'configs/student_prompt.txt', 'configs/formal_prompt.txt',
+    'configs/capability_improvement_prompt.txt',
+]
 
 
 def candidate_directory(path):
@@ -77,14 +86,18 @@ def prepare(directory, input_file):
     directory.mkdir(parents=True)
     copy_tree(library, directory / 'initial/library')
     copy_tree(library, directory / 'seed/library')
-    # Runtime source is common infrastructure. Historical task manifests and prompts
-    # are research evidence and must be selected explicitly, not copied with configs/.
+    # Keep the full source archive on the host. Only the reviewed runtime files
+    # below are mounted; historical research source uses the explicit evidence input.
     for folder in ['sdk', 'harness', 'analysis']:
         copy_tree(ROOT / folder, directory / 'initial/system' / folder)
     for name in ['student_prompt.txt', 'formal_prompt.txt', 'capability_improvement_prompt.txt']:
         destination = directory / 'initial/system/configs' / name
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / 'configs' / name, destination)
+    for name in RUNTIME_FILES:
+        destination = directory / 'runtime' / name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / name, destination)
     (directory / 'inputs').mkdir()
     shutil.copy2(input_file, directory / 'inputs/input.json')
     shutil.copy2(source_feedback, directory / 'inputs/recorded_feedback.json')
@@ -92,7 +105,9 @@ def prepare(directory, input_file):
     json.loads((directory / 'inputs/recorded_feedback.json').read_text())
     selected, files = {}, []
     mounts = [{'source': str(directory / folder), 'target': target}
-              for folder, target in [('initial', '/initial'), ('inputs', '/feedback')]]
+              for folder, target in [('initial/library', '/initial/library'),
+                                     ('runtime', '/initial/system'), ('runtime/sdk', '/sdk'),
+                                     ('inputs', '/feedback')]]
     for key, target in [('evidence', '/evidence'), ('development_gt', '/development_gt'),
                         ('history', '/candidate_history')]:
         selected[key], rows = evidence_view(directory, [resolve(path) for path in configuration.get(key, [])], target, key)
@@ -111,6 +126,7 @@ def prepare(directory, input_file):
         'feedback_source': str(source_feedback),
         'components': {'initial_library': '/initial/library', 'writable_candidate': '/app/library',
                        'current_system_snapshot': '/initial/system', 'editable_scope': 'capability_library_only',
+                       'runtime_source_files': RUNTIME_FILES,
                        'source_library': str(library)},
         'context': configuration.get('context', {}),
         'data_policy': {'used_outcomes': 'historical_development_experience',
@@ -143,6 +159,7 @@ def prepare(directory, input_file):
     write(directory / 'candidate.json', {'status': 'prepared',
           'prepared_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
           'initial_library': str(directory / 'initial/library'), 'source_library': str(library),
+          'host_system_archive': str(directory / 'initial/system'),
           'input_configuration': str(input_file), 'feedback': str(directory / 'inputs/feedback.json'),
           'agent_decision': None, 'independent_validation_status': 'not_run', 'promotion_status': 'not_promoted'})
     return feedback
