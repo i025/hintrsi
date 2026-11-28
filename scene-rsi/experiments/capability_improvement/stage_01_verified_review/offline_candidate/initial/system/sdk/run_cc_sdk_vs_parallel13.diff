@@ -1,0 +1,23 @@
+--- parallel13/run_cc_sdk.py
++++ trajectory-to-capability/run_cc_sdk.py
+@@ -303,7 +303,7 @@
+     1. SYSTEM_PROMPT_FILE 环境变量 — 指定文件全文替换 system prompt
+     2. APPEND_SYSTEM_PROMPT_FILE 环境变量 — 在默认 claude_code preset 之后
+        追加文件内容（以 <system-reminder> block 形式嵌入，不覆盖 preset）
+-    3. 默认 claude_code preset
++    3. claude_code preset 加公共空 reminder，保持无知识/有知识组的 SDK 身份说明一致
+     """
+     prompt_file = os.getenv("SYSTEM_PROMPT_FILE")
+     if prompt_file:
+@@ -329,7 +329,10 @@
+         else:
+             logger.warning(f"APPEND_SYSTEM_PROMPT_FILE not found: {append_file}, using default preset")
+ 
+-    return {"type": "preset", "preset": "claude_code"}
++    # SDK changes its identity line when append is absent. Use the same append
++    # route for the no-knowledge condition, without adding any knowledge text.
++    return {"type": "preset", "preset": "claude_code",
++            "append": "<system-reminder>\n\n</system-reminder>"}
+ 
+ 
+ SYSTEM_PROMPT_CONFIG_LOG_PATH = Path(

@@ -11,14 +11,14 @@ def read_rows(path):
     return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
 
 
-def summarize(directory, scope):
+def summarize(directory, scope, root=ROOT):
     requests = read_rows(directory / 'bridge/model_requests.jsonl')
     usage = read_rows(directory / 'bridge/token_usage.jsonl')
     totals = Counter()
     for item in usage:
         totals.update(item['usage'])
     reported = {row['request_id'] for row in usage}
-    result = {'run': directory.name, 'scope': scope, 'directory': str(directory.relative_to(ROOT)),
+    result = {'run': directory.name, 'scope': scope, 'directory': str(directory.relative_to(root)),
               'requests': len(requests), 'usage_records': len(usage), 'reported_tokens': dict(totals),
               'requests_without_usage': [row['request_id'] for row in requests if row['request_id'] not in reported],
               'actual_billing_usd': None}

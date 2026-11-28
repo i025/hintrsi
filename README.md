@@ -2,6 +2,12 @@
 
 这里整理了原始 Hint 实验交接包、Ofox 补充 baseline，以及后续通过 Codex CLI 运行的各版代码、配置、测试、实验成绩和诊断记录。上传整理时间：2026-11-24。原始实验目录保留，仓库是独立的脱敏副本。
 
+## 2026-11-28：Scene 第一阶段反馈与候选更新代码审查
+
+新增[审查说明](scene-rsi/docs/STAGE_01_FEEDBACK_REVIEW.md)、[单次候选入口](scene-rsi/harness/run_capability_improvement.py)和[完整英文 Prompt](scene-rsi/configs/capability_improvement_prompt.txt)：把真实03-A评价、轨迹、验证、来源和成本交给原SDK教师，在独立目录修改能力库并保留差异。原库与历史证据只读，候选不会自动晋升；旧实验执行路径及独立评价标准不变。
+
+14项单元检查与真实资料隔离预检通过，新模型调用和正式学生重建均为0。这里只交付第一阶段代码，停止在源码审查；尚未验证模型自主改进能力或候选收益。详见[真实反馈样例](scene-rsi/experiments/capability_improvement/stage_01_verified_review/feedback_example.json)和[工程验证](scene-rsi/experiments/capability_improvement/stage_01_verified_review/verification.json)。
+
 ## 2026-11-28：Scene 能力获取与教师评价实验
 
 新增 [实验 03-A 报告](scene-rsi/experiments/experiment_03a_capability_acquisition/REPORT_ZH.md)与[实验 03-B 报告](scene-rsi/experiments/experiment_03b_teacher_alignment/REPORT_ZH.md)。03-A 为四个新场景 × A0–A5 六组，共 24 次独立学生运行，22 次完整交付、2 次未生成文件；没有建立稳定迁移收益或 A5 最优的结论。03-B 完成 32 次 T0/T1 自动评价，未收集真实人工标签，T2/T3 尚未运行，不能宣称完成人类对齐。
