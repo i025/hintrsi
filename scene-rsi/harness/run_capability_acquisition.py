@@ -141,6 +141,12 @@ def freeze():
     print('Froze all five capability libraries.',flush=True)
 
 
+def with_capability_library(prompt, library):
+    if library is not None:
+        prompt+='\nFrozen general capability knowledge:\n'+(Path(library)/'SKILL.md').read_text()+'\n\nA frozen general capability library is available read-only at /capabilities. Its entry point is /capabilities/SKILL.md. You may inspect and use its documented methods when applicable, or choose your own methods. It contains no task-specific teacher feedback or reference scene assets. Keep any dependency needed to reproduce your final source with the delivered workspace.\n'
+    return prompt
+
+
 def student_jobs():
     split=json.loads((EXP/'configs/data_split.json').read_text());scenes=split['test'];jobs=[]
     base=(EXP/'prompts/base_student.txt').read_text()
@@ -150,7 +156,7 @@ def student_jobs():
             prompt=base
             mounts=[]
             if condition!='A0':
-                prompt+='\nFrozen general capability knowledge:\n'+(EXP/'libraries'/condition/'SKILL.md').read_text()+'\n\nA frozen general capability library is available read-only at /capabilities. Its entry point is /capabilities/SKILL.md. You may inspect and use its documented methods when applicable, or choose your own methods. It contains no task-specific teacher feedback or reference scene assets. Keep any dependency needed to reproduce your final source with the delivered workspace.\n'
+                prompt=with_capability_library(prompt,EXP/'libraries'/condition)
                 mounts=[{'source':str(EXP/'libraries'/condition),'target':'/capabilities'}]
             path=EXP/'prompts'/(condition+'-student.txt');path.write_text(prompt)
             config=EXP/'configs'/(condition+'-student.json')

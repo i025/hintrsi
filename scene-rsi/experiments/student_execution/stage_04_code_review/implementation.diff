@@ -1,0 +1,786 @@
+diff --git a/README.md b/README.md
+index 32efaf2..56daff1 100644
+--- a/README.md
++++ b/README.md
+@@ -2,6 +2,12 @@
+ 
+ 这里整理了原始 Hint 实验交接包、Ofox 补充 baseline，以及后续通过 Codex CLI 运行的各版代码、配置、测试、实验成绩和诊断记录。上传整理时间：2026-11-24。原始实验目录保留，仓库是独立的脱敏副本。
+ 
++## 2026-11-28：Scene 第四阶段通用学生入口审查
++
++[通用Student入口](scene-rsi/harness/run_student.py)接受外部参考图、原始/候选/空能力库、预算和新输出目录，复用原SDK、共同Prompt和知识注入。正常SDK结束与交付文件状态分别保存；不自动提供来源轨迹或GT，不执行评价或晋升。
++
++[完整审查说明](scene-rsi/docs/STAGE_04_STUDENT_REVIEW.md)、[外部配置](scene-rsi/configs/student_inputs/)和[真实隔离预检](scene-rsi/experiments/student_execution/stage_04_code_review/preflight/verification.json)。36项离线检查通过，原03-A六组Prompt保持一致；三个真实输入预检没有模型调用或正式重建。工作停止在代码审查阶段。
++
+ ## 2026-11-28：Scene 第三阶段源码可见范围审查
+ 
+ [第三阶段审查说明](scene-rsi/docs/STAGE_03_RUNTIME_VISIBILITY_REVIEW.md)记录默认可见的17个运行文件、完整宿主归档与显式历史证据的分离。改进会话不再挂载整个initial目录；历史分析与实验编排源码只能通过原evidence接口显式提供。SDK执行和候选机制保留。
+diff --git a/scene-rsi/README.md b/scene-rsi/README.md
+index 2df2193..b167494 100644
+--- a/scene-rsi/README.md
++++ b/scene-rsi/README.md
+@@ -39,3 +39,5 @@
+ 第二阶段代码修改已将起始能力库与本次知识来源改为独立外部输入，详见 [第二阶段审查说明](docs/STAGE_02_EXTERNAL_INPUT_REVIEW.md) 和 [四份完整配置示例](configs/improvement_inputs/)。通用入口使用 `prepare --input`；03-A 的组名和旧目录逻辑迁入单独适配器。原始库或历史候选均可作为起点，空GT不挂载，候选仍不晋升。通过23项离线检查和三种真实资料隔离预检，模型调用与正式重建均为0；停止在代码审查阶段。
+ 
+ 第三阶段代码修改已分离默认运行源码与宿主完整源码归档。改进Agent默认仅可查看17个明确列出的SDK、Bridge、运行接口和共同Prompt；历史研究源码通过原 `evidence` 显式提供。详见 [第三阶段审查说明](docs/STAGE_03_RUNTIME_VISIBILITY_REVIEW.md) 与 [真实隔离验收](experiments/capability_improvement/stage_03_runtime_visibility/preflight/verification.json)。25项离线检查通过，新模型调用和正式重建均为0，停在代码审查阶段。
++
++第四阶段已增加 [通用独立学生入口](harness/run_student.py)：外部指定参考图、可选能力库、预算、运行标识和新输出目录，复用原SDK、共同Prompt和能力注入方式。支持原始库、历史候选和空库；来源资料与GT不随库开放。详见 [完整审查说明](docs/STAGE_04_STUDENT_REVIEW.md)、[三份配置](configs/student_inputs/)和[真实隔离验收](experiments/student_execution/stage_04_code_review/preflight/verification.json)。36项离线检查通过；没有模型调用、正式重建、独立评价或晋升。
+diff --git a/scene-rsi/configs/student_inputs/a3.json b/scene-rsi/configs/student_inputs/a3.json
+new file mode 100644
+index 0000000..9c8d3c7
+--- /dev/null
++++ b/scene-rsi/configs/student_inputs/a3.json
+@@ -0,0 +1,21 @@
++{
++  "run_id": "S01-a3",
++  "output_directory": "../../experiments/student_execution/examples/S01-a3",
++  "reference_image": "../../data/evaluation_gt/office/office_s1210607561/color.png",
++  "capability_library": "../../experiments/experiment_03a_capability_acquisition/libraries/A3",
++  "budget": {
++    "seconds": 1500,
++    "calls": 120,
++    "cpus": [
++      32,
++      33,
++      34,
++      35,
++      36,
++      37,
++      38,
++      39
++    ],
++    "port": 19765
++  }
++}
+diff --git a/scene-rsi/configs/student_inputs/base.json b/scene-rsi/configs/student_inputs/base.json
+new file mode 100644
+index 0000000..642f430
+--- /dev/null
++++ b/scene-rsi/configs/student_inputs/base.json
+@@ -0,0 +1,21 @@
++{
++  "run_id": "S01-base",
++  "output_directory": "../../experiments/student_execution/examples/S01-base",
++  "reference_image": "../../data/evaluation_gt/office/office_s1210607561/color.png",
++  "capability_library": null,
++  "budget": {
++    "seconds": 1500,
++    "calls": 120,
++    "cpus": [
++      32,
++      33,
++      34,
++      35,
++      36,
++      37,
++      38,
++      39
++    ],
++    "port": 19765
++  }
++}
+diff --git a/scene-rsi/configs/student_inputs/candidate.json b/scene-rsi/configs/student_inputs/candidate.json
+new file mode 100644
+index 0000000..b180bf3
+--- /dev/null
++++ b/scene-rsi/configs/student_inputs/candidate.json
+@@ -0,0 +1,21 @@
++{
++  "run_id": "S01-candidate",
++  "output_directory": "../../experiments/student_execution/examples/S01-candidate",
++  "reference_image": "../../data/evaluation_gt/office/office_s1210607561/color.png",
++  "capability_library": "../../experiments/capability_improvement/stage_01_verified_review/offline_candidate/candidate/library",
++  "budget": {
++    "seconds": 1500,
++    "calls": 120,
++    "cpus": [
++      32,
++      33,
++      34,
++      35,
++      36,
++      37,
++      38,
++      39
++    ],
++    "port": 19765
++  }
++}
+diff --git a/scene-rsi/docs/STAGE_04_STUDENT_REVIEW.md b/scene-rsi/docs/STAGE_04_STUDENT_REVIEW.md
+new file mode 100644
+index 0000000..6f4c42a
+--- /dev/null
++++ b/scene-rsi/docs/STAGE_04_STUDENT_REVIEW.md
+@@ -0,0 +1,159 @@
++# 第四阶段代码审查：通用独立 Student 入口
++
++基于 `2e342e6`。本次只建立“外部参考图和可选能力库 → 原SDK学生 → 交付与原始记录”的单次入口。不启动正式重建、不调用模型，不接入独立评价、自动晋升或下一轮调度。
++
++## 修改文件与复用边界
++
++| 文件 | 作用 |
++|---|---|
++| [harness/run_student.py](../harness/run_student.py)（新增） | 读取外部配置、冻结参考图和可选库、准备原SDK会话、调用既有 `execute`、分别收集执行与交付状态。 |
++| [harness/run_capability_acquisition.py](../harness/run_capability_acquisition.py) | 将原能力注入文本抽成 `with_capability_library(prompt, library)`；原 `student_jobs()` 仅改为调用此函数。A0–A5分组、原任务划分、挂载、调度和其他算法不变。 |
++| [configs/student_inputs/](../configs/student_inputs/)（新增三份JSON） | 同一参考图配合原始A3库、历史候选库、空库的外部输入例子。 |
++| [tests/test_student.py](../tests/test_student.py)（新增） | 11项离线检查，覆盖外部起点、预算、快照、旧入口一致性、交付状态和失败留存等。 |
++| [tests/preflight_student.py](../tests/preflight_student.py)（新增） | 三种真实文件输入的隔离预检：实际SDK图像/文本输入、只读库、工具配置、Bash文件操作及Blender版本命令。 |
++| [README.md](../README.md)、本文件、仓库顶层README | 当前入口、配置、调用关系、验收与限制。前三阶段审查文档保留原文。 |
++| [工程验收记录](../experiments/student_execution/stage_04_code_review/) | 单元日志、原始配置、SDK构造输入、挂载命令、Blender记录、结果及未修改源码对照。 |
++
++[集中实际差异](../experiments/student_execution/stage_04_code_review/implementation.diff)只含实现、配置、测试和文档，不混入工程生成记录。
++
++没有修改 `run_sdk_session.py`、`sdk_student.py`、`isolation.py`、`run_experiment.py`、SDK、Bridge、评价算法或前三阶段改进入口。复用第三阶段的已审查源码清单，只在学生环境开放其中七个SDK文件，不增加历史研究知识入口。
++
++## 外部配置
++
++三个完整例子是 [a3.json](../configs/student_inputs/a3.json)、[candidate.json](../configs/student_inputs/candidate.json) 和 [base.json](../configs/student_inputs/base.json)。路径相对**配置文件所在目录**解析，支持绝对路径。
++
++```json
++{
++  "run_id": "S01-a3",
++  "output_directory": "../../experiments/student_execution/examples/S01-a3",
++  "reference_image": "../../data/evaluation_gt/office/office_s1210607561/color.png",
++  "capability_library": "../../experiments/experiment_03a_capability_acquisition/libraries/A3",
++  "budget": {
++    "seconds": 1500,
++    "calls": 120,
++    "cpus": [32, 33, 34, 35, 36, 37, 38, 39],
++    "port": 19765
++  }
++}
++```
++
++`capability_library` 为 `null`、空字符串或省略时，准备无能力库学生；其他字段必填。库路径可以是原始冻结库、此前候选的 `candidate/library`，或者其他符合原有结构的目录，不经过A组名称推断。输出必须是新目录，不能位于输入库内部；不会覆盖已有运行、库、候选或旧实验。不同运行使用不同目录，准备失败的部分记录也不会被自动清除后重做。
++
++本次候选示例指向第一阶段保存的工程候选，含 `ENGINEERING_PROBE.md`，仅用于证明任意已保存目录可直接作为输入，不是模型学习成果。
++
++参考图沿用原SDK的PNG协议；PNG字节直接复制，保持与已有实验一致。非PNG会在准备时明确报错，避免将其他格式错误标为 `image/png`。本次没有安装图像依赖或扩展原SDK媒体协议。
++
++模型仍由既有后端固定为 `gpt-6.1-terra / low`。时间、请求数、CPU及端口从外部预算传给原 `execute`。共同 `formal_prompt.txt` 保持原文件不变；当预算不是1500秒/120请求时，只替换其中时间和请求上限句。默认预算下Prompt原文不变，非默认预算使用明确秒数。Blender仍使用CPU、八线程，交付分辨率仍为640×360；CPU亲和性按传入CPU列表设置。
++
++## 能力注入与信息边界
++
++原03-A和新入口使用同一 `with_capability_library`：
++
++1. 有库时，将指定库的 `SKILL.md` 正文拼入初始Prompt。
++2. 延用原英文说明：库只读位于 `/capabilities`，学生可按适用性选择使用或采用自己的方法，并自行保留交付代码的必要依赖。
++3. 不强制调用任何方法，不改变六个工具、Skill自动加载或在线教师策略。
++
++新入口先将选定库复制到本次运行的 `library/`，再从该副本读取 `SKILL.md` 并只读挂载 `/capabilities`。因此Prompt和实际可读库来自同一保存版本；来源目录之后的修改不影响已准备的副本。`run.json` 保存来源路径、运行副本路径和文件名/字节数清单；副本本身保存实际内容，没有哈希或版本树。
++
++学生可见的是匿名 `/app/reference.png`、自己的空白工作区、共同SDK/工具和可选 `/capabilities`。原始外部 `input.json`、`run.json` 及库来源信息保存在宿主运行根目录，不挂入学生 `/inputs`；参考图即使来自GT目录，也只复制该PNG，不挂载其父目录或旁边的GT。
++
++不会因选择候选而提供其生成过程、教师反馈、历史轨迹、改进报告、完整系统归档、其他库或GT。库本身已编码的知识不会被清除，也不新增准入判定或宣称候选已获准晋升。
++
++## 调用关系与命令
++
++```text
++外部配置
++  → run_student.prepare(input_file)
++      → 新目录 + 输入配置副本 + 参考图副本 + 可选库副本
++      → formal_prompt：仅调整本次预算句
++      → run_capability_acquisition.with_capability_library
++      → isolation.prepare：workspace、images.json、prompt、session
++      → inputs/invocation.json + run.json(status=prepared)
++  → run_student.run(directory)
++      → run_sdk_session.execute(**已保存参数)
++          → 原Bridge / LiteLLM代理
++          → isolation.command
++          → sdk_student → run_cc_sdk → Claude Agent SDK
++          → 原Codex CLI Bridge → gpt-6.1-terra / low
++          → SDK工具执行，真实结果回到上下文；保留原始轨迹及Blender捕获
++      → finally: run_student.collect
++          → 原 usage_summary.summarize
++          → costs.json、result.json、run.json
++```
++
++准备一个新运行（不调用模型）：
++
++```bash
++/srv/lab-disks/disk2/users/xymo/hint-baseline-run/env/bin/python -B harness/run_student.py prepare \
++  --input configs/student_inputs/a3.json
++```
++
++审查之后的真实执行命令仍是单个原SDK会话：
++
++```bash
++/srv/lab-disks/disk2/users/xymo/hint-baseline-run/env/bin/python -B harness/run_student.py run \
++  --directory experiments/student_execution/examples/S01-a3
++```
++
++**本次未执行上述真实 `run`。** 正常 `run` 在 `finally` 中完成收集；`collect --directory ...` 只用于尚未收集的恢复情况，既有结果不覆盖、不重跑。原03-A命令及Experiment02的教师检查点方式保持可用。
++
++## 输出与状态
++
++采用现有运行根目录结构，工作区不增加新的任务阶段：
++
++```text
++run/
++  input.json                       # 原始外部配置，仅宿主可见
++  run.json                         # run_id、来源、快照、预算、状态
++  library/                         # 可选实际运行库，只读挂载
++  runtime/sdk/                     # 通用SDK运行副本
++  inputs/
++    reference.png、base_prompt.txt、prompt.txt、images.json
++    session.json、invocation.json
++  workspace/
++    reference.png
++    build.py、scene.blend、final.png # 由学生实际产生；缺失时不补造
++  capture/                         # SDK轨迹、Blender源码版本、命令、日志、场景/图像
++  bridge/、proxy/、sdk_command.json # 真实模型请求、返回、Token和原执行命令
++  status.json、resources.jsonl     # 原监督器执行记录
++  costs.json                       # 原用量汇总，缺失用量仍未知
++  execution_error.json             # 异常时存在
++  result.json                      # 分开记录执行与交付
++```
++
++`result.json.supervisor_state` 保存原监督器状态；`sdk_status` 独立读取真实轨迹/监督器的SDK状态。`delivery` 只检查三个要求文件是否存在且非空：
++
++- `missing_files`：至少一个缺失或为空。
++- `files_present_unvalidated`：三个文件存在且非空，未证明场景可打开、代码可复现或视觉恢复正确。
++
++正常SDK结束但没有交付时，仍记录缺失。执行异常时保存实际部分文件、错误和成本，不补写答案。`run.json.status=collected` 只说明结果已收集。`independent_quality_evaluation=not_run`、`candidate_promotion=not_performed` 始终明确本入口没有执行独立验证或晋升。
++
++原评价程序需要的 `workspace/`、`capture/`、`sdk_command.json`、状态、实际源图和可选库快照均保留。其03-A批处理CLI仍依赖原任务划分/命名；本阶段没有把任意新运行自动接到该CLI，也没有改其评价算法或启动评价。
++
++## 工程验收
++
++[单元日志](../experiments/student_execution/stage_04_code_review/unit_tests.log)：36项全部通过（前阶段25项＋本阶段11项）。其中用真实五组冻结库和历史Prompt生成原03-A学生任务，A0–A5六份Prompt逐字节匹配旧文件，挂载内容不变；新入口覆盖外部A3/历史候选/空库、非默认预算、独立副本、来源保护、状态分离、异常、未知用量及重复运行拒绝。
++
++[真实隔离预检](../experiments/student_execution/stage_04_code_review/preflight/verification.json)使用同一已有办公室PNG，分别选择真实A3库、真实历史候选库、空库。每次都是新的独立目录和隔离进程：
++
++- 原 `sdk_student.prompt_messages()` 实际构造图像和文本消息，解码后的图像字节与输入PNG一致，`SKILL.md` 注入来自实际只读副本。消息保存为 `capture/preflight_sdk_input.json`，明确标记**构造但未发送**。
++- 隔离内逐文件读取可见库，返回内容与外部指定来源直接字节比较，确认候选起点不是重新读取A3；空库时没有 `/capabilities`。
++- 真实六工具配置、SDK客户端构造和Bridge模型/effort核对通过，没有连接或查询模型。
++- 实际Bash与文件读写/修改通过；每次执行 `blender --version`，均返回Blender5.2.2并经原记录器保存命令、stdout、stderr和结果。没有建模、渲染或假交付文件。
++- 宿主完整工程路径、GT、历史证据、历史分析源码和候选父目录不可访问；原始外部配置不在学生 `/inputs` 中。
++- 原库、历史候选和参考图内容不变；用原收集函数保存工程结果，`sdk_status=null`、交付缺失、未评价、未晋升，没有冒充完成重建。
++
++原SDK、Bridge、学生执行、隔离、Improvement、知识提取和评价源码的未修改对照见 [preserved_sources.json](../experiments/student_execution/stage_04_code_review/preserved_sources.json)。能力注入函数抽取的实际差异单独列明。
++
++复查命令：
++
++```bash
++PYTHONDONTWRITEBYTECODE=1 /srv/lab-disks/disk2/users/xymo/hint-baseline-run/env/bin/python -B -m unittest discover -s tests -v
++
++PYTHONDONTWRITEBYTECODE=1 /srv/lab-disks/disk2/users/xymo/hint-baseline-run/env/bin/python -B tests/preflight_student.py \
++  --output experiments/student_execution/new_offline_check
++```
++
++这些检查需要已有完整工程及历史文件；没有重新下载或安装环境。预检实际调用模型0、正式重建0。SDK输入和工具环境经过离线检查，没有模型驱动的完整工具往返；未来真实重建效果和候选收益仍未知。
++
++GitHub保存本次源码、配置和实际工程记录；重复SDK副本留在本机，当前SDK源码在仓库 `scene-rsi/sdk/`。没有新增教师算法、能力准入、知识提取、GT学习、强制调用、独立评价、自动晋升、多轮搜索或Harness自修改。本阶段停止在代码审查。
+diff --git a/scene-rsi/harness/run_capability_acquisition.py b/scene-rsi/harness/run_capability_acquisition.py
+index 9819db6..c0b363e 100644
+--- a/scene-rsi/harness/run_capability_acquisition.py
++++ b/scene-rsi/harness/run_capability_acquisition.py
+@@ -141,6 +141,12 @@ def freeze():
+     print('Froze all five capability libraries.',flush=True)
+ 
+ 
++def with_capability_library(prompt, library):
++    if library is not None:
++        prompt+='\nFrozen general capability knowledge:\n'+(Path(library)/'SKILL.md').read_text()+'\n\nA frozen general capability library is available read-only at /capabilities. Its entry point is /capabilities/SKILL.md. You may inspect and use its documented methods when applicable, or choose your own methods. It contains no task-specific teacher feedback or reference scene assets. Keep any dependency needed to reproduce your final source with the delivered workspace.\n'
++    return prompt
++
++
+ def student_jobs():
+     split=json.loads((EXP/'configs/data_split.json').read_text());scenes=split['test'];jobs=[]
+     base=(EXP/'prompts/base_student.txt').read_text()
+@@ -150,7 +156,7 @@ def student_jobs():
+             prompt=base
+             mounts=[]
+             if condition!='A0':
+-                prompt+='\nFrozen general capability knowledge:\n'+(EXP/'libraries'/condition/'SKILL.md').read_text()+'\n\nA frozen general capability library is available read-only at /capabilities. Its entry point is /capabilities/SKILL.md. You may inspect and use its documented methods when applicable, or choose your own methods. It contains no task-specific teacher feedback or reference scene assets. Keep any dependency needed to reproduce your final source with the delivered workspace.\n'
++                prompt=with_capability_library(prompt,EXP/'libraries'/condition)
+                 mounts=[{'source':str(EXP/'libraries'/condition),'target':'/capabilities'}]
+             path=EXP/'prompts'/(condition+'-student.txt');path.write_text(prompt)
+             config=EXP/'configs'/(condition+'-student.json')
+diff --git a/scene-rsi/harness/run_student.py b/scene-rsi/harness/run_student.py
+new file mode 100644
+index 0000000..090485b
+--- /dev/null
++++ b/scene-rsi/harness/run_student.py
+@@ -0,0 +1,144 @@
++"""Prepare and run one independent SDK student from an external reference and optional library."""
++import argparse
++import datetime
++import json
++from pathlib import Path
++import shutil
++import sys
++
++from isolation import ROOT, prepare as prepare_isolated
++from run_capability_acquisition import TOOLS, copy_tree, write, with_capability_library
++from run_capability_improvement import RUNTIME_FILES
++from run_sdk_session import execute
++
++sys.path.insert(0, str(ROOT / 'analysis'))
++from usage_summary import summarize
++
++
++def prepare(input_file):
++    input_file = Path(input_file).resolve()
++    configuration = json.loads(input_file.read_text())
++
++    def resolve(path):
++        return (input_file.parent / path).resolve()
++
++    directory = resolve(configuration['output_directory'])
++    image = resolve(configuration['reference_image'])
++    library = resolve(configuration['capability_library']) if configuration.get('capability_library') else None
++    budget = configuration['budget']
++    if library is not None and (directory == library or library in directory.parents):
++        raise ValueError('The output directory must be outside the input capability library.')
++    # The unchanged SDK sends its reference image as image/png.
++    with image.open('rb') as reference:
++        if reference.read(8) != b'\x89PNG\r\n\x1a\n':
++            raise ValueError('Use a PNG reference image with the existing SDK image/png protocol.')
++    directory.mkdir(parents=True)
++    inputs = directory / 'inputs'
++    inputs.mkdir()
++    shutil.copy2(input_file, directory / 'input.json')
++    shutil.copy2(image, inputs / 'reference.png')
++    base = (ROOT / 'configs/formal_prompt.txt').read_text()
++    (inputs / 'base_prompt.txt').write_text(base)
++    if (budget['seconds'], budget['calls']) != (1500, 120):
++        base = base.replace('The student time budget is 25 minutes, with at most 120 model requests.',
++                            f"The student time budget is {budget['seconds']} seconds, with at most {budget['calls']} model requests.")
++    if library is not None:
++        copy_tree(library, directory / 'library')
++    prompt = with_capability_library(base, directory / 'library' if library is not None else None)
++    # Reuse the reviewed SDK source list; do not expose experimental source or library parents.
++    for name in RUNTIME_FILES:
++        if name.startswith('sdk/'):
++            destination = directory / 'runtime' / name
++            destination.parent.mkdir(parents=True, exist_ok=True)
++            shutil.copy2(ROOT / name, destination)
++    mounts = [{'source': str(directory / 'runtime/sdk'), 'target': '/sdk'}]
++    if library is not None:
++        mounts.append({'source': str(directory / 'library'), 'target': '/capabilities'})
++    session = {'role': 'student', 'task_kind': 'independent_reconstruction', 'run_id': configuration['run_id'],
++               'tools': TOOLS, 'readonly_mounts': mounts, 'hint_enabled': False,
++               'persistent_capability_enabled': library is not None, 'online_teacher_enabled': False,
++               'initial_images': [{'path': '/app/reference.png', 'label': 'Reference image'}]}
++    prepare_isolated(directory, inputs / 'reference.png', prompt, session=session)
++    invocation = {'directory': str(directory), 'image': str(inputs / 'reference.png'), 'prompt': prompt,
++                  'seconds': budget['seconds'], 'calls': budget['calls'], 'cpus': budget['cpus'],
++                  'port': budget['port'], 'session': session}
++    write(inputs / 'invocation.json', invocation)
++    files = [{'path': str(path.relative_to(directory / 'library')), 'bytes': path.stat().st_size}
++             for path in sorted((directory / 'library').rglob('*')) if path.is_file()] if library else []
++    record = {'run_id': configuration['run_id'], 'status': 'prepared',
++              'prepared_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
++              'source_configuration': str(input_file), 'reference_source': str(image),
++              'library_source': str(library) if library else None,
++              'runtime_library': str(directory / 'library') if library else None, 'library_files': files,
++              'model': 'gpt-6.1-terra', 'reasoning_effort': 'low', 'execution_budget': budget,
++              'independent_quality_evaluation': 'not_run', 'candidate_promotion': 'not_performed'}
++    write(directory / 'run.json', record)
++    return directory
++
++
++def collect(directory):
++    directory = Path(directory).resolve()
++    if (directory / 'result.json').exists():
++        raise FileExistsError('The existing student result is not overwritten.')
++    record = json.loads((directory / 'run.json').read_text())
++    state = json.loads((directory / 'status.json').read_text()) if (directory / 'status.json').exists() else None
++    trajectory = directory / 'capture/trajs.json'
++    sdk = json.loads(trajectory.read_text())['metadata'] if trajectory.exists() else {}
++    files = [{'path': 'workspace/' + name, 'exists': (directory / 'workspace' / name).is_file(),
++              'bytes': (directory / 'workspace' / name).stat().st_size if (directory / 'workspace' / name).is_file() else None}
++             for name in ['build.py', 'scene.blend', 'final.png']]
++    present = all(row['exists'] and row['bytes'] > 0 for row in files)
++    write(directory / 'costs.json', summarize(directory, 'independent_student', root=directory.parent))
++    result = {'run_id': record['run_id'], 'supervisor_state': state,
++              'sdk_status': sdk.get('status', (state or {}).get('sdk_status')),
++              'delivery': {'status': 'files_present_unvalidated' if present else 'missing_files',
++                           'required_files_present': present, 'files': files,
++                           'note': 'File presence is not scene validity, reproduction, or reconstruction quality.'},
++              'costs': str(directory / 'costs.json'),
++              'independent_quality_evaluation': 'not_run', 'candidate_promotion': 'not_performed'}
++    if (directory / 'execution_error.json').exists():
++        result['execution_error'] = json.loads((directory / 'execution_error.json').read_text())
++    write(directory / 'result.json', result)
++    record.update(status='collected', collected_at_utc=datetime.datetime.now(datetime.timezone.utc).isoformat())
++    write(directory / 'run.json', record)
++    return result
++
++
++def run(directory):
++    directory = Path(directory).resolve()
++    record = json.loads((directory / 'run.json').read_text())
++    if record['status'] != 'prepared' or (directory / 'result.json').exists():
++        raise FileExistsError('Use a newly prepared student run; existing attempts are not rerun.')
++    record['status'] = 'started'
++    write(directory / 'run.json', record)
++    invocation = json.loads((directory / 'inputs/invocation.json').read_text())
++    try:
++        execute(**invocation)
++    except BaseException as error:
++        write(directory / 'execution_error.json', {'type': type(error).__name__, 'message': str(error)})
++        raise
++    finally:
++        collect(directory)
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('stage', choices=['prepare', 'run', 'collect'])
++    parser.add_argument('--input', type=Path)
++    parser.add_argument('--directory', type=Path)
++    args = parser.parse_args()
++    if args.stage == 'prepare':
++        if not args.input:
++            parser.error('--input is required for prepare')
++        print(prepare(args.input))
++    else:
++        if not args.directory:
++            parser.error('--directory is required for run/collect')
++        if args.stage == 'run':
++            run(args.directory)
++        else:
++            collect(args.directory)
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scene-rsi/tests/preflight_student.py b/scene-rsi/tests/preflight_student.py
+new file mode 100644
+index 0000000..5039781
+--- /dev/null
++++ b/scene-rsi/tests/preflight_student.py
+@@ -0,0 +1,143 @@
++"""Exercise real student inputs, image messages and isolated tools without a model or reconstruction."""
++import argparse
++import base64
++import datetime
++import json
++from pathlib import Path
++import socket
++import subprocess
++import sys
++import tempfile
++import time
++
++ROOT = Path(__file__).resolve().parents[1]
++sys.path.insert(0, str(ROOT / 'harness'))
++from run_capability_acquisition import EXP, PYTHON, write
++from run_student import collect
++from isolation import command
++
++PREVIOUS = ROOT / 'experiments/capability_improvement/stage_01_verified_review/offline_candidate/candidate/library'
++PROBE = '''import base64, json, os, subprocess, sys
++from pathlib import Path
++import anyio
++sys.path.insert(0, '/harness')
++import sdk_student, run_cc_sdk, codex_cli_bridge
++from claude_agent_sdk import ClaudeSDKClient
++session = json.loads(Path('/inputs/session.json').read_text())
++assert session['role'] == 'student' and not session['hint_enabled'] and not session['online_teacher_enabled']
++assert sorted(path.name for path in Path('/app').iterdir()) == ['reference.png']
++assert not Path('/inputs/input.json').exists()
++assert not Path(sys.argv[1]).exists()  # Complete host project, including GT and old experiments.
++for path in ['/dev_gt', '/development_gt', '/evidence', '/candidate_history', '/initial', '/analysis', '/harness/run_exploration.py', '/sdk/run_cc_sdk_vs_parallel13.diff']:
++    assert not Path(path).exists(), path
++async def initial_messages():
++    return [message async for message in sdk_student.prompt_messages()]
++messages = anyio.run(initial_messages)
++content = messages[0]['message']['content']
++assert content[0]['text'] == Path('/inputs/prompt.txt').read_text()
++image = next(part['source'] for part in content if part['type'] == 'image')
++assert image['media_type'] == 'image/png'
++image_bytes = base64.b64decode(image['data'])
++assert image_bytes == Path('/app/reference.png').read_bytes() == Path('/inputs/reference.png').read_bytes()
++library = Path('/capabilities')
++assert library.exists() == session['persistent_capability_enabled']
++files = {}
++if library.exists():
++    assert (library/'SKILL.md').read_text() in content[0]['text']
++    for path in library.rglob('*'):
++        if path.is_file():
++            files[str(path.relative_to(library))] = base64.b64encode(path.read_bytes()).decode()
++    try:
++        descriptor = os.open(library/'SKILL.md', os.O_WRONLY)
++    except OSError:
++        pass
++    else:
++        os.close(descriptor)
++        raise AssertionError('Capability library is writable')
++else:
++    assert 'Frozen general capability knowledge:' not in content[0]['text']
++assert codex_cli_bridge.MODEL == 'gpt-6.1-terra' and codex_cli_bridge.EFFORT == 'low'
++options = run_cc_sdk.create_agent_options('/app')
++options.tools = session['tools']
++assert options.tools == ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep']
++client = ClaudeSDKClient(options=options)  # Never connect or query.
++subprocess.run(['/bin/bash', '-c', "printf 'Engineering only\\n' > /app/engineering_probe.txt"], check=True)
++path = Path('/app/engineering_probe.txt')
++path.write_text(path.read_text().replace('only', 'write/edit probe'))
++assert 'write/edit' in path.read_text()
++blender = subprocess.run(['blender', '--version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
++assert b'Blender 5.2.2' in blender.stdout
++Path('/capture/preflight_sdk_input.json').write_text(json.dumps({'kind': 'constructed_sdk_input_not_sent', 'messages': messages}, indent=2))
++Path('/capture/student_probe.json').write_text(json.dumps({
++    'actual_sdk_reference_bytes': len(image_bytes), 'skill_injected': library.exists(),
++    'library_files_base64': files, 'sdk_client_constructed_without_connecting': True,
++    'tools': options.tools, 'host_gt_and_research_unavailable': True,
++    'bash_read_write_edit_succeeded': True, 'blender_version_command_succeeded': True,
++    'new_model_calls': 0, 'new_reconstructions': 0}, indent=2))
++'''
++
++
++def contents(directory):
++    return {str(path.relative_to(directory)): path.read_bytes() for path in directory.rglob('*') if path.is_file()}
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('--output', type=Path, required=True)
++    args = parser.parse_args()
++    output = args.output.resolve()
++    output.mkdir(parents=True)
++    started = time.monotonic()
++    reference = Path(json.loads((ROOT / 'configs/scenes.json').read_text())['scenes'][0]['reference'])
++    image_before = reference.read_bytes()
++    libraries = {'a3': EXP / 'libraries/A3', 'candidate': PREVIOUS, 'base': None}
++    originals = {str(path): contents(path) for path in libraries.values() if path is not None}
++    records = []
++    for name, library in libraries.items():
++        run = output / name
++        configuration = {'run_id': name, 'output_directory': str(run), 'reference_image': str(reference),
++                         'capability_library': str(library) if library else None,
++                         'budget': {'seconds': 60, 'calls': 1, 'cpus': [32, 33], 'port': 19665}}
++        input_file = output / (name + '_input.json')
++        write(input_file, configuration)
++        argv = [PYTHON, '-B', str(ROOT / 'harness/run_student.py'), 'prepare', '--input', str(input_file)]
++        write(output / (name + '_prepare_command.json'), argv)
++        with (output / (name + '_prepare.log')).open('wb') as log:
++            subprocess.run(argv, stdout=log, stderr=subprocess.STDOUT, check=True)
++        assert (run / 'inputs/reference.png').read_bytes() == image_before
++        assert contents(run / 'library') == (originals[str(library)] if library else {})
++        with tempfile.TemporaryDirectory(prefix='scene-student-probe-') as temporary, socket.socket(socket.AF_UNIX) as channel:
++            channel.bind(str(Path(temporary) / 'proxy.sock'))
++            sdk_command = command(run, Path(temporary) / 'proxy.sock', 1)
++            write(run / 'sdk_command.json', sdk_command)
++            argv = ['nice', '-n', '15', 'taskset', '-c', '32,33'] + sdk_command[:sdk_command.index('--')] + [
++                    '--', '/opt/python/bin/python3.12', '-c', PROBE, str(ROOT)]
++            write(output / (name + '_namespace_command.json'), argv)
++            with (output / (name + '_namespace.log')).open('wb') as log:
++                subprocess.run(argv, stdout=log, stderr=subprocess.STDOUT, timeout=60, check=True)
++        probe = json.loads((run / 'capture/student_probe.json').read_text())
++        exposed = {path: base64.b64decode(value) for path, value in probe.pop('library_files_base64').items()}
++        assert exposed == (originals[str(library)] if library else {})
++        write(run / 'status.json', {'status': 'offline_engineering_preflight', 'model_requests': 0,
++                                   'sdk_command_kind': 'constructed_not_executed', 'model_agent_started': False})
++        result = collect(run)
++        assert result['delivery']['status'] == 'missing_files' and result['sdk_status'] is None
++        assert result['candidate_promotion'] == 'not_performed'
++        records.append({'run': str(run), 'checks': probe, 'runtime_library_matches_selected_source': True,
++                        'blender_capture_records': len(list((run / 'capture').glob('blender_*'))),
++                        'delivery_status': result['delivery']['status']})
++    assert reference.read_bytes() == image_before
++    assert all(contents(Path(path)) == original for path, original in originals.items())
++    result = {'kind': 'offline_student_entry_preflight_not_research',
++              'finished_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
++              'seconds': time.monotonic() - started, 'runs': records,
++              'reference_and_source_libraries_unchanged': True,
++              'new_model_calls': 0, 'new_reconstructions': 0,
++              'limits': 'The actual SDK image/text input was constructed and saved but not sent. SDK client construction and isolated filesystem/Blender --version were exercised; no model-guided SDK tool roundtrip, scene generation, evaluation or candidate promotion occurred.'}
++    write(output / 'verification.json', result)
++    print(json.dumps({'verification': str(output / 'verification.json'), 'seconds': result['seconds'],
++                      'runs': len(records), 'new_model_calls': 0}))
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scene-rsi/tests/test_student.py b/scene-rsi/tests/test_student.py
+new file mode 100644
+index 0000000..09824e1
+--- /dev/null
++++ b/scene-rsi/tests/test_student.py
+@@ -0,0 +1,182 @@
++"""External student inputs and recording contracts; no model requests."""
++import json
++from pathlib import Path
++import shutil
++import sys
++import tempfile
++import unittest
++from unittest.mock import patch
++
++ROOT = Path(__file__).resolve().parents[1]
++sys.path.insert(0, str(ROOT / 'harness'))
++import run_student as student
++import run_capability_acquisition as acquisition
++
++EXPERIMENT = ROOT / 'experiments/experiment_03a_capability_acquisition'
++PREVIOUS = ROOT / 'experiments/capability_improvement/stage_01_verified_review/offline_candidate/candidate/library'
++REFERENCE = Path(json.loads((ROOT / 'configs/scenes.json').read_text())['scenes'][0]['reference'])
++
++
++def write(path, value):
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(json.dumps(value, indent=2))
++
++
++class IndependentStudent(unittest.TestCase):
++    def setUp(self):
++        temporary = tempfile.TemporaryDirectory(prefix='scene-student-test-')
++        self.addCleanup(temporary.cleanup)
++        self.root = Path(temporary.name)
++        root_patch = patch.object(student, 'ROOT', self.root)
++        root_patch.start()
++        self.addCleanup(root_patch.stop)
++        for name in ['configs/formal_prompt.txt'] + [name for name in student.RUNTIME_FILES if name.startswith('sdk/')]:
++            target = self.root / name
++            target.parent.mkdir(parents=True, exist_ok=True)
++            shutil.copy2(ROOT / name, target)
++        shutil.copytree(EXPERIMENT / 'libraries/A3', self.root / 'original')
++        shutil.copytree(PREVIOUS, self.root / 'previous')
++        shutil.copy2(REFERENCE, self.root / 'reference.png')
++
++    def prepare(self, library='original', name='run', seconds=90, calls=3):
++        input_file = self.root / (name + '.json')
++        write(input_file, {'run_id': name, 'output_directory': name,
++                          'reference_image': 'reference.png', 'capability_library': library,
++                          'budget': {'seconds': seconds, 'calls': calls, 'cpus': [32, 33], 'port': 19665}})
++        return student.prepare(input_file)
++
++    def test_original_library_prompt_and_frozen_runtime_copy(self):
++        directory = self.prepare()
++        prompt = (directory / 'inputs/prompt.txt').read_text()
++        self.assertIn((self.root / 'original/SKILL.md').read_text(), prompt)
++        self.assertIn('90 seconds, with at most 3 model requests', prompt)
++        self.assertNotIn('25 minutes', prompt)
++        self.assertEqual(list((directory / 'workspace').iterdir()), [directory / 'workspace/reference.png'])
++        before = (directory / 'library/SKILL.md').read_bytes()
++        (self.root / 'original/SKILL.md').write_text('External source changed after prepare.\n')
++        self.assertEqual((directory / 'library/SKILL.md').read_bytes(), before)
++        invocation = json.loads((directory / 'inputs/invocation.json').read_text())
++        self.assertEqual(invocation['seconds'], 90)
++        self.assertEqual(invocation['calls'], 3)
++        self.assertEqual(invocation['session']['tools'], acquisition.TOOLS)
++        self.assertEqual(invocation['session']['readonly_mounts'][-1]['source'], str(directory / 'library'))
++        self.assertNotIn('checkpoint', invocation)
++
++    def test_candidate_is_used_directly_without_its_parent_evidence(self):
++        directory = self.prepare('previous')
++        self.assertTrue((directory / 'library/ENGINEERING_PROBE.md').exists())
++        for path in (self.root / 'previous').iterdir():
++            self.assertEqual(path.read_bytes(), (directory / 'library' / path.name).read_bytes())
++        session = json.loads((directory / 'inputs/session.json').read_text())
++        self.assertEqual([row['target'] for row in session['readonly_mounts']], ['/sdk', '/capabilities'])
++        self.assertFalse(any((directory / name).exists() for name in ['evidence', 'development_gt', 'candidate_history']))
++
++    def test_empty_library_prepares_an_original_student(self):
++        directory = self.prepare(None, seconds=1500, calls=120)
++        self.assertEqual((directory / 'inputs/prompt.txt').read_bytes(), (ROOT / 'configs/formal_prompt.txt').read_bytes())
++        self.assertFalse((directory / 'library').exists())
++        session = json.loads((directory / 'inputs/session.json').read_text())
++        self.assertFalse(session['persistent_capability_enabled'])
++        self.assertEqual([row['target'] for row in session['readonly_mounts']], ['/sdk'])
++
++    def test_same_reference_with_three_independent_library_inputs(self):
++        paths = [self.prepare(library, name) for library, name in [('original', 'a3'), ('previous', 'candidate'), (None, 'base')]]
++        self.assertTrue(all((path / 'workspace/reference.png').read_bytes() == REFERENCE.read_bytes() for path in paths))
++        self.assertEqual(len({path for path in paths}), 3)
++
++    def test_non_png_reference_is_not_silently_sent_as_png(self):
++        (self.root / 'reference.jpg').write_bytes(b'\xff\xd8Engineering non-PNG fixture.')
++        input_file = self.root / 'jpeg.json'
++        write(input_file, {'run_id': 'jpeg', 'output_directory': 'jpeg', 'reference_image': 'reference.jpg',
++                          'budget': {'seconds': 90, 'calls': 3, 'cpus': [32, 33], 'port': 19665}})
++        with self.assertRaisesRegex(ValueError, 'PNG reference'):
++            student.prepare(input_file)
++        self.assertFalse((self.root / 'jpeg').exists())
++
++    def test_sdk_completion_and_delivery_are_separate(self):
++        directory = self.prepare()
++        def execute_fixture(**arguments):
++            self.assertEqual(arguments['directory'], str(directory))
++            self.assertEqual(arguments['session']['role'], 'student')
++            self.assertEqual(arguments['session']['initial_images'], [{'path': '/app/reference.png', 'label': 'Reference image'}])
++            write(directory / 'status.json', {'status': 'completed', 'sdk_status': 'completed'})
++        with patch.object(student, 'execute', side_effect=execute_fixture) as execute:
++            student.run(directory)
++            execute.assert_called_once()
++        result = json.loads((directory / 'result.json').read_text())
++        self.assertEqual(result['sdk_status'], 'completed')
++        self.assertEqual(result['delivery']['status'], 'missing_files')
++        self.assertFalse(result['delivery']['required_files_present'])
++
++    def test_files_present_do_not_imply_quality_validation_or_promotion(self):
++        directory = self.prepare()
++        for name in ['build.py', 'scene.blend', 'final.png']:
++            (directory / 'workspace' / name).write_bytes(b'Engineering fixture, not a reconstruction.')
++        result = student.collect(directory)
++        self.assertEqual(result['delivery']['status'], 'files_present_unvalidated')
++        self.assertIsNone(result['sdk_status'])
++        self.assertEqual(result['independent_quality_evaluation'], 'not_run')
++        self.assertEqual(result['candidate_promotion'], 'not_performed')
++
++    def test_execution_failure_preserves_partial_files_and_costs(self):
++        directory = self.prepare()
++        def failed(**arguments):
++            (directory / 'workspace/build.py').write_text('# Unfinished engineering fixture.\n')
++            bridge = directory / 'bridge'
++            bridge.mkdir()
++            (bridge / 'model_requests.jsonl').write_text('{"request_id":"one"}\n{"request_id":"two"}\n')
++            (bridge / 'token_usage.jsonl').write_text('{"request_id":"one","usage":{"input_tokens":100,"output_tokens":10,"cached_input_tokens":40}}\n')
++            raise InterruptedError('Engineering fixture interruption')
++        with patch.object(student, 'execute', side_effect=failed):
++            with self.assertRaises(InterruptedError):
++                student.run(directory)
++        result = json.loads((directory / 'result.json').read_text())
++        self.assertEqual(result['execution_error']['type'], 'InterruptedError')
++        self.assertTrue((directory / 'workspace/build.py').exists())
++        costs = json.loads((directory / 'costs.json').read_text())
++        self.assertEqual(costs['requests'], 2)
++        self.assertEqual(costs['requests_without_usage'], ['two'])
++        self.assertEqual(costs['reported_tokens']['input_tokens'] + costs['reported_tokens']['output_tokens'], 110)
++
++    def test_existing_directories_results_and_runs_are_not_overwritten(self):
++        directory = self.prepare()
++        with self.assertRaises(FileExistsError):
++            self.prepare()
++        student.collect(directory)
++        with self.assertRaises(FileExistsError):
++            student.collect(directory)
++        with patch.object(student, 'execute') as execute:
++            with self.assertRaises(FileExistsError):
++                student.run(directory)
++            execute.assert_not_called()
++
++    def test_output_cannot_be_created_inside_the_source_library(self):
++        input_file = self.root / 'nested.json'
++        write(input_file, {'run_id': 'nested', 'output_directory': 'original/nested',
++                          'reference_image': 'reference.png', 'capability_library': 'original',
++                          'budget': {'seconds': 90, 'calls': 3, 'cpus': [32, 33], 'port': 19665}})
++        with self.assertRaisesRegex(ValueError, 'outside the input'):
++            student.prepare(input_file)
++        self.assertFalse((self.root / 'original/nested').exists())
++
++    def test_original_03a_jobs_keep_exact_prompts_and_mounts(self):
++        experiment = self.root / 'historical-03a'
++        shutil.copytree(EXPERIMENT / 'libraries', experiment / 'libraries')
++        (experiment / 'prompts').mkdir()
++        shutil.copy2(ROOT / 'configs/formal_prompt.txt', experiment / 'prompts/base_student.txt')
++        write(experiment / 'configs/data_split.json', {'test': [{'id': 'TEST', 'reference': str(REFERENCE)}]})
++        with patch.object(acquisition, 'EXP', experiment):
++            jobs = acquisition.student_jobs()
++        self.assertEqual(len(jobs), 6)
++        for job in jobs:
++            group = job['id'].split('-')[-1]
++            old_prompt = EXPERIMENT / 'prompts' / (group + '-student.txt')
++            self.assertEqual(Path(job['prompt']).read_bytes(), old_prompt.read_bytes())
++            session = json.loads(Path(job['session']).read_text())
++            self.assertEqual(session['persistent_capability_enabled'], group != 'A0')
++            self.assertEqual(session['readonly_mounts'], [] if group == 'A0' else [
++                {'source': str(experiment / 'libraries' / group), 'target': '/capabilities'}])
++
++
++if __name__ == '__main__':
++    unittest.main()

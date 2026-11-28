@@ -39,3 +39,5 @@
 第二阶段代码修改已将起始能力库与本次知识来源改为独立外部输入，详见 [第二阶段审查说明](docs/STAGE_02_EXTERNAL_INPUT_REVIEW.md) 和 [四份完整配置示例](configs/improvement_inputs/)。通用入口使用 `prepare --input`；03-A 的组名和旧目录逻辑迁入单独适配器。原始库或历史候选均可作为起点，空GT不挂载，候选仍不晋升。通过23项离线检查和三种真实资料隔离预检，模型调用与正式重建均为0；停止在代码审查阶段。
 
 第三阶段代码修改已分离默认运行源码与宿主完整源码归档。改进Agent默认仅可查看17个明确列出的SDK、Bridge、运行接口和共同Prompt；历史研究源码通过原 `evidence` 显式提供。详见 [第三阶段审查说明](docs/STAGE_03_RUNTIME_VISIBILITY_REVIEW.md) 与 [真实隔离验收](experiments/capability_improvement/stage_03_runtime_visibility/preflight/verification.json)。25项离线检查通过，新模型调用和正式重建均为0，停在代码审查阶段。
+
+第四阶段已增加 [通用独立学生入口](harness/run_student.py)：外部指定参考图、可选能力库、预算、运行标识和新输出目录，复用原SDK、共同Prompt和能力注入方式。支持原始库、历史候选和空库；来源资料与GT不随库开放。详见 [完整审查说明](docs/STAGE_04_STUDENT_REVIEW.md)、[三份配置](configs/student_inputs/)和[真实隔离验收](experiments/student_execution/stage_04_code_review/preflight/verification.json)。36项离线检查通过；没有模型调用、正式重建、独立评价或晋升。
