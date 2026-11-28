@@ -35,3 +35,5 @@
 实验 03 最终记录 147 个已结束／中断 SDK 会话、570 次请求，已知输入＋输出合计 16,566,207 Token；其中 14 次请求缺失用量，不能当作零。实际 Codex 美元账单未知，没有调用 Ofox。分实验完整账本见 [联合用量记录](experiments/experiment_03_usage_summary.json)，包含保留的工程失败与报告生成消耗。
 
 第一阶段代码修改已增加“评价反馈 → 单次 SDK 改进 Agent → 独立能力库候选”入口，详见 [完整代码审查说明](docs/STAGE_01_FEEDBACK_REVIEW.md)、[调用源码](harness/run_capability_improvement.py)和[完整英文 Prompt](configs/capability_improvement_prompt.txt)。本阶段通过14项单元检查和真实资料的隔离预检，新模型调用与正式学生重建均为0。候选不会自动晋升，03-A结果在后续反馈中作为历史开发经验；未来独立测试须用新留出场景。工作停止在源码审查阶段。
+
+第二阶段代码修改已将起始能力库与本次知识来源改为独立外部输入，详见 [第二阶段审查说明](docs/STAGE_02_EXTERNAL_INPUT_REVIEW.md) 和 [四份完整配置示例](configs/improvement_inputs/)。通用入口使用 `prepare --input`；03-A 的组名和旧目录逻辑迁入单独适配器。原始库或历史候选均可作为起点，空GT不挂载，候选仍不晋升。通过23项离线检查和三种真实资料隔离预检，模型调用与正式重建均为0；停止在代码审查阶段。

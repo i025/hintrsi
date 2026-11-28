@@ -1,0 +1,1247 @@
+diff --git a/README.md b/README.md
+index 4f74d81..69f8660 100644
+--- a/README.md
++++ b/README.md
+@@ -2,6 +2,12 @@
+ 
+ 这里整理了原始 Hint 实验交接包、Ofox 补充 baseline，以及后续通过 Codex CLI 运行的各版代码、配置、测试、实验成绩和诊断记录。上传整理时间：2026-11-24。原始实验目录保留，仓库是独立的脱敏副本。
+ 
++## 2026-11-28：Scene 第二阶段外部输入代码审查
++
++[第二阶段审查说明](scene-rsi/docs/STAGE_02_EXTERNAL_INPUT_REVIEW.md)记录实际差异、完整调用关系、权限边界和验证。改进模块接受独立的起始库、实际反馈、指定证据、可选GT/历史与预算；[配置示例](scene-rsi/configs/improvement_inputs/)覆盖原始A3和已保存候选。03-A仅保留为输入适配器，候选不自动晋升。
++
++23项离线检查和三种真实资料隔离预检通过；未启动模型或正式学生实验。详见[实际验收](scene-rsi/experiments/capability_improvement/stage_02_external_inputs/final_preflight/verification.json)。工作停止在源码审查阶段。
++
+ ## 2026-11-28：Scene 第一阶段反馈与候选更新代码审查
+ 
+ 新增[审查说明](scene-rsi/docs/STAGE_01_FEEDBACK_REVIEW.md)、[单次候选入口](scene-rsi/harness/run_capability_improvement.py)和[完整英文 Prompt](scene-rsi/configs/capability_improvement_prompt.txt)：把真实03-A评价、轨迹、验证、来源和成本交给原SDK教师，在独立目录修改能力库并保留差异。原库与历史证据只读，候选不会自动晋升；旧实验执行路径及独立评价标准不变。
+diff --git a/scene-rsi/.gitignore b/scene-rsi/.gitignore
+index 6a06df1..89458a2 100644
+--- a/scene-rsi/.gitignore
++++ b/scene-rsi/.gitignore
+@@ -8,3 +8,5 @@ __pycache__/
+ **/home/
+ **/tmp/
+ experiments/capability_improvement/**/evidence/
++experiments/capability_improvement/**/development_gt/
++experiments/capability_improvement/**/candidate_history/
+diff --git a/scene-rsi/README.md b/scene-rsi/README.md
+index 7cd881c..3941c79 100644
+--- a/scene-rsi/README.md
++++ b/scene-rsi/README.md
+@@ -35,3 +35,5 @@
+ 实验 03 最终记录 147 个已结束／中断 SDK 会话、570 次请求，已知输入＋输出合计 16,566,207 Token；其中 14 次请求缺失用量，不能当作零。实际 Codex 美元账单未知，没有调用 Ofox。分实验完整账本见 [联合用量记录](experiments/experiment_03_usage_summary.json)，包含保留的工程失败与报告生成消耗。
+ 
+ 第一阶段代码修改已增加“评价反馈 → 单次 SDK 改进 Agent → 独立能力库候选”入口，详见 [完整代码审查说明](docs/STAGE_01_FEEDBACK_REVIEW.md)、[调用源码](harness/run_capability_improvement.py)和[完整英文 Prompt](configs/capability_improvement_prompt.txt)。本阶段通过14项单元检查和真实资料的隔离预检，新模型调用与正式学生重建均为0。候选不会自动晋升，03-A结果在后续反馈中作为历史开发经验；未来独立测试须用新留出场景。工作停止在源码审查阶段。
++
++第二阶段代码修改已将起始能力库与本次知识来源改为独立外部输入，详见 [第二阶段审查说明](docs/STAGE_02_EXTERNAL_INPUT_REVIEW.md) 和 [四份完整配置示例](configs/improvement_inputs/)。通用入口使用 `prepare --input`；03-A 的组名和旧目录逻辑迁入单独适配器。原始库或历史候选均可作为起点，空GT不挂载，候选仍不晋升。通过23项离线检查和三种真实资料隔离预检，模型调用与正式重建均为0；停止在代码审查阶段。
+diff --git a/scene-rsi/configs/capability_improvement_prompt.txt b/scene-rsi/configs/capability_improvement_prompt.txt
+index 407176b..08d9c73 100644
+--- a/scene-rsi/configs/capability_improvement_prompt.txt
++++ b/scene-rsi/configs/capability_improvement_prompt.txt
+@@ -1,12 +1,12 @@
+-You are the development improvement agent for an editable Blender reconstruction system. Your task is to investigate actual evaluation feedback and, when supported by evidence, modify a candidate capability library. Use the existing SDK tools in this workspace. The original system and frozen libraries are read-only; your candidate is not a promoted student version.
++You are the development improvement agent for an editable Blender reconstruction system. Your task is to investigate actual evaluation feedback and, when supported by evidence, modify a candidate capability library. Use the existing SDK tools in this workspace. The original system and selected input library are read-only; your candidate is not a promoted student version.
+ 
+-Start with /feedback/feedback.json. It contains actual recorded outcomes, costs, provenance, current component paths, and entries into the original evidence. /feedback/evidence_index.json lists the available historical files. Original records may contain host paths: use the host_root to mounted_root mapping in feedback.json to locate the corresponding files. For paths inside earlier containers, use historical_container_paths rather than treating an old /app as this candidate workspace. An old inventory is not an access grant. Read the evidence needed for your investigation rather than automatically re-auditing every historical trajectory.
++Start with /feedback/feedback.json. It identifies the externally selected initial library, actual recorded feedback, available evidence, optional development GT, optional history, context, and execution budget. Read the actual feedback at recorded_feedback; use its evidence entries as needed. /feedback/evidence_index.json lists the available historical files. Original records may contain host paths: use the explicit source-to-path entries in path_mapping and evidence_index.json to locate files. A path outside those selections is unavailable. For paths inside earlier containers, use historical_container_paths rather than treating an old /app as this candidate workspace. An old inventory is not an access grant. Read the evidence needed for your investigation rather than automatically re-auditing every historical trajectory.
+ 
+-The current library before this attempt is /initial/library. The writable candidate starts as an independent copy at /app/library. The current SDK, student Harness, and configuration are preserved at /initial/system. Historical source snapshots describe the versions actually used in earlier runs. Inspect their real contents when relevant; do not infer implementation behavior from a report or README alone.
++The current library before this attempt is /initial/library. The writable candidate starts as an independent copy at /app/library. The common SDK, student Harness, analysis source and common task prompts are preserved at /initial/system. Historical task manifests and additional configurations are available only if externally selected as evidence. Historical source snapshots describe the versions actually used in earlier runs. Inspect their real contents when relevant; do not infer implementation behavior from a report or README alone.
+ 
+-You may investigate the library's generation sources and process, validation attempts, actual student SDK messages and tool results, written and executed Blender code, saved scenes, renders, independent evaluations, prior successful or unsuccessful checks, rejected alternatives, and actual costs. The evidence index and feedback record point to these files. You may read images and inspect accessible Blender files using the existing environment. Only the development GT directories explicitly listed in feedback.json are mounted as GT sources. Original A1-A5 information restrictions describe historical conditions, not the current development agent's permission boundary.
++You may investigate the library's generation sources and process, validation attempts, actual student SDK messages and tool results, written and executed Blender code, saved scenes, renders, independent evaluations, prior successful or unsuccessful checks, rejected alternatives, and actual costs. The evidence index and feedback record point to these files. You may read images and inspect accessible Blender files using the existing environment. Only the development GT directories explicitly listed in feedback.json are mounted as GT sources. The initial library and permitted knowledge sources are independent inputs. Choosing a library does not grant its generation sources, other libraries, trajectories, or GT. Read only the explicitly selected sources. An empty allowed_development_gt list means no GT source has been mounted; prior knowledge already encoded in the input library or supplied feedback is not removed.
+ 
+-Experiment03-A outcomes made available here are historical development experience. They cannot be reused as an independent test of a candidate informed by them. Any future independent test must use new held-out scenes. Do not access unavailable data, retrieve external reference scenes, or infer hidden model reasoning.
++Outcomes supplied for improvement become historical development experience, including any former independent-test outcomes. They cannot be reused as an independent test of a candidate informed by them. Any future independent test must use new held-out scenes. Do not access unavailable data, retrieve external reference scenes, or infer hidden model reasoning.
+ 
+ Choose your own investigation and update. Determine what the evidence supports, which competing explanations remain, whether further checks are useful within the budget, and whether any change is justified. No particular component is presumed responsible. You may identify issues outside the editable scope and explain them, but this stage only permits capability-library changes. Do not modify the student Harness, SDK, bridge, evaluator, improvement controller, prompts, original records, or GT.
+ 
+diff --git a/scene-rsi/configs/improvement_inputs/a3_feedback_only.json b/scene-rsi/configs/improvement_inputs/a3_feedback_only.json
+new file mode 100644
+index 0000000..35f1204
+--- /dev/null
++++ b/scene-rsi/configs/improvement_inputs/a3_feedback_only.json
+@@ -0,0 +1,25 @@
++{
++  "initial_library": "../../experiments/experiment_03a_capability_acquisition/libraries/A3",
++  "feedback": "../../experiments/experiment_03a_capability_acquisition/analysis/observed_results.json",
++  "evidence": [],
++  "development_gt": [],
++  "history": [],
++  "budget": {
++    "seconds": 600,
++    "calls": 24,
++    "cpus": [
++      32,
++      33,
++      34,
++      35,
++      36,
++      37,
++      38,
++      39
++    ],
++    "port": 19665
++  },
++  "context": {
++    "note": "Original A3 library with recorded outcomes only. No historical trajectory or GT access is granted."
++  }
++}
+diff --git a/scene-rsi/configs/improvement_inputs/a3_selected_evidence.json b/scene-rsi/configs/improvement_inputs/a3_selected_evidence.json
+new file mode 100644
+index 0000000..f640103
+--- /dev/null
++++ b/scene-rsi/configs/improvement_inputs/a3_selected_evidence.json
+@@ -0,0 +1,32 @@
++{
++  "initial_library": "../../experiments/experiment_03a_capability_acquisition/libraries/A3",
++  "feedback": "../../experiments/experiment_03a_capability_acquisition/analysis/observed_results.json",
++  "evidence": [
++    "../../experiments/experiment_03a_capability_acquisition/runs/A-T01-A2/capture/trajs.json",
++    "../../experiments/experiment_03a_capability_acquisition/runs/A-T01-A3/workspace",
++    "../../experiments/experiment_03a_capability_acquisition/runs/A-T01-A3/analysis",
++    "../../experiments/experiment_03a_capability_acquisition/learning/A3/capture/trajs.json",
++    "../../experiments/experiment_03a_capability_acquisition/validation/A3/workspace/validation_report.json",
++    "../../experiments/experiment_03a_capability_acquisition/analysis/final_usage_summary.json"
++  ],
++  "development_gt": [],
++  "history": [],
++  "budget": {
++    "seconds": 600,
++    "calls": 24,
++    "cpus": [
++      32,
++      33,
++      34,
++      35,
++      36,
++      37,
++      38,
++      39
++    ],
++    "port": 19665
++  },
++  "context": {
++    "note": "The same A3 initial library with explicit historical execution, generation, validation and cost evidence. No full GT source is supplied."
++  }
++}
+diff --git a/scene-rsi/configs/improvement_inputs/a3_selected_evidence_gt.json b/scene-rsi/configs/improvement_inputs/a3_selected_evidence_gt.json
+new file mode 100644
+index 0000000..64590da
+--- /dev/null
++++ b/scene-rsi/configs/improvement_inputs/a3_selected_evidence_gt.json
+@@ -0,0 +1,34 @@
++{
++  "initial_library": "../../experiments/experiment_03a_capability_acquisition/libraries/A3",
++  "feedback": "../../experiments/experiment_03a_capability_acquisition/analysis/observed_results.json",
++  "evidence": [
++    "../../experiments/experiment_03a_capability_acquisition/runs/A-T01-A2/capture/trajs.json",
++    "../../experiments/experiment_03a_capability_acquisition/runs/A-T01-A3/workspace",
++    "../../experiments/experiment_03a_capability_acquisition/runs/A-T01-A3/analysis",
++    "../../experiments/experiment_03a_capability_acquisition/learning/A3/capture/trajs.json",
++    "../../experiments/experiment_03a_capability_acquisition/validation/A3/workspace/validation_report.json",
++    "../../experiments/experiment_03a_capability_acquisition/analysis/final_usage_summary.json"
++  ],
++  "development_gt": [
++    "../../data/evaluation_gt/office/office_s1210607561"
++  ],
++  "history": [],
++  "budget": {
++    "seconds": 600,
++    "calls": 24,
++    "cpus": [
++      32,
++      33,
++      34,
++      35,
++      36,
++      37,
++      38,
++      39
++    ],
++    "port": 19665
++  },
++  "context": {
++    "note": "The same initial library and selected evidence with one explicitly permitted development GT directory."
++  }
++}
+diff --git a/scene-rsi/configs/improvement_inputs/previous_candidate.json b/scene-rsi/configs/improvement_inputs/previous_candidate.json
+new file mode 100644
+index 0000000..97d8454
+--- /dev/null
++++ b/scene-rsi/configs/improvement_inputs/previous_candidate.json
+@@ -0,0 +1,28 @@
++{
++  "initial_library": "../../experiments/capability_improvement/stage_01_verified_review/offline_candidate/candidate/library",
++  "feedback": "../../experiments/experiment_03a_capability_acquisition/analysis/observed_results.json",
++  "evidence": [],
++  "development_gt": [],
++  "history": [
++    "../../experiments/capability_improvement/stage_01_verified_review/offline_candidate/candidate.json",
++    "../../experiments/capability_improvement/stage_01_verified_review/offline_candidate/candidate/costs.json"
++  ],
++  "budget": {
++    "seconds": 600,
++    "calls": 24,
++    "cpus": [
++      32,
++      33,
++      34,
++      35,
++      36,
++      37,
++      38,
++      39
++    ],
++    "port": 19665
++  },
++  "context": {
++    "note": "This saved library contains an offline engineering marker, not a model-generated learned improvement. Only its library and the two selected history records are supplied."
++  }
++}
+diff --git a/scene-rsi/docs/STAGE_02_EXTERNAL_INPUT_REVIEW.md b/scene-rsi/docs/STAGE_02_EXTERNAL_INPUT_REVIEW.md
+new file mode 100644
+index 0000000..4e8a8ef
+--- /dev/null
++++ b/scene-rsi/docs/STAGE_02_EXTERNAL_INPUT_REVIEW.md
+@@ -0,0 +1,245 @@
++# 第二阶段代码审查：外部改进起点与知识来源
++
++本次基于 `2ac0342`，只修改输入组织与信息访问边界。保留第一阶段的评价反馈、自主 SDK 改进 Agent、独立候选、差异与成本收集。本次没有调用模型、没有正式学生重建、没有执行多轮 RSI，也没有产生研究意义上的新能力。提交差异可在本次 GitHub commit 的 Files changed 中逐文件审查；[仅实现、配置、测试与文档的实际差异](../experiments/capability_improvement/stage_02_external_inputs/implementation.diff)排除了重复的生成记录，便于集中审查。
++
++## 1. 修改前后
++
++原入口：
++
++```text
++prepare(--condition A3, --experiment 03-A, --history ...)
++  → 固定读取 03-A/libraries/A3
++  → 开放整批 03-A 索引中的历史证据
++  → 自动挂载原三个开发 GT
++  → 历史候选仅作为旁证，无法直接成为起始库
++  → 原 SDK 单次执行 → collect → 未晋升候选
++```
++
++现在：
++
++```text
++外部 input.json
++  ├─ initial_library：任意符合现有库结构的起始目录
++  ├─ feedback：实际执行/评价反馈 JSON
++  ├─ evidence：明确允许读取的文件或目录
++  ├─ development_gt：明确允许的 GT 文件或目录，可为空
++  ├─ history：明确允许的历史候选/经验文件或目录，可为空
++  ├─ budget：秒数、模型请求上限、CPU、端口
++  └─ context：可选来源、实验背景等元数据
++        ↓
++prepare(--input ...)
++  → 独立复制指定库，冻结输入与实际反馈
++  → 仅为明确选择的证据建立只读视图
++  → 原 SDK 单次执行 → 原 collect → 未晋升候选
++```
++
++A1–A5 仅存在于原实验和单独的 03-A 输入适配器中。通用 `prepare(directory, input_file)` 不读取实验 split、冻结库记录、03-A 结果固定目录或组名；离线测试删除这些固定来源后仍能准备其他目录中的库。
++
++## 2. 新增和修改文件
++
++| 文件 | 作用 |
++|---|---|
++| [harness/run_capability_improvement.py](../harness/run_capability_improvement.py) | `prepare` 接收外部配置；`evidence_view` 只展开显式路径；生成 schema 2 的反馈包装、证据索引、SDK invocation；`run/collect` 保留既有执行、差异、异常和成本语义。 |
++| [harness/prepare_improvement_03a.py](../harness/prepare_improvement_03a.py)（新增） | 将已有 03-A 冻结库和真实结果整理成外部配置。组名及旧实验目录只留在这里。证据、GT、历史均须显式传入。只写配置，不启动 Agent。 |
++| [harness/isolation.py](../harness/isolation.py) | 仅在 `image is not None` 时复制初始图。新改进会话使用 `image=null`、`initial_images=[]`；已有有图调用保持原行为。工具和隔离执行逻辑未改变。 |
++| [configs/capability_improvement_prompt.txt](../configs/capability_improvement_prompt.txt) | 将来源说明改成通用外部输入与显式权限；保留自主调查、实际候选修改、三种决策、原准入限制与报告结构。未指定具体重建方法。 |
++| [configs/improvement_inputs/a3_feedback_only.json](../configs/improvement_inputs/a3_feedback_only.json)（新增） | 原始 A3 库与真实结果，无额外轨迹、GT、历史。 |
++| [configs/improvement_inputs/a3_selected_evidence.json](../configs/improvement_inputs/a3_selected_evidence.json)（新增） | 相同 A3 库与指定执行、评价、生成、验证和成本证据，无完整 GT。 |
++| [configs/improvement_inputs/a3_selected_evidence_gt.json](../configs/improvement_inputs/a3_selected_evidence_gt.json)（新增） | 相同 A3 库、相同指定证据，显式增加一个办公室开发 GT。 |
++| [configs/improvement_inputs/previous_candidate.json](../configs/improvement_inputs/previous_candidate.json)（新增） | 从第一阶段已保存候选库开始，历史范围仅包括显式列出的记录。该旧候选含工程标记，并非模型学习成果。 |
++| [tests/test_capability_improvement.py](../tests/test_capability_improvement.py) | 保留第一阶段契约，扩展为23项离线检查。 |
++| [tests/preflight_capability_improvement.py](../tests/preflight_capability_improvement.py) | 使用真实旧文件执行三种输入配置及真实文件隔离检查；不启动 SDK、Bridge 或 Blender。 |
++| [README.md](../README.md)、本文件 | 现行入口、调用关系、权限语义和验收说明。第一阶段审查说明及旧实验记录保留原文。 |
++| [.gitignore](../.gitignore) | 发布时排除可重建的证据、GT、历史视图；原始文件仍由索引指向。 |
++| [本次工程验收记录](../experiments/capability_improvement/stage_02_external_inputs/) | 保存实际配置、prepare/隔离命令与日志、输入副本、初始库、工程候选、差异和验证结果。属于工程记录，不是新正式实验。 |
++
++仓库顶层 README 同步增加本阶段入口。运行源码快照保留在各工程候选的 `initial/system/`；这些是源码副本，不是额外实现。
++
++## 3. 外部输入完整示例
++
++以下对应 `a3_feedback_only.json` 的主体，路径相对于**输入 JSON 所在目录**解析，而非调用者工作目录：
++
++```json
++{
++  "initial_library": "../../experiments/experiment_03a_capability_acquisition/libraries/A3",
++  "feedback": "../../experiments/experiment_03a_capability_acquisition/analysis/observed_results.json",
++  "evidence": [],
++  "development_gt": [],
++  "history": [],
++  "budget": {
++    "seconds": 600,
++    "calls": 24,
++    "cpus": [32, 33, 34, 35, 36, 37, 38, 39],
++    "port": 19665
++  },
++  "context": {
++    "note": "Original A3 library with recorded outcomes only. No historical trajectory or GT access is granted."
++  }
++}
++```
++
++`initial_library`、`feedback`、`budget` 必填；三个证据列表及 `context` 可省略。列表元素是文件或目录路径，既支持本工程路径，也支持其他本地位置。选择目录代表允许读取该目录内的普通文件；不要把不想开放的材料放进所选目录。
++
++`feedback` 是实际反馈 JSON 文件，不需要重新改写成固定实验字段。其原文复制到 `inputs/recorded_feedback.json`，Agent 从该真实文件读取。文件本身包含哪些结果，由外部实验配置负责决定：示例使用完整03-A真实结果，不代表只看到A3组反馈；要限制到某些评价，应由外部提供相应真实反馈子集。`context` 也属于提供给 Agent 的信息，不应写入本次不允许的知识。
++
++模型保持代码中固定的 `gpt-6.1-terra / low`，不是本次可调实验变量。预算的 `calls` 是请求上限，不是已消耗调用量。
++
++选择历史候选作为起点只需替换 `initial_library`，例如：
++
++```json
++"initial_library": "../../experiments/capability_improvement/stage_01_verified_review/offline_candidate/candidate/library"
++```
++
++这不会自动开放候选的输入、原始证据、GT、轨迹或其他候选。若需要其改进经验，应在 `history` 中明确列出 `candidate.json`、`candidate/update_report.json`、`candidate/costs.json` 或所需轨迹目录。`history` 不再自动推断、扩展一个候选父目录的内容。
++
++## 4. 准备与调用
++
++在本机完整 `scene-rsi` 工程内：
++
++```bash
++/srv/lab-disks/disk2/users/xymo/hint-baseline-run/env/bin/python -B harness/run_capability_improvement.py prepare \
++  --directory experiments/capability_improvement/reviewed_C001 \
++  --input configs/improvement_inputs/a3_selected_evidence.json
++```
++
++`prepare` 不调用模型。审查后，如需真实单次改进，仍使用既有入口：
++
++```bash
++/srv/lab-disks/disk2/users/xymo/hint-baseline-run/env/bin/python -B harness/run_capability_improvement.py run \
++  --directory experiments/capability_improvement/reviewed_C001
++```
++
++**本次没有执行该 `run` 命令。** 入口不会自动启动学生验证、晋升或下一轮。`collect` 仍用于已有但尚未收集的会话；正常 `run` 已在 `finally` 收集，不重复覆盖。
++
++03-A 的可选配置生成方式：
++
++```bash
++/srv/lab-disks/disk2/users/xymo/hint-baseline-run/env/bin/python -B harness/prepare_improvement_03a.py \
++  --condition A3 \
++  --output /tmp/scene-rsi-a3-input.json \
++  --evidence experiments/experiment_03a_capability_acquisition/runs/A-T01-A2/capture/trajs.json \
++  --evidence experiments/experiment_03a_capability_acquisition/analysis/final_usage_summary.json \
++  --seconds 600 --calls 24
++```
++
++该适配器的默认反馈文件是原03-A `observed_results.json`；可用 `--feedback` 更换。`--evidence`、`--gt`、`--history` 可重复传入，默认全部为空，`--condition A3` 只决定初始库与来源元数据，**不会增加权限**。`--experiment` 可指向恢复的03-A目录。通用模块不再接受旧的 `--condition/--experiment/--history/--seconds/...` 准备参数；它们迁移到适配器或外部 JSON，避免两个优先级来源。第一阶段已经准备好的 invocation 仍能由原 `run` 执行保存的参数。
++
++## 5. 关键源码与完整调用关系
++
++```text
++可选 prepare_improvement_03a.configuration()/main()
++    → 外部 input.json
++run_capability_improvement.main(): prepare --input
++    → prepare(directory, input_file)
++       → 复制指定 initial_library 到 initial/library 和 seed/library
++       → 冻结 inputs/input.json、recorded_feedback.json、prompt.txt
++       → evidence_view() 分别处理 evidence / development_gt / history
++       → feedback.json、evidence_index.json、session.json、invocation.json
++       → candidate.json(status=prepared)
++run_capability_improvement.main(): run
++    → run(directory)
++       → 读取已保存 invocation
++       → run_sdk_session.execute(**invocation)               [保持原有实现]
++          → isolation.prepare(image=None, initial_images=[]) [新增纯文本准备支持]
++          → Bridge + 现有 LiteLLM 消息转换/代理
++          → isolation.command(): 独立文件/网络命名空间 + 显式只读挂载
++          → sdk_student.py → sdk/run_cc_sdk.py
++          → Claude Agent SDK 执行会话和工具循环
++          → Codex CLI Bridge → gpt-6.1-terra / low 模型决策
++          → SDK 工具调用执行，工具结果进入后续模型上下文
++          → 保存原始消息、请求/返回、轨迹、状态、资源与用量
++       → finally: collect(directory)                        [保持原有实现]
++          → 保存 workspace/library 和原样 update_report
++          → 对比 initial/library，记录真实增/改/删及 library.diff
++          → usage_summary.summarize(..., root=directory)
++          → candidate.json：实际状态、未知报告/用量、未独立验证、未晋升
++```
++
++不使用 Codex 原生 Agent 执行上层学生或教师任务，后端替换边界未改变。`run_capability_acquisition.py` 仅复用既有 `TOOLS/copy_tree/write` 通用工具，不向通用 `prepare` 传入A1–A5逻辑。SDK、Bridge、工具、Hint算法、知识提取、学生能力调用、独立评价和能力准入实现均未修改。
++
++## 6. 实际反馈结构与文件权限
++
++准备后 `inputs/feedback.json` 为 schema 2，核心结构：
++
++```json
++{
++  "schema_version": 2,
++  "recorded_feedback": "/feedback/recorded_feedback.json",
++  "components": {
++    "initial_library": "/initial/library",
++    "writable_candidate": "/app/library",
++    "current_system_snapshot": "/initial/system",
++    "editable_scope": "capability_library_only",
++    "source_library": "<external initial_library>"
++  },
++  "allowed_evidence": [{"source": "<selected host path>", "path": "/evidence/001/<name>", "scope": "evidence"}],
++  "allowed_development_gt": [],
++  "candidate_history": [],
++  "path_mapping": ["<the actual source/path/scope entries>"],
++  "evidence_index": "/feedback/evidence_index.json"
++}
++```
++
++完整真实实例见 [final_preflight/a3_limited/inputs/feedback.json](../experiments/capability_improvement/stage_02_external_inputs/final_preflight/a3_limited/inputs/feedback.json)，原始反馈副本为同目录 `recorded_feedback.json`。`evidence_index.json` 对每个文件记录宿主来源、可访问路径、作用域、是否存在及字节数，不为缺失文件编造内容。`path_mapping` 只有显式选择的映射，原记录里的其他路径不因此获得访问权。映射有重叠时以文件索引中的具体项为准。
++
++`initial/library`、`inputs` 和证据视图只读挂载；`/app/library` 是独立可写副本。证据在同一文件系统使用硬链接，跨文件系统时复制；没有重复下载。已有私密运行目录、凭据和符号链接不进入证据视图。历史目录被明确选中时，它包含的普通研究文件也属于授权范围；若只想提供某个报告，应选择该文件，不选择整个候选目录。
++
++共同运行源码仍开放，避免 Agent 仅凭 README 猜测实现。自动复制的 `configs/` 现在仅包含三个共同 Prompt，不包括 `scenes.json`、历史任务配置、其他实验输入或新增的外部配置示例。这些额外材料若需要，应显式选为证据。源码中存在的组名或路径字面量不等于挂载相应数据。
++
++空 `development_gt` 不创建 GT 挂载，也不再为纯文本改进复制任何默认参考图。但是，库或反馈中已经存在的 GT 衍生知识不会被“抹除”。外部显式选择含 GT 的证据目录或将 GT 内容写入反馈，同样会提供该知识；本模块不对任意文件做语义删改或重新分类。不同知识来源对照必须由外部配置准确控制。
++
++03-A 的结果一旦用于改进，就按历史开发经验使用，不能再当作相应候选的独立测试。旧split和报告保持不变；未来正式独立测试仍需新的留出场景。
++
++## 7. 保存方式与验收
++
++目录结构沿用第一阶段：
++
++```text
++attempt/
++  initial/library/、initial/system/       # 改进前库、共同系统源码
++  seed/library/                           # 独立工作区的起始库
++  inputs/input.json                        # 外部配置原文
++  inputs/recorded_feedback.json            # 实际反馈原文
++  inputs/feedback.json、evidence_index.json
++  inputs/prompt.txt、session.json、invocation.json
++  evidence/、development_gt/、candidate_history/  # 显式选择的只读视图；发布时不重复上传
++  session/workspace/、capture/、bridge/...  # 真实运行时按原机制保存
++  candidate/library/、library.diff、file_changes.json
++  candidate/update_report.json（若存在）、costs.json
++  candidate.json
++```
++
++23项单元检查覆盖原有收集、异常、三种决策、未知用量、SDK参数派发及新接口。还验证独立外部库、相同库的不同证据、空GT、历史候选起点、相对路径、符号链接访问边界、跨文件系统证据、缺失记录和旧有图像/已准备invocation行为。
++
++真实预检详见 [final_preflight/verification.json](../experiments/capability_improvement/stage_02_external_inputs/final_preflight/verification.json) 和 [unit_tests.log](../experiments/capability_improvement/stage_02_external_inputs/unit_tests.log)。三组分别验证：
++
++| 工程配置 | 初始库 | 额外证据 | GT/历史 | 验证内容 |
++|---|---|---|---|---|
++| a3_limited | 原始A3 | 指定真实轨迹、完成运行的代码/场景/渲染及评价 | 均为空 | 文件可读且只读，宿主原路径不可访问，空GT不挂载。 |
++| a3_expanded | 相同A3 | 增加生成轨迹、验证报告、真实成本 | 显式一个开发GT及两份历史记录 | 同一起点可使用不同信息范围；新增来源实际可读且只读。 |
++| previous_candidate | 第一阶段已保存候选库 | 无 | 均为空 | 旧工程标记完整进入新起点，未重新读取A3冻结库，未自动获得旧证据或GT。 |
++
++三个起点均逐文件对比实际字节，确认 `initial/library`、`seed/library` 与指定来源一致；原始A3和历史候选逐文件内容不变。每个新候选只被工程探针增加 `ENGINEERING_PROBE_02.md`，通过原 `collect` 保存差异。没有模型报告，因此 `agent_decision=null`，候选均未晋升。工程探针不是能力学习结果。
++
++检查01–03实验与第一阶段已验证记录共94,475个历史文件，大小和修改时间无变化。直接与 `2ac0342` 比较的八个现有核心执行、SDK、Bridge、评价和用量文件相同；`isolation.py` 的唯一功能变化单独列明。未使用哈希或校验和系统。
++
++四份已交付配置还逐一执行了真实 `prepare`，没有缺失证据文件，见 [example_checks.json](../experiments/capability_improvement/stage_02_external_inputs/example_checks.json)。03-A适配器的命令行也实际生成配置，并交给通用入口完成准备，见 `adapter_cli_input.json` 与 `adapter_cli_preparation/inputs/`；均没有模型调用。
++
++工程记录通过 [file_index.json](../experiments/capability_improvement/stage_02_external_inputs/file_index.json)列出本地文件与发布范围。GitHub保存实际配置、反馈、索引、命令、日志、初始/候选库、差异和验收记录；显式证据/GT/历史的只读视图及重复系统源码快照保留本地，不重复上传。当前完整源码在仓库 `scene-rsi/`。
++
++复查命令：
++
++```bash
++PYTHONDONTWRITEBYTECODE=1 /srv/lab-disks/disk2/users/xymo/hint-baseline-run/env/bin/python -B -m unittest discover -s tests -v
++
++PYTHONDONTWRITEBYTECODE=1 /srv/lab-disks/disk2/users/xymo/hint-baseline-run/env/bin/python -B tests/preflight_capability_improvement.py \
++  --output experiments/capability_improvement/new_offline_input_check
++```
++
++本机完整旧实验或恢复的原始归档是测试数据前提，Git可浏览子集不包含所有原始轨迹。此次未重新下载数据或安装环境。实际准备、隔离和收集日志已保存；SDK执行仅通过离线mock验证派发，未启动真实模型会话。新模型调用0、新学生重建0、GPU使用0。
++
++## 8. 本阶段停止位置
++
++保留模型自主决定修改、不修改或证据不足的既有机制，但本次没有真实调用模型，因此没有检验新的自主诊断效果或候选收益。不修改准入标准、教师Hint、知识提取或评价标准，不自动排名、晋升、验证学生、多轮调度或自修改Harness。下一步仍是审查源码与外部权限配置。
++
++完整英文改进 Prompt 以 [实际配置文件](../configs/capability_improvement_prompt.txt) 为准；真实准备的原文副本保存在各 `inputs/prompt.txt`。与第一阶段相比只调整外部来源、映射及权限表述，未加入具体Blender方法或指定失败原因。
+diff --git a/scene-rsi/harness/isolation.py b/scene-rsi/harness/isolation.py
+index f118623..908e0bb 100644
+--- a/scene-rsi/harness/isolation.py
++++ b/scene-rsi/harness/isolation.py
+@@ -18,7 +18,8 @@ def prepare(directory, image, prompt, checkpoint=None, session=None):
+     if checkpoint:
+         shutil.copytree(checkpoint, directory / 'workspace', dirs_exist_ok=True,
+                         ignore=shutil.ignore_patterns('.git', '__pycache__', '*.pyc'))
+-    shutil.copyfile(image, directory / 'workspace/reference.png')
++    if image is not None:
++        shutil.copyfile(image, directory / 'workspace/reference.png')
+     (directory / 'inputs/prompt.txt').write_text(prompt)
+     (directory / 'inputs/session.json').write_text(json.dumps(session or {}, indent=2))
+     if 'initial_images' in (session or {}):
+diff --git a/scene-rsi/harness/prepare_improvement_03a.py b/scene-rsi/harness/prepare_improvement_03a.py
+new file mode 100644
+index 0000000..aa9607e
+--- /dev/null
++++ b/scene-rsi/harness/prepare_improvement_03a.py
+@@ -0,0 +1,52 @@
++"""Write external improvement input from Experiment03-A; this adapter grants no implicit evidence or GT."""
++import argparse
++import json
++from pathlib import Path
++
++from run_capability_acquisition import EXP, write
++
++
++def configuration(condition, experiment=EXP, feedback=None, evidence=(), development_gt=(), history=(),
++                  seconds=600, calls=24, cpus=None, port=19665):
++    experiment = Path(experiment).resolve()
++    frozen = json.loads((experiment / 'configs/frozen_libraries.json').read_text())
++    source = next(row for row in frozen['libraries'] if row['condition'] == condition)
++    split = json.loads((experiment / 'configs/data_split.json').read_text())
++    return {
++        'initial_library': str(experiment / 'libraries' / condition),
++        'feedback': str(Path(feedback).resolve() if feedback else experiment / 'analysis/observed_results.json'),
++        'evidence': [str(Path(path).resolve()) for path in evidence],
++        'development_gt': [str(Path(path).resolve()) for path in development_gt],
++        'history': [str(Path(path).resolve()) for path in history],
++        'budget': {'seconds': seconds, 'calls': calls, 'cpus': cpus or list(range(32, 40)), 'port': port},
++        'context': {'source_adapter': 'experiment03a', 'source_library_record': source,
++                    'former_test_scene_ids': [scene['id'] for scene in split['test']],
++                    'outcomes_used_for_improvement': 'historical_development_experience',
++                    'generation_record': str(experiment / 'learning' / condition),
++                    'validation_record': str(experiment / 'validation' / condition),
++                    'note': 'Provenance paths grant no access. Select the actual generation, validation, trajectory, cost or GT files explicitly.'},
++    }
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('--output', type=Path, required=True)
++    parser.add_argument('--condition', choices=['A1', 'A2', 'A3', 'A4', 'A5'], required=True)
++    parser.add_argument('--experiment', type=Path, default=EXP)
++    parser.add_argument('--feedback', type=Path)
++    parser.add_argument('--evidence', type=Path, action='append', default=[])
++    parser.add_argument('--gt', type=Path, action='append', default=[])
++    parser.add_argument('--history', type=Path, action='append', default=[])
++    parser.add_argument('--seconds', type=int, default=600)
++    parser.add_argument('--calls', type=int, default=24)
++    parser.add_argument('--port', type=int, default=19665)
++    parser.add_argument('--cpus', default='32,33,34,35,36,37,38,39')
++    args = parser.parse_args()
++    if args.output.exists():
++        raise FileExistsError('Choose a new input file; previous configurations are not overwritten.')
++    write(args.output, configuration(args.condition, args.experiment, args.feedback, args.evidence,
++          args.gt, args.history, args.seconds, args.calls, [int(cpu) for cpu in args.cpus.split(',')], args.port))
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scene-rsi/harness/run_capability_improvement.py b/scene-rsi/harness/run_capability_improvement.py
+index cea321c..f440a62 100644
+--- a/scene-rsi/harness/run_capability_improvement.py
++++ b/scene-rsi/harness/run_capability_improvement.py
+@@ -2,13 +2,15 @@
+ import argparse
+ import datetime
+ import difflib
++import errno
+ import json
+ import os
+ from pathlib import Path
+ import shutil
+ import sys
+ 
+-from run_capability_acquisition import ROOT, EXP, TOOLS, copy_tree, write
++from run_capability_acquisition import TOOLS, copy_tree, write
++from isolation import ROOT
+ from run_sdk_session import execute
+ 
+ sys.path.insert(0, str(ROOT / 'analysis'))
+@@ -24,132 +26,125 @@ def candidate_directory(path):
+     return directory
+ 
+ 
+-def mounted(path):
+-    return '/evidence/' + str(path.relative_to(ROOT))
+-
+-
+-def evidence_view(directory, experiment):
+-    """Reuse the historical index without duplicating large scientific payloads."""
+-    index = json.loads((experiment / 'file_index.json').read_text())
+-    prefix = str(experiment.relative_to(ROOT)) + '/'
+-    rows = []
+-    paths = [ROOT / row['path'] for row in index['files'] if row['path'].startswith(prefix)]
+-    paths += [experiment / 'file_index.json', experiment / 'sync_manifest.json']
+-    for path in sorted(set(paths)):
+-        relative = path.relative_to(experiment)
+-        # Full former-test GT is not needed to expose its recorded evaluation.
+-        if relative.parts[0] == 'data_preparation' and relative.parts[1] != 'development_gt':
+-            continue
+-        if EXCLUDED.intersection(relative.parts) or path.name in {'auth.json', '.env'} or path.is_symlink():
+-            continue
+-        record = {'source': str(path), 'path': mounted(path), 'available': path.is_file()}
+-        if record['available']:
+-            target = directory / 'evidence' / path.relative_to(ROOT)
+-            target.parent.mkdir(parents=True, exist_ok=True)
+-            os.link(path, target)
+-            record['bytes'] = path.stat().st_size
+-        rows.append(record)
+-    write(directory / 'inputs/evidence_index.json', {'source_index': str(experiment / 'file_index.json'),
+-          'host_root': str(ROOT), 'mounted_root': '/evidence', 'files': rows,
+-          'storage': 'Hard links on the project filesystem, mounted read-only; no payload download or model audit.'})
+-    return rows
+-
+-
+-def prepare(directory, condition, experiment=EXP, history=(), seconds=600, calls=24,
+-            cpus=None, port=19665):
+-    directory, experiment = candidate_directory(directory), Path(experiment).resolve()
++def evidence_view(directory, sources, target, scope):
++    """Expose only explicitly selected files; never follow evidence symlinks."""
++    view = directory / target.lstrip('/')
++    view.mkdir(parents=True)
++    selections, files = [], []
++    for number, source in enumerate(sources, 1):
++        source = Path(source)
++        if source.is_symlink():
++            raise ValueError('Select the actual evidence path, not a symlink: ' + str(source))
++        name = str(number).zfill(3) + '/' + source.name
++        destination = view / name
++        mounted = target + '/' + name
++        selections.append({'source': str(source), 'path': mounted, 'scope': scope})
++        paths = sorted(source.rglob('*')) if source.is_dir() else [source]
++        for path in paths:
++            relative = path.relative_to(source) if source.is_dir() else Path('.')
++            if EXCLUDED.intersection(relative.parts) or path.name in {'auth.json', '.env'} or path.is_symlink():
++                continue
++            if path.is_dir():
++                continue
++            output = destination / relative if source.is_dir() else destination
++            record = {'source': str(path), 'path': target + '/' + str(output.relative_to(view)),
++                      'scope': scope, 'available': path.is_file()}
++            if record['available']:
++                output.parent.mkdir(parents=True, exist_ok=True)
++                try:
++                    os.link(path, output)
++                except OSError as error:
++                    if error.errno != errno.EXDEV:
++                        raise
++                    shutil.copy2(path, output)
++                record['bytes'] = path.stat().st_size
++            files.append(record)
++    return selections, files
++
++
++def prepare(directory, input_file):
++    directory = candidate_directory(directory)
++    input_file = Path(input_file).resolve()
++    configuration = json.loads(input_file.read_text())
++
++    def resolve(path):
++        path = Path(path)
++        return Path(os.path.abspath(input_file.parent / path))
++
++    library = resolve(configuration['initial_library'])
++    source_feedback = resolve(configuration['feedback'])
++    budget = dict(configuration['budget'], model='gpt-6.1-terra', reasoning_effort='low')
+     directory.mkdir(parents=True)
+-    library = experiment / 'libraries' / condition
+     copy_tree(library, directory / 'initial/library')
+     copy_tree(library, directory / 'seed/library')
+-    for folder in ['sdk', 'harness', 'analysis', 'configs']:
++    # Runtime source is common infrastructure. Historical task manifests and prompts
++    # are research evidence and must be selected explicitly, not copied with configs/.
++    for folder in ['sdk', 'harness', 'analysis']:
+         copy_tree(ROOT / folder, directory / 'initial/system' / folder)
++    for name in ['student_prompt.txt', 'formal_prompt.txt', 'capability_improvement_prompt.txt']:
++        destination = directory / 'initial/system/configs' / name
++        destination.parent.mkdir(parents=True, exist_ok=True)
++        shutil.copy2(ROOT / 'configs' / name, destination)
+     (directory / 'inputs').mkdir()
+-    evidence = evidence_view(directory, experiment)
+-    split = json.loads((experiment / 'configs/data_split.json').read_text())
+-    frozen = json.loads((experiment / 'configs/frozen_libraries.json').read_text())
+-    source = next(row for row in frozen['libraries'] if row['condition'] == condition)
+-    outcomes = json.loads((experiment / 'analysis/observed_results.json').read_text())
++    shutil.copy2(input_file, directory / 'inputs/input.json')
++    shutil.copy2(source_feedback, directory / 'inputs/recorded_feedback.json')
++    # Parse the real feedback now, before a model can be invoked.
++    json.loads((directory / 'inputs/recorded_feedback.json').read_text())
++    selected, files = {}, []
+     mounts = [{'source': str(directory / folder), 'target': target}
+-              for folder, target in [('initial', '/initial'), ('inputs', '/feedback'), ('evidence', '/evidence')]]
+-    gt = []
+-    for scene in split['development']:
+-        target = '/development_gt/' + scene['id']
+-        mounts.append({'source': scene['evaluation_directory'], 'target': target})
+-        gt.append({'scene': scene['id'], 'path': target, 'blend': target + '/scene.blend',
+-                   'source': scene['evaluation_directory'], 'license': scene['license']})
+-    historical = []
+-    for number, path in enumerate(history, 1):
+-        path = Path(path).resolve()
+-        target = '/candidate_history/H' + str(number).zfill(3)
+-        # Expose the previous result and input, not its runtime homes or duplicated evidence view.
+-        for name in ['candidate.json', 'candidate', 'initial', 'inputs', 'session/workspace',
+-                     'session/capture', 'session/bridge', 'session/proxy',
+-                     'session/status.json', 'session/resources.jsonl']:
+-            if (path / name).exists():
+-                mounts.append({'source': str(path / name), 'target': target + '/' + name})
+-        historical.append({'source': str(path), 'path': target,
+-                           'record': json.loads((path / 'candidate.json').read_text())})
+-    budget = {'seconds': seconds, 'model_requests': calls, 'cpus': cpus or list(range(32, 40)),
+-              'port': port, 'model': 'gpt-6.1-terra', 'reasoning_effort': 'low'}
++              for folder, target in [('initial', '/initial'), ('inputs', '/feedback')]]
++    for key, target in [('evidence', '/evidence'), ('development_gt', '/development_gt'),
++                        ('history', '/candidate_history')]:
++        selected[key], rows = evidence_view(directory, [resolve(path) for path in configuration.get(key, [])], target, key)
++        files += rows
++        # Empty selections do not create GT/history mounts.
++        if selected[key]:
++            mounts.append({'source': str(directory / target.lstrip('/')), 'target': target})
++    write(directory / 'inputs/evidence_index.json', {
++        'selections': selected, 'files': files,
++        'storage': 'Selected files only; read-only mounts. Hard links when on the same filesystem, copies otherwise.'})
+     feedback = {
+-        'schema_version': 1, 'purpose': 'One development feedback-to-candidate attempt; not a formal experiment.',
+-        'condition': condition, 'execution_budget': budget,
+-        'path_mapping': {'host_root': str(ROOT), 'mounted_root': '/evidence',
+-                         'note': 'Rebase original host paths using this mapping; consult evidence_index.json for actual availability.'},
+-        'historical_container_paths': {'scope': 'Paths inside an earlier session, not this candidate workspace.',
+-                                        '/app': '<historical run>/workspace',
+-                                        '/capture': '<historical run>/capture',
+-                                        '/capabilities': mounted(experiment / 'libraries') + '/<historical condition>',
+-                                        '/dev_gt': 'Use only the current allowed_development_gt list.'},
+-        'data_policy': {'experiment03a_outcomes': 'historical_development_experience',
+-                        'former_test_scene_ids': [scene['id'] for scene in split['test']],
+-                        'future_independent_test': 'Requires new held-out scenes; no such test is configured or launched here.',
+-                        'historical_split': mounted(experiment / 'configs/data_split.json'),
+-                        'original_records_modified': False,
+-                        'gt_scope': 'Only the original development GT directories below are directly mounted. Historical evaluations may contain GT-derived observations.'},
++        'schema_version': 2,
++        'purpose': 'One externally configured feedback-to-candidate attempt; not a formal experiment.',
++        'execution_budget': budget,
++        'recorded_feedback': '/feedback/recorded_feedback.json',
++        'feedback_source': str(source_feedback),
+         'components': {'initial_library': '/initial/library', 'writable_candidate': '/app/library',
+                        'current_system_snapshot': '/initial/system', 'editable_scope': 'capability_library_only',
+-                       'source_record': source},
+-        'generation': {'input': mounted(experiment / 'learning_inputs' / condition),
+-                       'execution': mounted(experiment / 'learning' / condition),
+-                       'prompt': mounted(experiment / 'prompts' / (condition + '-learning.txt')),
+-                       'session': mounted(experiment / 'configs' / (condition + '-learning.json'))},
+-        'validation': {'execution': mounted(experiment / 'validation' / condition),
+-                       'report': mounted(experiment / 'validation' / condition / 'workspace/validation_report.json'),
+-                       'rejected_alternatives': 'See the actual validation report and generation workspace/research_evidence.json.'},
+-        'student_outcomes': outcomes,
+-        'student_runs': [{'run': row['run'], 'path': mounted(experiment / 'runs' / row['run']),
+-                          'trajectory': mounted(experiment / 'runs' / row['run'] / 'capture/trajs.json'),
+-                          'code_scene_and_render': mounted(experiment / 'runs' / row['run'] / 'workspace'),
+-                          'independent_evaluation': mounted(experiment / 'runs' / row['run'] / 'analysis')}
+-                         for row in outcomes['runs']],
+-        'independent_evaluation': {'results': mounted(experiment / 'analysis'),
+-                                   'reviewer_records': mounted(experiment / 'acquisition_reviews'),
+-                                   'scope': 'Recorded evaluations are evidence, not newly verified truth or human ratings.'},
+-        'costs': {'record': json.loads((experiment / 'analysis/final_usage_summary.json').read_text()),
+-                  'source': mounted(experiment / 'analysis/final_usage_summary.json'),
+-                  'raw_records': 'Each historical session includes bridge/model_requests.jsonl, token_usage.jsonl, resources.jsonl and status.json when available.'},
+-        'allowed_development_gt': gt, 'candidate_history': historical,
++                       'source_library': str(library)},
++        'context': configuration.get('context', {}),
++        'data_policy': {'used_outcomes': 'historical_development_experience',
++                        'future_independent_test': 'Requires new held-out scenes not used for improvement.',
++                        'access_scope': 'Only the selected input library, recorded feedback, common runtime source and explicitly listed evidence are available. Paths in records grant no access.',
++                        'original_records_modified': False},
++        'path_mapping': selected['evidence'] + selected['development_gt'] + selected['history'],
++        'historical_container_paths': {'/app': '<selected historical session>/workspace',
++                                       '/capture': '<selected historical session>/capture',
++                                       '/capabilities': '<explicitly selected historical library, if supplied>',
++                                       '/dev_gt': 'Use only allowed_development_gt below.'},
++        'allowed_evidence': selected['evidence'],
++        'allowed_development_gt': selected['development_gt'],
++        'candidate_history': selected['history'],
+         'evidence_index': '/feedback/evidence_index.json',
+-        'unavailable_evidence': [row['path'] for row in evidence if not row['available']],
++        'unavailable_evidence': [row['path'] for row in files if not row['available']],
+     }
+     write(directory / 'inputs/feedback.json', feedback)
+     prompt = (ROOT / 'configs/capability_improvement_prompt.txt').read_text()
+     (directory / 'inputs/prompt.txt').write_text(prompt)
+-    session = {'role': 'teacher', 'task_kind': 'capability_improvement', 'condition': condition,
++    session = {'role': 'teacher', 'task_kind': 'capability_improvement',
+                'tools': TOOLS, 'initial_images': [], 'readonly_mounts': mounts,
+                'hint_enabled': False, 'persistent_capability_enabled': False}
+     write(directory / 'inputs/session.json', session)
+-    invocation = {'directory': str(directory / 'session'), 'image': split['development'][0]['reference'],
+-                  'prompt': prompt, 'seconds': seconds, 'calls': calls, 'cpus': budget['cpus'], 'port': port,
++    invocation = {'directory': str(directory / 'session'), 'image': None,
++                  'prompt': prompt, 'seconds': budget['seconds'], 'calls': budget['calls'],
++                  'cpus': budget['cpus'], 'port': budget['port'],
+                   'checkpoint': str(directory / 'seed'), 'session': session}
+     write(directory / 'inputs/invocation.json', invocation)
+-    write(directory / 'candidate.json', {'status': 'prepared', 'condition': condition,
++    write(directory / 'candidate.json', {'status': 'prepared',
+           'prepared_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+           'initial_library': str(directory / 'initial/library'), 'source_library': str(library),
+-          'feedback': str(directory / 'inputs/feedback.json'), 'agent_decision': None,
+-          'independent_validation_status': 'not_run', 'promotion_status': 'not_promoted'})
++          'input_configuration': str(input_file), 'feedback': str(directory / 'inputs/feedback.json'),
++          'agent_decision': None, 'independent_validation_status': 'not_run', 'promotion_status': 'not_promoted'})
+     return feedback
+ 
+ 
+@@ -220,19 +215,12 @@ def main():
+     parser = argparse.ArgumentParser(description=__doc__)
+     parser.add_argument('stage', choices=['prepare', 'run', 'collect'])
+     parser.add_argument('--directory', type=Path, required=True)
+-    parser.add_argument('--experiment', type=Path, default=EXP)
+-    parser.add_argument('--condition', choices=['A1', 'A2', 'A3', 'A4', 'A5'])
+-    parser.add_argument('--history', type=Path, action='append', default=[])
+-    parser.add_argument('--seconds', type=int, default=600)
+-    parser.add_argument('--calls', type=int, default=24)
+-    parser.add_argument('--port', type=int, default=19665)
+-    parser.add_argument('--cpus', default='32,33,34,35,36,37,38,39')
++    parser.add_argument('--input', type=Path, help='External JSON input; relative paths are resolved beside this file.')
+     args = parser.parse_args()
+     if args.stage == 'prepare':
+-        if not args.condition:
+-            parser.error('--condition is required for prepare')
+-        prepare(args.directory, args.condition, args.experiment, args.history, args.seconds, args.calls,
+-                [int(cpu) for cpu in args.cpus.split(',')], args.port)
++        if not args.input:
++            parser.error('--input is required for prepare; use prepare_improvement_03a.py for the historical adapter')
++        prepare(args.directory, args.input)
+     elif args.stage == 'run':
+         run(args.directory)
+     else:
+diff --git a/scene-rsi/tests/preflight_capability_improvement.py b/scene-rsi/tests/preflight_capability_improvement.py
+index 1ad1dbf..167d237 100644
+--- a/scene-rsi/tests/preflight_capability_improvement.py
++++ b/scene-rsi/tests/preflight_capability_improvement.py
+@@ -1,4 +1,4 @@
+-"""Use real historical evidence and the real namespace, without starting a model or student."""
++"""Exercise external inputs with real archives and filesystem isolation; no model or Blender execution."""
+ import argparse
+ import datetime
+ import json
+@@ -13,45 +13,65 @@ import time
+ ROOT = Path(__file__).resolve().parents[1]
+ sys.path.insert(0, str(ROOT / 'harness'))
+ from run_capability_acquisition import EXP, PYTHON, write
++from prepare_improvement_03a import configuration
+ from run_capability_improvement import collect, EXCLUDED
+ from isolation import prepare as prepare_isolated, command
+ 
++PREVIOUS = ROOT / 'experiments/capability_improvement/stage_01_verified_review/offline_candidate'
+ PROBE = '''import json, os
+ from pathlib import Path
+ feedback = json.loads(Path('/feedback/feedback.json').read_text())
+-assert feedback['data_policy']['experiment03a_outcomes'] == 'historical_development_experience'
+-assert len(feedback['student_outcomes']['runs']) == 24
+-failed = next(row for row in feedback['student_runs'] if row['run'] == 'A-T01-A2')
+-trajectory = Path(failed['trajectory'])
+-assert json.loads(trajectory.read_text())['trajectories']['main_agent']
+-completed = next(row for row in feedback['student_outcomes']['runs'] if row['complete_delivery'])
+-run = next(row for row in feedback['student_runs'] if row['run'] == completed['run'])
+-assert (Path(run['code_scene_and_render'])/'final.png').read_bytes()[:8] == b'\\x89PNG\\r\\n\\x1a\\n'
+-assert (Path(run['code_scene_and_render'])/'scene.blend').stat().st_size > 0
+-assert (Path(run['code_scene_and_render'])/'build.py').read_text()
+-readonly = {}
+-for path in ['/initial/library/SKILL.md', str(trajectory), feedback['allowed_development_gt'][0]['blend']]:
++observed = json.loads(Path(feedback['recorded_feedback']).read_text())
++assert len(observed['runs']) == 24
++assert feedback['data_policy']['used_outcomes'] == 'historical_development_experience'
++index = json.loads(Path(feedback['evidence_index']).read_text())
++readonly = []
++for row in index['files']:
++    if not row['available']:
++        continue
++    path = Path(row['path'])
++    assert path.is_file(), str(path)
++    assert path.stat().st_size == row['bytes']
++    if path.name == 'trajs.json':
++        assert json.loads(path.read_text())['trajectories']['main_agent']
++    if path.name == 'final.png':
++        assert path.read_bytes()[:8] == b'\\x89PNG\\r\\n\\x1a\\n'
+     try:
+         descriptor = os.open(path, os.O_WRONLY)
+     except OSError:
+-        readonly[path] = True
++        readonly.append(str(path))
+     else:
+         os.close(descriptor)
+-        readonly[path] = False
+-assert all(readonly.values()), readonly
+-assert not Path(feedback['path_mapping']['host_root']).exists()
+-split = json.loads(Path(feedback['data_policy']['historical_split']).read_text())
+-for scene in split['test']:
+-    assert not Path(scene['blend'].replace(feedback['path_mapping']['host_root'], '/evidence')).exists()
+-Path('/app/library/ENGINEERING_PROBE.md').write_text('Engineering namespace write probe only. Not a model-generated capability or research result.\\n')
+-Path('/app/engineering_probe.json').write_text(json.dumps({'actual_feedback_read': True, 'actual_student_trajectory_read': True, 'actual_code_scene_and_render_read': True, 'readonly_open_checks': readonly, 'host_project_not_mounted': True, 'former_test_gt_not_mounted': True, 'candidate_write_succeeded': True, 'model_requests': 0}, indent=2))
++        raise AssertionError('Evidence is writable: ' + str(path))
++for path in [Path('/initial/library/SKILL.md'), Path('/feedback/recorded_feedback.json')]:
++    try:
++        descriptor = os.open(path, os.O_WRONLY)
++    except OSError:
++        readonly.append(str(path))
++    else:
++        os.close(descriptor)
++        raise AssertionError('Initial input is writable: ' + str(path))
++assert not Path(feedback['components']['source_library']).exists()
++assert not Path(feedback['feedback_source']).exists()
++assert not Path('/initial/system/configs/scenes.json').exists()
++assert not Path('/initial/system/configs/experiment_01.json').exists()
++assert Path('/development_gt').exists() == bool(feedback['allowed_development_gt'])
++assert Path('/candidate_history').exists() == bool(feedback['candidate_history'])
++assert not Path('/evidence/experiments/experiment_03a_capability_acquisition/libraries/A4').exists()
++if 'stage_01_verified_review' in feedback['components']['source_library']:
++    assert Path('/app/library/ENGINEERING_PROBE.md').exists()
++    assert not feedback['allowed_evidence'] and not feedback['allowed_development_gt'] and not feedback['candidate_history']
++Path('/app/library/ENGINEERING_PROBE_02.md').write_text('External-input engineering write probe. Not a model-generated capability or research result.\\n')
++Path('/app/engineering_probe.json').write_text(json.dumps({'feedback_read': True, 'available_evidence_files_read': len(readonly)-2, 'readonly_files_checked': len(readonly), 'gt_mount_present': bool(feedback['allowed_development_gt']), 'history_mount_present': bool(feedback['candidate_history']), 'host_source_paths_unavailable': True, 'unselected_historical_configurations_unavailable': True, 'candidate_write_succeeded': True, 'model_requests': 0}, indent=2))
+ '''
+ 
+ 
+ def inventory():
+     records = {}
+-    for name in ['experiment_01_natural_trajectories', 'experiment_02_teacher_guided_exploration',
+-                 'experiment_03a_capability_acquisition', 'experiment_03b_teacher_alignment']:
++    names = ['experiment_01_natural_trajectories', 'experiment_02_teacher_guided_exploration',
++             'experiment_03a_capability_acquisition', 'experiment_03b_teacher_alignment',
++             'capability_improvement/stage_01_verified_review']
++    for name in names:
+         base = ROOT / 'experiments' / name
+         for path in base.rglob('*'):
+             if path.is_file() and not path.is_symlink() and not EXCLUDED.intersection(path.relative_to(base).parts):
+@@ -60,6 +80,10 @@ def inventory():
+     return records
+ 
+ 
++def library_files(path):
++    return {str(file.relative_to(path)): file.read_bytes() for file in path.rglob('*') if file.is_file()}
++
++
+ def main():
+     parser = argparse.ArgumentParser(description=__doc__)
+     parser.add_argument('--output', type=Path, required=True)
+@@ -68,32 +92,55 @@ def main():
+     output = args.output.resolve()
+     output.mkdir(parents=True)
+     before = inventory()
+-    libraries = {str(p): p.read_bytes() for p in (EXP / 'libraries').rglob('*') if p.is_file()}
++    libraries = {str(path): library_files(path) for path in [EXP / 'libraries/A3', PREVIOUS / 'candidate/library']}
+     started = time.monotonic()
+-    candidate = output / 'offline_candidate'
+-    argv = [PYTHON, '-B', str(ROOT / 'harness/run_capability_improvement.py'), 'prepare',
+-            '--directory', str(candidate), '--condition', 'A3', '--seconds', '90', '--calls', '3']
+-    write(output / 'prepare_command.json', argv)
+-    with (output / 'prepare.log').open('wb') as log:
+-        subprocess.run(argv, stdout=log, stderr=subprocess.STDOUT, check=True)
+-    invocation = json.loads((candidate / 'inputs/invocation.json').read_text())
+-    prepare_isolated(invocation['directory'], invocation['image'], invocation['prompt'],
+-                     invocation['checkpoint'], invocation['session'])
+-    with tempfile.TemporaryDirectory(prefix='scene-feedback-probe-') as temporary, socket.socket(socket.AF_UNIX) as channel:
+-        channel.bind(str(Path(temporary) / 'proxy.sock'))
+-        argv = command(candidate / 'session', Path(temporary) / 'proxy.sock', 3)
+-        argv = argv[:argv.index('--')] + ['--', '/opt/python/bin/python3.12', '-c', PROBE]
+-        argv = ['nice', '-n', '15', 'taskset', '-c', '32,33'] + argv
+-        write(output / 'namespace_command.json', argv)
+-        with (output / 'namespace.log').open('wb') as log:
+-            subprocess.run(argv, stdout=log, stderr=subprocess.STDOUT, timeout=90, check=True)
+-    probe = json.loads((candidate / 'session/workspace/engineering_probe.json').read_text())
+-    write(candidate / 'session/status.json', {'status': 'offline_engineering_probe',
+-          'agent_loop_started': False, 'model_requests': 0, 'owned_processes_stopped': True})
+-    record = collect(candidate)
+-    assert record['agent_decision'] is None and record['promotion_status'] == 'not_promoted'
+-    assert (candidate / 'candidate/library/ENGINEERING_PROBE.md').exists()
+-    assert all(Path(path).read_bytes() == content for path, content in libraries.items())
++    observed = json.loads((EXP / 'analysis/observed_results.json').read_text())
++    complete = next(row for row in observed['runs'] if row['complete_delivery'])['run']
++    evidence = [EXP / 'runs/A-T01-A2/capture/trajs.json', EXP / 'runs' / complete / 'workspace',
++                EXP / 'runs' / complete / 'analysis']
++    limited = configuration('A3', evidence=evidence, seconds=90, calls=3, cpus=[32, 33])
++    expanded = dict(limited, evidence=limited['evidence'] + [str(EXP / 'learning/A3/capture/trajs.json'),
++                    str(EXP / 'validation/A3/workspace/validation_report.json'),
++                    str(EXP / 'analysis/final_usage_summary.json')],
++                    development_gt=[json.loads((EXP / 'configs/data_split.json').read_text())['development'][0]['evaluation_directory']],
++                    history=[str(PREVIOUS / 'candidate.json'), str(PREVIOUS / 'candidate/costs.json')])
++    previous = dict(limited, initial_library=str(PREVIOUS / 'candidate/library'), evidence=[],
++                    development_gt=[], history=[], context={'note': 'Prior library is an offline engineering candidate, not a learned improvement.'})
++    results = []
++    for name, configuration_input in [('a3_limited', limited), ('a3_expanded', expanded), ('previous_candidate', previous)]:
++        input_file = output / 'inputs' / (name + '.json')
++        write(input_file, configuration_input)
++        candidate = output / name
++        argv = [PYTHON, '-B', str(ROOT / 'harness/run_capability_improvement.py'), 'prepare',
++                '--directory', str(candidate), '--input', str(input_file)]
++        write(output / (name + '_prepare_command.json'), argv)
++        with (output / (name + '_prepare.log')).open('wb') as log:
++            subprocess.run(argv, stdout=log, stderr=subprocess.STDOUT, check=True)
++        initial = library_files(Path(configuration_input['initial_library']))
++        assert library_files(candidate / 'initial/library') == initial
++        assert library_files(candidate / 'seed/library') == initial
++        invocation = json.loads((candidate / 'inputs/invocation.json').read_text())
++        assert invocation['image'] is None
++        prepare_isolated(invocation['directory'], invocation['image'], invocation['prompt'],
++                         invocation['checkpoint'], invocation['session'])
++        with tempfile.TemporaryDirectory(prefix='scene-feedback-probe-') as temporary, socket.socket(socket.AF_UNIX) as channel:
++            channel.bind(str(Path(temporary) / 'proxy.sock'))
++            argv = command(candidate / 'session', Path(temporary) / 'proxy.sock', 3)
++            argv = argv[:argv.index('--')] + ['--', '/opt/python/bin/python3.12', '-c', PROBE]
++            argv = ['nice', '-n', '15', 'taskset', '-c', '32,33'] + argv
++            write(output / (name + '_namespace_command.json'), argv)
++            with (output / (name + '_namespace.log')).open('wb') as log:
++                subprocess.run(argv, stdout=log, stderr=subprocess.STDOUT, timeout=90, check=True)
++        checks = json.loads((candidate / 'session/workspace/engineering_probe.json').read_text())
++        write(candidate / 'session/status.json', {'status': 'offline_engineering_probe',
++              'agent_loop_started': False, 'model_requests': 0, 'owned_processes_stopped': True})
++        record = collect(candidate)
++        assert record['agent_decision'] is None and record['promotion_status'] == 'not_promoted'
++        assert record['file_changes'] == [{'path': 'ENGINEERING_PROBE_02.md', 'kind': 'added'}]
++        results.append({'input': str(input_file), 'candidate': str(candidate), 'checks': checks,
++                        'initial_copy_matches_selected_library': True,
++                        'changes': record['file_changes'], 'promotion_status': record['promotion_status']})
++    assert all(library_files(Path(path)) == contents for path, contents in libraries.items())
+     after = inventory()
+     differences = [path for path in before.keys() | after.keys() if before.get(path) != after.get(path)]
+     assert not differences, differences
+@@ -101,24 +148,21 @@ def main():
+     if args.baseline_repository:
+         for path in ['harness/run_capability_acquisition.py', 'harness/run_sdk_session.py',
+                      'harness/sdk_student.py', 'harness/run_exploration.py', 'sdk/run_cc_sdk.py',
+-                     'sdk/codex_cli_bridge.py', 'analysis/evaluate_capability_acquisition.py']:
++                     'sdk/codex_cli_bridge.py', 'analysis/evaluate_capability_acquisition.py', 'analysis/usage_summary.py']:
+             original = subprocess.check_output(['git', '-C', str(args.baseline_repository), 'show',
+-                                                'ad837c5:scene-rsi/' + path])
++                                                '2ac0342:scene-rsi/' + path])
+             assert original == (ROOT / path).read_bytes(), path
+             unchanged.append(path)
+-    summary = {'kind': 'offline_engineering_preflight_not_research',
++    summary = {'kind': 'offline_external_input_preflight_not_research',
+                'finished_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+-               'seconds': time.monotonic() - started, 'checks': probe,
+-               'candidate_library_diff': str(candidate / 'candidate/library.diff'),
+-               'agent_report_status': record['report_status'],
+-               'candidate_promotion_status': record['promotion_status'],
++               'seconds': time.monotonic() - started, 'attempts': results,
+                'historical_files_checked': len(before), 'historical_file_size_or_mtime_differences': differences,
+-               'frozen_library_bytes_unchanged': True, 'existing_execution_sources_unchanged': unchanged,
++               'original_and_previous_library_bytes_unchanged': True,
++               'existing_execution_sources_unchanged': unchanged,
+                'sdk_or_bridge_started': False, 'new_model_calls': 0, 'new_student_reconstructions': 0,
+                'new_downloads_or_environment_installs': 0, 'gpu_used': False,
+-               'limits': 'The library marker was written by the engineering probe, not an improvement model. Unit tests mock execute() to verify SDK dispatch and collection. Model autonomy and candidate benefit have not been tested.'}
++               'limits': 'Engineering probes wrote markers, not capabilities. SDK dispatch is mocked in unit tests; model autonomy and candidate benefit were not tested. Explicit evidence/feedback may itself contain GT-derived knowledge; empty GT means no additional GT source mount, not removal of prior knowledge.'}
+     write(output / 'verification.json', summary)
+-    shutil.copy2(candidate / 'inputs/feedback.json', output / 'feedback_example.json')
+     print(json.dumps(summary, ensure_ascii=False), flush=True)
+ 
+ 
+diff --git a/scene-rsi/tests/test_capability_improvement.py b/scene-rsi/tests/test_capability_improvement.py
+index ce784ce..1486261 100644
+--- a/scene-rsi/tests/test_capability_improvement.py
++++ b/scene-rsi/tests/test_capability_improvement.py
+@@ -1,5 +1,6 @@
+ """Feedback/candidate contracts; no model backend or student experiment is started."""
+ import json
++import errno
+ from pathlib import Path
+ import shutil
+ import sys
+@@ -10,6 +11,8 @@ from unittest.mock import patch
+ ROOT = Path(__file__).resolve().parents[1]
+ sys.path.insert(0, str(ROOT / 'harness'))
+ import run_capability_improvement as improvement
++from prepare_improvement_03a import configuration
++from isolation import prepare as prepare_isolated
+ 
+ REAL = ROOT / 'experiments/experiment_03a_capability_acquisition'
+ 
+@@ -32,7 +35,8 @@ class FeedbackCandidates(unittest.TestCase):
+         for folder in ['sdk', 'harness', 'analysis', 'configs']:
+             (self.root / folder).mkdir()
+             (self.root / folder / 'source.txt').write_text('Engineering fixture only.\n')
+-        shutil.copy2(ROOT / 'configs/capability_improvement_prompt.txt', self.root / 'configs/capability_improvement_prompt.txt')
++        for name in ['student_prompt.txt', 'formal_prompt.txt', 'capability_improvement_prompt.txt']:
++            shutil.copy2(ROOT / 'configs' / name, self.root / 'configs' / name)
+         shutil.copytree(REAL / 'libraries/A3', self.experiment / 'libraries/A3')
+         frozen = json.loads((REAL / 'configs/frozen_libraries.json').read_text())
+         write(self.experiment / 'configs/frozen_libraries.json', frozen)
+@@ -58,9 +62,16 @@ class FeedbackCandidates(unittest.TestCase):
+         write(self.experiment / 'file_index.json', {'files': files})
+         write(self.experiment / 'sync_manifest.json', {'fixture': True})
+ 
+-    def prepare(self, directory=None, history=()):
+-        return improvement.prepare(directory or self.candidate, 'A3', self.experiment, history,
+-                                   seconds=90, calls=3, cpus=[32, 33], port=19665)
++    def prepare(self, directory=None, history=(), library=None, evidence=None, gt=()):
++        directory = directory or self.candidate
++        selected = [self.experiment / 'runs/A-T01-A2'] if evidence is None else evidence
++        config = configuration('A3', self.experiment, evidence=selected, development_gt=gt,
++                               history=history, seconds=90, calls=3, cpus=[32, 33], port=19665)
++        if library:
++            config['initial_library'] = str(library)
++        input_file = self.root / (directory.name + '-input.json')
++        write(input_file, config)
++        return improvement.prepare(directory, input_file)
+ 
+     def workspace(self):
+         target = self.candidate / 'session/workspace'
+@@ -69,20 +80,21 @@ class FeedbackCandidates(unittest.TestCase):
+ 
+     def test_actual_outcome_and_original_trajectory_are_available(self):
+         feedback = self.prepare()
+-        self.assertEqual(feedback['student_outcomes']['runs'][0], self.outcome)
+-        self.assertFalse(feedback['student_outcomes']['runs'][0]['complete_delivery'])
+-        self.assertIsNone(feedback['student_outcomes']['runs'][0]['human_rating'])
+-        raw = self.candidate / 'evidence/experiments/experiment_03a_capability_acquisition/runs/A-T01-A2/capture/trajs.json'
++        observed = json.loads((self.candidate / 'inputs/recorded_feedback.json').read_text())
++        self.assertEqual(observed['runs'][0], self.outcome)
++        self.assertFalse(observed['runs'][0]['complete_delivery'])
++        self.assertIsNone(observed['runs'][0]['human_rating'])
++        raw = self.candidate / 'evidence/001/A-T01-A2/capture/trajs.json'
+         self.assertEqual(raw.read_bytes(), (REAL / 'runs/A-T01-A2/capture/trajs.json').read_bytes())
+         self.assertFalse((raw.parent.parent / 'backend_home/auth.json').exists())
+ 
+     def test_reclassification_is_a_new_record_not_an_edit_to_original_split(self):
+         original = (self.experiment / 'configs/data_split.json').read_bytes()
+         feedback = self.prepare()
+-        self.assertEqual(feedback['data_policy']['experiment03a_outcomes'], 'historical_development_experience')
++        self.assertEqual(feedback['context']['outcomes_used_for_improvement'], 'historical_development_experience')
+         self.assertIn('new held-out', feedback['data_policy']['future_independent_test'])
+         self.assertEqual((self.experiment / 'configs/data_split.json').read_bytes(), original)
+-        self.assertEqual(len(feedback['allowed_development_gt']), 1)
++        self.assertEqual(feedback['allowed_development_gt'], [])
+ 
+     def test_candidate_copy_and_diff_do_not_modify_original_library(self):
+         self.prepare()
+@@ -123,6 +135,8 @@ class FeedbackCandidates(unittest.TestCase):
+             self.assertEqual(arguments['cpus'], [32, 33])
+             self.assertEqual(arguments['session']['role'], 'teacher')
+             self.assertEqual(arguments['session']['initial_images'], [])
++            self.assertIsNone(arguments['image'])
++            self.assertNotIn('condition', arguments['session'])
+             self.assertIn('/feedback/feedback.json', arguments['prompt'])
+             self.assertEqual(arguments['checkpoint'], str(self.candidate / 'seed'))
+             workspace = self.workspace()
+@@ -174,13 +188,13 @@ class FeedbackCandidates(unittest.TestCase):
+         write(workspace / 'update_report.json', {'decision': 'no_change', 'rejected_candidates': ['fixture only']})
+         improvement.collect(self.candidate)
+         next_candidate = self.root / 'experiments/capability_improvement/C002'
+-        feedback = self.prepare(next_candidate, history=[self.candidate])
++        feedback = self.prepare(next_candidate, history=[self.candidate / 'candidate.json'])
+         previous = feedback['candidate_history'][0]
+-        self.assertEqual(previous['record']['agent_decision'], 'no_change')
+-        session = json.loads((next_candidate / 'inputs/session.json').read_text())
+-        destinations = [mount['target'] for mount in session['readonly_mounts']]
+-        self.assertIn('/candidate_history/H001/session/workspace', destinations)
+-        self.assertFalse(any('/backend_home' in path or '/home/' in path for path in destinations))
++        self.assertEqual(previous['path'], '/candidate_history/001/candidate.json')
++        record = json.loads((next_candidate / 'candidate_history/001/candidate.json').read_text())
++        self.assertEqual(record['agent_decision'], 'no_change')
++        self.assertEqual(list((next_candidate / 'candidate_history').rglob('SKILL.md')), [])
++        self.assertFalse((next_candidate / 'candidate_history/001/inputs').exists())
+ 
+     def test_missing_usage_stays_unknown_and_cached_tokens_are_not_added_twice(self):
+         self.prepare()
+@@ -232,6 +246,115 @@ class FeedbackCandidates(unittest.TestCase):
+         self.assertEqual(changes, {'SKILL.md': 'removed', 'SKILL.md/engineering.txt': 'added'})
+         self.assertEqual(record['promotion_status'], 'not_promoted')
+ 
++    def test_same_library_with_different_evidence_and_optional_gt(self):
++        first = self.prepare(evidence=[])
++        other = self.root / 'experiments/capability_improvement/expanded'
++        second = self.prepare(other, gt=[self.root / 'development/S01'])
++        self.assertEqual(first['components']['source_library'], second['components']['source_library'])
++        self.assertEqual(first['allowed_evidence'], [])
++        self.assertEqual(len(second['allowed_evidence']), 1)
++        self.assertEqual(first['allowed_development_gt'], [])
++        self.assertEqual(len(second['allowed_development_gt']), 1)
++        session = json.loads((self.candidate / 'inputs/session.json').read_text())
++        self.assertFalse(any(row['target'] == '/development_gt' for row in session['readonly_mounts']))
++        self.assertFalse((self.candidate / 'initial/system/configs/scenes.json').exists())
++        self.assertFalse((self.candidate / 'initial/system/configs/experiment_01.json').exists())
++
++    def test_previous_candidate_is_the_actual_initial_library(self):
++        self.prepare()
++        workspace = self.workspace()
++        (workspace / 'library/engineering.md').write_text('Previous candidate marker; not a learned capability.\n')
++        improvement.collect(self.candidate)
++        source = self.candidate / 'candidate/library'
++        before = {path.name: path.read_bytes() for path in source.iterdir()}
++        next_candidate = self.root / 'experiments/capability_improvement/next'
++        feedback = self.prepare(next_candidate, library=source, evidence=[])
++        self.assertEqual(feedback['components']['source_library'], str(source))
++        for path in source.iterdir():
++            self.assertEqual((next_candidate / 'seed/library' / path.name).read_bytes(), before[path.name])
++        self.assertTrue((next_candidate / 'initial/library/engineering.md').exists())
++        self.assertEqual(feedback['candidate_history'], [])
++        self.assertEqual(list((next_candidate / 'evidence').rglob('*')), [])
++        (next_candidate / 'seed/library/engineering.md').write_text('New copy only.\n')
++        self.assertEqual((source / 'engineering.md').read_bytes(), before['engineering.md'])
++
++    def test_generic_input_has_no_condition_or_experiment_dependency(self):
++        library = self.root / 'arbitrary-library'
++        shutil.copytree(self.experiment / 'libraries/A3', library)
++        input_file = self.root / 'generic.json'
++        write(input_file, {'initial_library': 'arbitrary-library',
++                          'feedback': 'experiments/experiment_03a_capability_acquisition/analysis/observed_results.json',
++                          'budget': {'seconds': 17, 'calls': 2, 'cpus': [32], 'port': 19670}})
++        shutil.rmtree(self.experiment / 'libraries')
++        shutil.rmtree(self.experiment / 'configs')
++        feedback = improvement.prepare(self.candidate, input_file)
++        self.assertEqual(feedback['components']['source_library'], str(library))
++        self.assertEqual(feedback['execution_budget']['seconds'], 17)
++        self.assertEqual(feedback['candidate_history'], [])
++        self.assertEqual(feedback['context'], {})
++        self.assertNotIn('condition', feedback)
++
++    def test_unselected_and_symlinked_evidence_is_not_copied(self):
++        secret = self.root / 'development/S01/scene.blend'
++        (self.experiment / 'runs/A-T01-A2/gt-link.blend').symlink_to(secret)
++        feedback = self.prepare()
++        paths = [row['source'] for row in json.loads((self.candidate / 'inputs/evidence_index.json').read_text())['files']]
++        self.assertNotIn(str(secret), paths)
++        self.assertFalse(any('gt-link' in path for path in paths))
++        self.assertEqual(feedback['allowed_development_gt'], [])
++        self.assertFalse((self.candidate / 'evidence/001/A-T01-A2/gt-link.blend').exists())
++        self.assertFalse((self.candidate / 'evidence/001/A-T01-A2/backend_home/auth.json').exists())
++
++    def test_text_only_and_existing_image_session_preparation(self):
++        self.prepare()
++        invocation = json.loads((self.candidate / 'inputs/invocation.json').read_text())
++        prepare_isolated(invocation['directory'], invocation['image'], invocation['prompt'],
++                         invocation['checkpoint'], invocation['session'])
++        self.assertFalse((self.candidate / 'session/workspace/reference.png').exists())
++        self.assertEqual(json.loads((self.candidate / 'session/inputs/images.json').read_text()), [])
++        old = self.root / 'existing-image-session'
++        image = self.root / 'development/S01/reference.png'
++        prepare_isolated(old, image, 'Existing image behavior')
++        self.assertEqual((old / 'workspace/reference.png').read_bytes(), image.read_bytes())
++        self.assertEqual(json.loads((old / 'inputs/images.json').read_text()),
++                         [{'path': '/app/reference.png', 'label': 'Reference image'}])
++
++    def test_relative_evidence_symlinks_do_not_expand_access(self):
++        (self.root / 'gt-link').symlink_to(self.root / 'development/S01', target_is_directory=True)
++        input_file = self.root / 'relative-link.json'
++        write(input_file, {'initial_library': str(self.experiment / 'libraries/A3'),
++                          'feedback': str(self.experiment / 'analysis/observed_results.json'),
++                          'evidence': ['gt-link'],
++                          'budget': {'seconds': 17, 'calls': 2, 'cpus': [32], 'port': 19670}})
++        with self.assertRaisesRegex(ValueError, 'not a symlink'):
++            improvement.prepare(self.candidate, input_file)
++
++    def test_external_evidence_on_another_filesystem_can_be_copied(self):
++        with patch.object(improvement.os, 'link', side_effect=OSError(errno.EXDEV, 'Cross-device fixture')):
++            self.prepare()
++        self.assertEqual((self.candidate / 'evidence/001/A-T01-A2/capture/trajs.json').read_bytes(),
++                         (self.experiment / 'runs/A-T01-A2/capture/trajs.json').read_bytes())
++
++    def test_missing_selected_record_stays_unavailable(self):
++        feedback = self.prepare(evidence=[self.root / 'unavailable.json'])
++        self.assertEqual(feedback['unavailable_evidence'], ['/evidence/001/unavailable.json'])
++        self.assertFalse((self.candidate / 'evidence/001/unavailable.json').exists())
++
++    def test_previously_prepared_invocation_still_uses_its_saved_settings(self):
++        self.prepare()
++        invocation_path = self.candidate / 'inputs/invocation.json'
++        invocation = json.loads(invocation_path.read_text())
++        invocation['image'] = str(self.root / 'development/S01/reference.png')
++        invocation['session']['condition'] = 'A3'
++        write(invocation_path, invocation)
++        def sdk_fixture(**arguments):
++            self.assertEqual(arguments['image'], invocation['image'])
++            self.assertEqual(arguments['session']['condition'], 'A3')
++            self.workspace()
++        with patch.object(improvement, 'execute', side_effect=sdk_fixture):
++            improvement.run(self.candidate)
++        self.assertEqual(json.loads((self.candidate / 'candidate.json').read_text())['file_changes'], [])
++
+ 
+ if __name__ == '__main__':
+     unittest.main()

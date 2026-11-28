@@ -18,7 +18,8 @@ def prepare(directory, image, prompt, checkpoint=None, session=None):
     if checkpoint:
         shutil.copytree(checkpoint, directory / 'workspace', dirs_exist_ok=True,
                         ignore=shutil.ignore_patterns('.git', '__pycache__', '*.pyc'))
-    shutil.copyfile(image, directory / 'workspace/reference.png')
+    if image is not None:
+        shutil.copyfile(image, directory / 'workspace/reference.png')
     (directory / 'inputs/prompt.txt').write_text(prompt)
     (directory / 'inputs/session.json').write_text(json.dumps(session or {}, indent=2))
     if 'initial_images' in (session or {}):

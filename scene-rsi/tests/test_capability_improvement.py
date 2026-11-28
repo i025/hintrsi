@@ -1,5 +1,6 @@
 """Feedback/candidate contracts; no model backend or student experiment is started."""
 import json
+import errno
 from pathlib import Path
 import shutil
 import sys
@@ -10,6 +11,8 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'harness'))
 import run_capability_improvement as improvement
+from prepare_improvement_03a import configuration
+from isolation import prepare as prepare_isolated
 
 REAL = ROOT / 'experiments/experiment_03a_capability_acquisition'
 
@@ -32,7 +35,8 @@ class FeedbackCandidates(unittest.TestCase):
         for folder in ['sdk', 'harness', 'analysis', 'configs']:
             (self.root / folder).mkdir()
             (self.root / folder / 'source.txt').write_text('Engineering fixture only.\n')
-        shutil.copy2(ROOT / 'configs/capability_improvement_prompt.txt', self.root / 'configs/capability_improvement_prompt.txt')
+        for name in ['student_prompt.txt', 'formal_prompt.txt', 'capability_improvement_prompt.txt']:
+            shutil.copy2(ROOT / 'configs' / name, self.root / 'configs' / name)
         shutil.copytree(REAL / 'libraries/A3', self.experiment / 'libraries/A3')
         frozen = json.loads((REAL / 'configs/frozen_libraries.json').read_text())
         write(self.experiment / 'configs/frozen_libraries.json', frozen)
@@ -58,9 +62,16 @@ class FeedbackCandidates(unittest.TestCase):
         write(self.experiment / 'file_index.json', {'files': files})
         write(self.experiment / 'sync_manifest.json', {'fixture': True})
 
-    def prepare(self, directory=None, history=()):
-        return improvement.prepare(directory or self.candidate, 'A3', self.experiment, history,
-                                   seconds=90, calls=3, cpus=[32, 33], port=19665)
+    def prepare(self, directory=None, history=(), library=None, evidence=None, gt=()):
+        directory = directory or self.candidate
+        selected = [self.experiment / 'runs/A-T01-A2'] if evidence is None else evidence
+        config = configuration('A3', self.experiment, evidence=selected, development_gt=gt,
+                               history=history, seconds=90, calls=3, cpus=[32, 33], port=19665)
+        if library:
+            config['initial_library'] = str(library)
+        input_file = self.root / (directory.name + '-input.json')
+        write(input_file, config)
+        return improvement.prepare(directory, input_file)
 
     def workspace(self):
         target = self.candidate / 'session/workspace'
@@ -69,20 +80,21 @@ class FeedbackCandidates(unittest.TestCase):
 
     def test_actual_outcome_and_original_trajectory_are_available(self):
         feedback = self.prepare()
-        self.assertEqual(feedback['student_outcomes']['runs'][0], self.outcome)
-        self.assertFalse(feedback['student_outcomes']['runs'][0]['complete_delivery'])
-        self.assertIsNone(feedback['student_outcomes']['runs'][0]['human_rating'])
-        raw = self.candidate / 'evidence/experiments/experiment_03a_capability_acquisition/runs/A-T01-A2/capture/trajs.json'
+        observed = json.loads((self.candidate / 'inputs/recorded_feedback.json').read_text())
+        self.assertEqual(observed['runs'][0], self.outcome)
+        self.assertFalse(observed['runs'][0]['complete_delivery'])
+        self.assertIsNone(observed['runs'][0]['human_rating'])
+        raw = self.candidate / 'evidence/001/A-T01-A2/capture/trajs.json'
         self.assertEqual(raw.read_bytes(), (REAL / 'runs/A-T01-A2/capture/trajs.json').read_bytes())
         self.assertFalse((raw.parent.parent / 'backend_home/auth.json').exists())
 
     def test_reclassification_is_a_new_record_not_an_edit_to_original_split(self):
         original = (self.experiment / 'configs/data_split.json').read_bytes()
         feedback = self.prepare()
-        self.assertEqual(feedback['data_policy']['experiment03a_outcomes'], 'historical_development_experience')
+        self.assertEqual(feedback['context']['outcomes_used_for_improvement'], 'historical_development_experience')
         self.assertIn('new held-out', feedback['data_policy']['future_independent_test'])
         self.assertEqual((self.experiment / 'configs/data_split.json').read_bytes(), original)
-        self.assertEqual(len(feedback['allowed_development_gt']), 1)
+        self.assertEqual(feedback['allowed_development_gt'], [])
 
     def test_candidate_copy_and_diff_do_not_modify_original_library(self):
         self.prepare()
@@ -123,6 +135,8 @@ class FeedbackCandidates(unittest.TestCase):
             self.assertEqual(arguments['cpus'], [32, 33])
             self.assertEqual(arguments['session']['role'], 'teacher')
             self.assertEqual(arguments['session']['initial_images'], [])
+            self.assertIsNone(arguments['image'])
+            self.assertNotIn('condition', arguments['session'])
             self.assertIn('/feedback/feedback.json', arguments['prompt'])
             self.assertEqual(arguments['checkpoint'], str(self.candidate / 'seed'))
             workspace = self.workspace()
@@ -174,13 +188,13 @@ class FeedbackCandidates(unittest.TestCase):
         write(workspace / 'update_report.json', {'decision': 'no_change', 'rejected_candidates': ['fixture only']})
         improvement.collect(self.candidate)
         next_candidate = self.root / 'experiments/capability_improvement/C002'
-        feedback = self.prepare(next_candidate, history=[self.candidate])
+        feedback = self.prepare(next_candidate, history=[self.candidate / 'candidate.json'])
         previous = feedback['candidate_history'][0]
-        self.assertEqual(previous['record']['agent_decision'], 'no_change')
-        session = json.loads((next_candidate / 'inputs/session.json').read_text())
-        destinations = [mount['target'] for mount in session['readonly_mounts']]
-        self.assertIn('/candidate_history/H001/session/workspace', destinations)
-        self.assertFalse(any('/backend_home' in path or '/home/' in path for path in destinations))
+        self.assertEqual(previous['path'], '/candidate_history/001/candidate.json')
+        record = json.loads((next_candidate / 'candidate_history/001/candidate.json').read_text())
+        self.assertEqual(record['agent_decision'], 'no_change')
+        self.assertEqual(list((next_candidate / 'candidate_history').rglob('SKILL.md')), [])
+        self.assertFalse((next_candidate / 'candidate_history/001/inputs').exists())
 
     def test_missing_usage_stays_unknown_and_cached_tokens_are_not_added_twice(self):
         self.prepare()
@@ -231,6 +245,115 @@ class FeedbackCandidates(unittest.TestCase):
         changes = {row['path']: row['kind'] for row in record['file_changes']}
         self.assertEqual(changes, {'SKILL.md': 'removed', 'SKILL.md/engineering.txt': 'added'})
         self.assertEqual(record['promotion_status'], 'not_promoted')
+
+    def test_same_library_with_different_evidence_and_optional_gt(self):
+        first = self.prepare(evidence=[])
+        other = self.root / 'experiments/capability_improvement/expanded'
+        second = self.prepare(other, gt=[self.root / 'development/S01'])
+        self.assertEqual(first['components']['source_library'], second['components']['source_library'])
+        self.assertEqual(first['allowed_evidence'], [])
+        self.assertEqual(len(second['allowed_evidence']), 1)
+        self.assertEqual(first['allowed_development_gt'], [])
+        self.assertEqual(len(second['allowed_development_gt']), 1)
+        session = json.loads((self.candidate / 'inputs/session.json').read_text())
+        self.assertFalse(any(row['target'] == '/development_gt' for row in session['readonly_mounts']))
+        self.assertFalse((self.candidate / 'initial/system/configs/scenes.json').exists())
+        self.assertFalse((self.candidate / 'initial/system/configs/experiment_01.json').exists())
+
+    def test_previous_candidate_is_the_actual_initial_library(self):
+        self.prepare()
+        workspace = self.workspace()
+        (workspace / 'library/engineering.md').write_text('Previous candidate marker; not a learned capability.\n')
+        improvement.collect(self.candidate)
+        source = self.candidate / 'candidate/library'
+        before = {path.name: path.read_bytes() for path in source.iterdir()}
+        next_candidate = self.root / 'experiments/capability_improvement/next'
+        feedback = self.prepare(next_candidate, library=source, evidence=[])
+        self.assertEqual(feedback['components']['source_library'], str(source))
+        for path in source.iterdir():
+            self.assertEqual((next_candidate / 'seed/library' / path.name).read_bytes(), before[path.name])
+        self.assertTrue((next_candidate / 'initial/library/engineering.md').exists())
+        self.assertEqual(feedback['candidate_history'], [])
+        self.assertEqual(list((next_candidate / 'evidence').rglob('*')), [])
+        (next_candidate / 'seed/library/engineering.md').write_text('New copy only.\n')
+        self.assertEqual((source / 'engineering.md').read_bytes(), before['engineering.md'])
+
+    def test_generic_input_has_no_condition_or_experiment_dependency(self):
+        library = self.root / 'arbitrary-library'
+        shutil.copytree(self.experiment / 'libraries/A3', library)
+        input_file = self.root / 'generic.json'
+        write(input_file, {'initial_library': 'arbitrary-library',
+                          'feedback': 'experiments/experiment_03a_capability_acquisition/analysis/observed_results.json',
+                          'budget': {'seconds': 17, 'calls': 2, 'cpus': [32], 'port': 19670}})
+        shutil.rmtree(self.experiment / 'libraries')
+        shutil.rmtree(self.experiment / 'configs')
+        feedback = improvement.prepare(self.candidate, input_file)
+        self.assertEqual(feedback['components']['source_library'], str(library))
+        self.assertEqual(feedback['execution_budget']['seconds'], 17)
+        self.assertEqual(feedback['candidate_history'], [])
+        self.assertEqual(feedback['context'], {})
+        self.assertNotIn('condition', feedback)
+
+    def test_unselected_and_symlinked_evidence_is_not_copied(self):
+        secret = self.root / 'development/S01/scene.blend'
+        (self.experiment / 'runs/A-T01-A2/gt-link.blend').symlink_to(secret)
+        feedback = self.prepare()
+        paths = [row['source'] for row in json.loads((self.candidate / 'inputs/evidence_index.json').read_text())['files']]
+        self.assertNotIn(str(secret), paths)
+        self.assertFalse(any('gt-link' in path for path in paths))
+        self.assertEqual(feedback['allowed_development_gt'], [])
+        self.assertFalse((self.candidate / 'evidence/001/A-T01-A2/gt-link.blend').exists())
+        self.assertFalse((self.candidate / 'evidence/001/A-T01-A2/backend_home/auth.json').exists())
+
+    def test_text_only_and_existing_image_session_preparation(self):
+        self.prepare()
+        invocation = json.loads((self.candidate / 'inputs/invocation.json').read_text())
+        prepare_isolated(invocation['directory'], invocation['image'], invocation['prompt'],
+                         invocation['checkpoint'], invocation['session'])
+        self.assertFalse((self.candidate / 'session/workspace/reference.png').exists())
+        self.assertEqual(json.loads((self.candidate / 'session/inputs/images.json').read_text()), [])
+        old = self.root / 'existing-image-session'
+        image = self.root / 'development/S01/reference.png'
+        prepare_isolated(old, image, 'Existing image behavior')
+        self.assertEqual((old / 'workspace/reference.png').read_bytes(), image.read_bytes())
+        self.assertEqual(json.loads((old / 'inputs/images.json').read_text()),
+                         [{'path': '/app/reference.png', 'label': 'Reference image'}])
+
+    def test_relative_evidence_symlinks_do_not_expand_access(self):
+        (self.root / 'gt-link').symlink_to(self.root / 'development/S01', target_is_directory=True)
+        input_file = self.root / 'relative-link.json'
+        write(input_file, {'initial_library': str(self.experiment / 'libraries/A3'),
+                          'feedback': str(self.experiment / 'analysis/observed_results.json'),
+                          'evidence': ['gt-link'],
+                          'budget': {'seconds': 17, 'calls': 2, 'cpus': [32], 'port': 19670}})
+        with self.assertRaisesRegex(ValueError, 'not a symlink'):
+            improvement.prepare(self.candidate, input_file)
+
+    def test_external_evidence_on_another_filesystem_can_be_copied(self):
+        with patch.object(improvement.os, 'link', side_effect=OSError(errno.EXDEV, 'Cross-device fixture')):
+            self.prepare()
+        self.assertEqual((self.candidate / 'evidence/001/A-T01-A2/capture/trajs.json').read_bytes(),
+                         (self.experiment / 'runs/A-T01-A2/capture/trajs.json').read_bytes())
+
+    def test_missing_selected_record_stays_unavailable(self):
+        feedback = self.prepare(evidence=[self.root / 'unavailable.json'])
+        self.assertEqual(feedback['unavailable_evidence'], ['/evidence/001/unavailable.json'])
+        self.assertFalse((self.candidate / 'evidence/001/unavailable.json').exists())
+
+    def test_previously_prepared_invocation_still_uses_its_saved_settings(self):
+        self.prepare()
+        invocation_path = self.candidate / 'inputs/invocation.json'
+        invocation = json.loads(invocation_path.read_text())
+        invocation['image'] = str(self.root / 'development/S01/reference.png')
+        invocation['session']['condition'] = 'A3'
+        write(invocation_path, invocation)
+        def sdk_fixture(**arguments):
+            self.assertEqual(arguments['image'], invocation['image'])
+            self.assertEqual(arguments['session']['condition'], 'A3')
+            self.workspace()
+        with patch.object(improvement, 'execute', side_effect=sdk_fixture):
+            improvement.run(self.candidate)
+        self.assertEqual(json.loads((self.candidate / 'candidate.json').read_text())['file_changes'], [])
 
 
 if __name__ == '__main__':

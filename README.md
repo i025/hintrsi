@@ -2,6 +2,12 @@
 
 这里整理了原始 Hint 实验交接包、Ofox 补充 baseline，以及后续通过 Codex CLI 运行的各版代码、配置、测试、实验成绩和诊断记录。上传整理时间：2026-11-24。原始实验目录保留，仓库是独立的脱敏副本。
 
+## 2026-11-28：Scene 第二阶段外部输入代码审查
+
+[第二阶段审查说明](scene-rsi/docs/STAGE_02_EXTERNAL_INPUT_REVIEW.md)记录实际差异、完整调用关系、权限边界和验证。改进模块接受独立的起始库、实际反馈、指定证据、可选GT/历史与预算；[配置示例](scene-rsi/configs/improvement_inputs/)覆盖原始A3和已保存候选。03-A仅保留为输入适配器，候选不自动晋升。
+
+23项离线检查和三种真实资料隔离预检通过；未启动模型或正式学生实验。详见[实际验收](scene-rsi/experiments/capability_improvement/stage_02_external_inputs/final_preflight/verification.json)。工作停止在源码审查阶段。
+
 ## 2026-11-28：Scene 第一阶段反馈与候选更新代码审查
 
 新增[审查说明](scene-rsi/docs/STAGE_01_FEEDBACK_REVIEW.md)、[单次候选入口](scene-rsi/harness/run_capability_improvement.py)和[完整英文 Prompt](scene-rsi/configs/capability_improvement_prompt.txt)：把真实03-A评价、轨迹、验证、来源和成本交给原SDK教师，在独立目录修改能力库并保留差异。原库与历史证据只读，候选不会自动晋升；旧实验执行路径及独立评价标准不变。
