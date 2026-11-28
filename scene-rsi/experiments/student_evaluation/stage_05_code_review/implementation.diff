@@ -1,0 +1,969 @@
+diff --git a/README.md b/README.md
+index 56daff1..22301a5 100644
+--- a/README.md
++++ b/README.md
+@@ -2,6 +2,12 @@
+ 
+ 这里整理了原始 Hint 实验交接包、Ofox 补充 baseline，以及后续通过 Codex CLI 运行的各版代码、配置、测试、实验成绩和诊断记录。上传整理时间：2026-11-24。原始实验目录保留，仓库是独立的脱敏副本。
+ 
++## 2026-11-28：Scene 第五阶段通用独立评价入口审查
++
++[通用Evaluation入口](scene-rsi/analysis/evaluate_student.py)接受任意已结束Student目录、评价输出和预算，复用原技术检查及独立匿名RGB评价，输出可供外部Improvement直接使用的结构化反馈。没有组名或03-A目录要求，缺失评价保持未知。
++
++[完整审查说明](scene-rsi/docs/STAGE_05_EVALUATION_REVIEW.md)、[配置示例](scene-rsi/configs/evaluation_inputs/)、[真实反馈](scene-rsi/experiments/student_evaluation/stage_05_code_review/preflight/complete/feedback.json)和[工程验收](scene-rsi/experiments/student_evaluation/stage_05_code_review/preflight/verification.json)。49项离线检查通过；一次旧交付再生成成功且RGBA像素一致，真实隔离中核对了仅含两张图的SDK输入。没有模型调用、新Student重建、候选改进、晋升或多轮调度；停止在代码审查阶段。
++
+ ## 2026-11-28：Scene 第四阶段通用学生入口审查
+ 
+ [通用Student入口](scene-rsi/harness/run_student.py)接受外部参考图、原始/候选/空能力库、预算和新输出目录，复用原SDK、共同Prompt和知识注入。正常SDK结束与交付文件状态分别保存；不自动提供来源轨迹或GT，不执行评价或晋升。
+diff --git a/scene-rsi/README.md b/scene-rsi/README.md
+index b167494..f6983b4 100644
+--- a/scene-rsi/README.md
++++ b/scene-rsi/README.md
+@@ -41,3 +41,5 @@
+ 第三阶段代码修改已分离默认运行源码与宿主完整源码归档。改进Agent默认仅可查看17个明确列出的SDK、Bridge、运行接口和共同Prompt；历史研究源码通过原 `evidence` 显式提供。详见 [第三阶段审查说明](docs/STAGE_03_RUNTIME_VISIBILITY_REVIEW.md) 与 [真实隔离验收](experiments/capability_improvement/stage_03_runtime_visibility/preflight/verification.json)。25项离线检查通过，新模型调用和正式重建均为0，停在代码审查阶段。
+ 
+ 第四阶段已增加 [通用独立学生入口](harness/run_student.py)：外部指定参考图、可选能力库、预算、运行标识和新输出目录，复用原SDK、共同Prompt和能力注入方式。支持原始库、历史候选和空库；来源资料与GT不随库开放。详见 [完整审查说明](docs/STAGE_04_STUDENT_REVIEW.md)、[三份配置](configs/student_inputs/)和[真实隔离验收](experiments/student_execution/stage_04_code_review/preflight/verification.json)。36项离线检查通过；没有模型调用、正式重建、独立评价或晋升。
++
++第五阶段增加 [通用独立评价入口](analysis/evaluate_student.py)：读取任意已结束Student的实际参考图、库快照、交付和轨迹，复用原源码再生成、场景检查、图像辅助指标和匿名双图RGB评价，输出可直接接入Improvement的 `feedback.json`。详见 [完整代码审查](docs/STAGE_05_EVALUATION_REVIEW.md)、[外部配置](configs/evaluation_inputs/)和[真实工程验收](experiments/student_evaluation/stage_05_code_review/preflight/verification.json)。49项离线检查通过，一份旧交付成功再生成且RGBA像素一致；RGB只验证真实隔离输入及离线调用接口，没有模型评分。新模型调用0、新Student重建0，未启动候选改进、晋升或多轮调度。
+diff --git a/scene-rsi/analysis/evaluate_student.py b/scene-rsi/analysis/evaluate_student.py
+new file mode 100644
+index 0000000..6f014ad
+--- /dev/null
++++ b/scene-rsi/analysis/evaluate_student.py
+@@ -0,0 +1,274 @@
++"""Evaluate one ended student with existing technical checks and an optional blind RGB SDK review."""
++import argparse
++import datetime
++import json
++from pathlib import Path
++import shutil
++import sys
++import time
++
++ROOT = Path(__file__).resolve().parents[1]
++sys.path.insert(0, str(ROOT / 'harness'))
++from run_capability_acquisition import copy_tree, write
++from run_capability_improvement import RUNTIME_FILES
++from run_sdk_session import execute
++from isolation import prepare as prepare_isolated
++import evaluate_capability_acquisition as technical_checks
++from review_capability_acquisition import VISUAL_PROMPT, session_file
++from summarize_run import summarize as summarize_evidence
++from usage_summary import summarize as summarize_usage
++
++ITEMS = ['reproduction', 'scene', 'images', 'evidence', 'visual']
++
++
++def read(path, default=None):
++    return json.loads(path.read_text()) if path.exists() else default
++
++
++def usage(directory, scope):
++    # A missing request log does not establish that no model calls occurred.
++    available = {name: (directory / 'bridge' / name).exists()
++                 for name in ['model_requests.jsonl', 'token_usage.jsonl']}
++    return {'record': summarize_usage(directory, scope, root=directory.parent), 'logs_available': available,
++            'total_calls_known': available['model_requests.jsonl'],
++            'note': 'Counts describe saved logs; unavailable usage or billing remains unknown.'}
++
++
++def prepare(input_file):
++    input_file = Path(input_file).resolve()
++    configuration = read(input_file)
++    student = (input_file.parent / configuration['student_run']).resolve()
++    output = (input_file.parent / configuration['output_directory']).resolve()
++    state, record = read(student / 'status.json', {}), read(student / 'run.json', {})
++    if state.get('status') in ('starting', 'running') or record.get('status') in ('prepared', 'started'):
++        raise ValueError('Evaluate only an ended student run.')
++    if not state and record.get('status') != 'collected':
++        raise ValueError('A student completion record is required, including failed attempts.')
++    if student == output or student in output.parents:
++        raise ValueError('Use a new evaluation directory outside the student run.')
++    if set(configuration['items']) - set(ITEMS):
++        raise ValueError('Supported existing evaluation items: ' + ', '.join(ITEMS))
++    output.mkdir(parents=True)
++    shutil.copy2(input_file, output / 'input.json')
++    reference = next((path for path in [student / 'inputs/reference.png', student / 'workspace/reference.png']
++                      if path.is_file()), None)
++    if reference:
++        shutil.copy2(reference, output / 'reference.png')
++    library = student / 'library'
++    evaluation = {'status': 'prepared', 'student_run': str(student), 'run_id': record.get('run_id', student.name),
++                  'student_record': record or None, 'supervisor_state': state or None,
++                  'reference_source': str(reference) if reference else None,
++                  'reference_used': str(output / 'reference.png') if reference else None,
++                  'runtime_library': str(library) if library.is_dir() else None,
++                  'runtime_library_status': 'snapshot_available' if library.is_dir() else
++                      'none' if state.get('persistent_capability_enabled') is False or
++                      ('runtime_library' in record and record['runtime_library'] is None) else 'unknown',
++                  'items': configuration['items'], 'budget': configuration['budget'],
++                  'prepared_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat()}
++    visual = {'status': 'not_requested', 'result': None}
++    if 'visual' in evaluation['items']:
++        final = student / 'workspace/final.png'
++        if reference is None or not final.is_file() or final.stat().st_size == 0:
++            visual = {'status': 'skipped', 'reason': 'Missing actual reference or delivered final.png.', 'result': None}
++        else:
++            folder = output / 'visual'
++            seed = folder / 'seed'
++            seed.mkdir(parents=True)
++            shutil.copy2(output / 'reference.png', seed / 'reference.png')
++            shutil.copy2(final, seed / 'final.png')
++            for name in RUNTIME_FILES:
++                if name.startswith('sdk/'):
++                    destination = folder / 'runtime' / name
++                    destination.parent.mkdir(parents=True, exist_ok=True)
++                    shutil.copy2(ROOT / name, destination)
++            config = session_file('visual', [{'source': str(folder / 'runtime/sdk'), 'target': '/sdk'}],
++                                  visual=True, path=folder / 'session_config.json')
++            session = read(config)
++            budget = evaluation['budget']
++            invocation = {'directory': str(folder / 'session'), 'image': str(seed / 'reference.png'),
++                          'checkpoint': str(seed), 'prompt': VISUAL_PROMPT,
++                          'seconds': budget['visual_seconds'], 'calls': budget['visual_calls'],
++                          'cpus': budget['cpus'], 'port': budget['visual_port'], 'session': session}
++            prepare_isolated(invocation['directory'], invocation['image'], invocation['prompt'],
++                             invocation['checkpoint'], invocation['session'])
++            write(folder / 'invocation.json', invocation)
++            visual = {'status': 'prepared', 'result': None, 'invocation': str(folder / 'invocation.json')}
++    evaluation['visual'] = visual
++    write(output / 'evaluation.json', evaluation)
++    return output
++
++
++def technical(directory):
++    directory = Path(directory).resolve()
++    if (directory / 'technical.json').exists() or (directory / 'feedback.json').exists():
++        raise FileExistsError('Existing evaluation results are not overwritten.')
++    evaluation = read(directory / 'evaluation.json')
++    student = Path(evaluation['student_run'])
++    budget = evaluation['budget']
++    cpus = ','.join(map(str, budget['cpus']))
++    output = directory / 'technical'
++    output.mkdir()
++    results = {}
++    for item in ITEMS[:-1]:
++        if item not in evaluation['items']:
++            results[item] = {'status': 'not_requested', 'result': None}
++            continue
++        missing = []
++        if item in ('reproduction', 'scene'):
++            required = ['sdk_command.json', 'workspace/' + ('build.py' if item == 'reproduction' else 'scene.blend')]
++            missing = [name for name in required if not (student / name).is_file()]
++        if item == 'images':
++            missing = [name for name in ['reference.png'] if not (directory / name).is_file()]
++            missing += ['workspace/final.png'] if not (student / 'workspace/final.png').is_file() else []
++        if missing:
++            results[item] = {'status': 'skipped', 'missing': missing, 'result': None}
++            continue
++        started = time.monotonic()
++        try:
++            if item == 'reproduction':
++                value, replica = technical_checks.reproduce(student, output / 'source_only', cpus,
++                                                            budget['stage_seconds'])
++                status = 'completed' if value['exit_code'] == 0 and not value['timeout'] else 'failed'
++            elif item == 'scene':
++                original = output / 'original_copy'
++                copy_tree(student / 'workspace', original)
++                inspection = output / 'original_inspection'
++                argv = technical_checks.environment(student, inspection, original)
++                invocation = technical_checks.blender(argv, '/analysis/acquisition_scene_metrics.py',
++                            ['--input', '/app/scene.blend', '--output', '/capture/original'])
++                execution = technical_checks.invoke(invocation, inspection, 'scene_inspection', cpus, budget['stage_seconds'])
++                summary = read(inspection / 'capture/original/summary.json')
++                value = {'execution': execution, 'scene_facts': summary,
++                         'evidence_directory': str(inspection / 'capture/original')}
++                status = 'completed' if execution['exit_code'] == 0 and summary is not None else 'failed'
++            elif item == 'images':
++                value = technical_checks.compare_images(student / 'workspace/final.png',
++                            output / 'source_only/replica/final.png', directory / 'reference.png')
++                status = 'completed'
++            else:
++                index = summarize_evidence(student, output=output / 'evidence')
++                facts = technical_checks.code_facts(student)
++                write(output / 'evidence/code_facts.json', facts)
++                value = {'index': str(output / 'evidence/evidence_index.json'),
++                         'sdk_events': str(output / 'evidence/sdk_events.json'),
++                         'code_facts': str(output / 'evidence/code_facts.json'),
++                         'observed_tool_calls': index['tool_calls'],
++                         'scope': 'Original student events and executed captures; static calls do not establish execution or library benefit.'}
++                status = 'completed'
++            results[item] = {'status': status, 'result': value, 'seconds': time.monotonic() - started}
++        except Exception as error:
++            results[item] = {'status': 'failed', 'result': None,
++                             'error': {'type': type(error).__name__, 'message': str(error)},
++                             'seconds': time.monotonic() - started}
++        write(directory / 'technical.json', results)
++    write(directory / 'technical.json', results)
++    return results
++
++
++def visual(directory):
++    directory = Path(directory).resolve()
++    evaluation = read(directory / 'evaluation.json')
++    if (directory / 'feedback.json').exists() or evaluation['visual']['status'] != 'prepared':
++        raise ValueError('Use a prepared, unexecuted RGB review.')
++    evaluation['visual']['status'] = 'started'
++    write(directory / 'evaluation.json', evaluation)
++    try:
++        execute(**read(directory / 'visual/invocation.json'))
++    except Exception as error:
++        write(directory / 'visual/execution_error.json', {'type': type(error).__name__, 'message': str(error)})
++    finally:
++        evaluation['visual']['status'] = 'attempted'
++        write(directory / 'evaluation.json', evaluation)
++
++
++def collect(directory):
++    directory = Path(directory).resolve()
++    if (directory / 'feedback.json').exists():
++        raise FileExistsError('The existing feedback is not overwritten.')
++    evaluation = read(directory / 'evaluation.json')
++    student = Path(evaluation['student_run'])
++    state = read(student / 'status.json')
++    metadata = read(student / 'capture/trajs.json', {}).get('metadata', {})
++    files = [{'path': str(student / 'workspace' / name), 'exists': (student / 'workspace' / name).is_file(),
++              'bytes': (student / 'workspace' / name).stat().st_size if (student / 'workspace' / name).is_file() else None}
++             for name in ['build.py', 'scene.blend', 'final.png']]
++    present = sum(row['exists'] and row['bytes'] > 0 for row in files)
++    review = dict(evaluation['visual'])
++    review.update(result=None, human_rating=None)
++    if review['status'] in ('started', 'attempted'):
++        report = directory / 'visual/session/workspace/visual_evaluation.json'
++        review['session_state'] = read(directory / 'visual/session/status.json')
++        review['execution_error'] = read(directory / 'visual/execution_error.json')
++        review['report'] = str(report)
++        try:
++            value = read(report)
++            review['result'] = value if isinstance(value, dict) else None
++            review['status'] = 'reported' if isinstance(value, dict) else 'missing_or_invalid_report'
++        except json.JSONDecodeError:
++            review['status'] = 'invalid_json_report'
++    elif review['status'] == 'prepared':
++        review['status'] = 'not_run'
++    costs = {'student': usage(student, 'student'),
++             'visual': usage(directory / 'visual/session', 'visual_evaluation') if evaluation['visual']['status'] in ('started', 'attempted') else None,
++             'technical': {'record': str(directory / 'technical.json'),
++                           'note': 'Stage wall times and execution logs are evaluator costs, not student behavior.'}}
++    write(directory / 'costs.json', costs)
++    library = Path(evaluation['runtime_library']) if evaluation['runtime_library'] else None
++    prompt = student / 'inputs/prompt.txt'
++    feedback = {'schema_version': 1, 'kind': 'independent_student_evaluation',
++        'student': {'run': str(student), 'run_id': evaluation['run_id'], 'record': evaluation['student_record'],
++                    'supervisor_state': state, 'sdk_status': metadata.get('status', (state or {}).get('sdk_status')),
++                    'delivery': {'kind': 'complete_files_unvalidated' if present == 3 else 'partial' if present else 'none',
++                                 'files': files, 'required_files_present': present == 3}},
++        'inputs': {'reference_source': evaluation['reference_source'], 'reference_used': evaluation['reference_used'],
++                   'runtime_library': str(library) if library else None,
++                   'runtime_library_status': evaluation['runtime_library_status'],
++                   'skill_in_prepared_prompt': (library / 'SKILL.md').read_text() in prompt.read_text()
++                       if library and (library / 'SKILL.md').exists() and prompt.exists() else None},
++        'technical': read(directory / 'technical.json', {item: {
++            'status': 'not_run' if item in evaluation['items'] else 'not_requested', 'result': None} for item in ITEMS[:-1]}),
++        'visual': review, 'costs': costs,
++        'student_evidence': {'sdk_trajectory': str(student / 'capture/trajs.json'),
++                             'model_requests': str(student / 'bridge/model_requests.jsonl'),
++                             'tool_and_blender_captures': str(student / 'capture'),
++                             'delivered_source_and_scene': str(student / 'workspace'),
++                             'library_snapshot': str(library) if library else None},
++        'evaluator_evidence': {'output': str(directory), 'technical': str(directory / 'technical'),
++                               'visual': str(directory / 'visual/session')},
++        'data_policy': {'outcomes_used_for_improvement': 'historical_development_experience',
++                        'future_independent_test': 'Use new held-out scenes after these outcomes inform improvement.'},
++        'limits': ['Prepared-prompt knowledge presence, recorded reads, static source calls, actual executions and benefit are distinct evidence.',
++                   'Deterministic regeneration/inspection is an evaluator action. RGB judgments are automated model observations, not human ratings.',
++                   'Missing or unexecuted judgments remain unknown. No composite score, GT correspondence, promotion or next iteration is implemented.']}
++    write(directory / 'feedback.json', feedback)
++    evaluation.update(status='collected', collected_at_utc=datetime.datetime.now(datetime.timezone.utc).isoformat())
++    write(directory / 'evaluation.json', evaluation)
++    return feedback
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('stage', choices=['prepare', 'technical', 'visual', 'collect', 'run'])
++    parser.add_argument('--input', type=Path)
++    parser.add_argument('--directory', type=Path)
++    args = parser.parse_args()
++    if args.stage == 'prepare':
++        if not args.input:
++            parser.error('--input is required for prepare')
++        print(prepare(args.input))
++    else:
++        if not args.directory:
++            parser.error('--directory is required')
++        if args.stage == 'run':
++            try:
++                technical(args.directory)
++                if read(args.directory / 'evaluation.json')['visual']['status'] == 'prepared':
++                    visual(args.directory)
++            finally:
++                collect(args.directory)
++        else:
++            {'technical': technical, 'visual': visual, 'collect': collect}[args.stage](args.directory)
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scene-rsi/analysis/review_capability_acquisition.py b/scene-rsi/analysis/review_capability_acquisition.py
+index 6d0da66..2efb00a 100644
+--- a/scene-rsi/analysis/review_capability_acquisition.py
++++ b/scene-rsi/analysis/review_capability_acquisition.py
+@@ -150,8 +150,8 @@ def freeze_blind_order():
+     return order
+ 
+ 
+-def session_file(stage,mounts=None,visual=False):
+-    path=EXP/'configs'/('acquisition_review_'+stage+'.json')
++def session_file(stage,mounts=None,visual=False,path=None):
++    path=Path(path) if path is not None else EXP/'configs'/('acquisition_review_'+stage+'.json')
+     write(path,{'role':'visual_evaluator' if visual else ('research_reporter' if stage=='report' else ('projection_identity_reviewer' if stage in ('projection-review','projection-followup') else 'posthoc_annotator')),
+                 'tools':['Read','Grep','Write'] if stage=='report' else (['Read','Write'] if visual else TOOLS),
+                 'initial_images':[{'path':'/app/reference.png','label':'Reference image'},
+diff --git a/scene-rsi/analysis/summarize_run.py b/scene-rsi/analysis/summarize_run.py
+index c301f1f..3c8d5ec 100644
+--- a/scene-rsi/analysis/summarize_run.py
++++ b/scene-rsi/analysis/summarize_run.py
+@@ -21,7 +21,7 @@ def compact(value):
+     return value
+ 
+ 
+-def summarize(directory):
++def summarize(directory, output=None):
+     directory = Path(directory)
+     requests = rows(directory / 'bridge/model_requests.jsonl')
+     responses = rows(directory / 'bridge/model_responses.jsonl')
+@@ -53,7 +53,7 @@ def summarize(directory):
+         executions[-1]['python_traceback_logs'] = [str((capture / name).relative_to(directory))
+             for name in ('stdout.log', 'stderr.log') if (capture / name).exists()
+             and 'Traceback (most recent call last)' in (capture / name).read_text(errors='replace')]
+-    result = {'run': directory.name, 'status': json.loads((directory / 'status.json').read_text()),
++    result = {'run': directory.name, 'status': json.loads((directory / 'status.json').read_text()) if (directory / 'status.json').exists() else None,
+               'model_requests': len(requests), 'model_responses': len(responses),
+               'model_errors': rows(directory / 'bridge/model_errors.jsonl'),
+               'tokens': dict(totals), 'sdk_result': metadata.get('ResultMessage'),
+@@ -64,8 +64,8 @@ def summarize(directory):
+                             for p in (directory / 'workspace').rglob('*') if p.is_file() and '.git' not in p.parts],
+               'image_requests': [{'request_id': p.parent.name, 'attachments': json.loads(p.read_text())}
+                                  for p in (directory / 'bridge').glob('*/image_attachments.json')]}
+-    output = directory / 'analysis'
+-    output.mkdir(exist_ok=True)
++    output = Path(output) if output is not None else directory / 'analysis'
++    output.mkdir(parents=True, exist_ok=True)
+     (output / 'evidence_index.json').write_text(json.dumps(result, indent=2))
+     (output / 'sdk_events.json').write_text(json.dumps(events, ensure_ascii=False, indent=2))
+     return result
+diff --git a/scene-rsi/configs/evaluation_inputs/next_improvement.json b/scene-rsi/configs/evaluation_inputs/next_improvement.json
+new file mode 100644
+index 0000000..de55abe
+--- /dev/null
++++ b/scene-rsi/configs/evaluation_inputs/next_improvement.json
+@@ -0,0 +1,18 @@
++{
++  "initial_library": "../../experiments/student_execution/examples/S01-a3/library",
++  "feedback": "../../experiments/student_evaluation/examples/S01-a3-with-visual/feedback.json",
++  "evidence": [
++    "../../experiments/student_execution/examples/S01-a3/workspace",
++    "../../experiments/student_execution/examples/S01-a3/capture",
++    "../../experiments/student_execution/examples/S01-a3/bridge",
++    "../../experiments/student_evaluation/examples/S01-a3-with-visual/technical"
++  ],
++  "development_gt": [],
++  "history": [],
++  "budget": {
++    "seconds": 60,
++    "calls": 2,
++    "cpus": [32, 33],
++    "port": 19866
++  }
++}
+diff --git a/scene-rsi/configs/evaluation_inputs/technical.json b/scene-rsi/configs/evaluation_inputs/technical.json
+new file mode 100644
+index 0000000..d24b9a2
+--- /dev/null
++++ b/scene-rsi/configs/evaluation_inputs/technical.json
+@@ -0,0 +1,9 @@
++{
++  "student_run": "../../experiments/student_execution/examples/S01-a3",
++  "output_directory": "../../experiments/student_evaluation/examples/S01-a3-technical",
++  "items": ["reproduction", "scene", "images", "evidence"],
++  "budget": {
++    "cpus": [32, 33],
++    "stage_seconds": 120
++  }
++}
+diff --git a/scene-rsi/configs/evaluation_inputs/with_visual.json b/scene-rsi/configs/evaluation_inputs/with_visual.json
+new file mode 100644
+index 0000000..4a4f671
+--- /dev/null
++++ b/scene-rsi/configs/evaluation_inputs/with_visual.json
+@@ -0,0 +1,12 @@
++{
++  "student_run": "../../experiments/student_execution/examples/S01-a3",
++  "output_directory": "../../experiments/student_evaluation/examples/S01-a3-with-visual",
++  "items": ["reproduction", "scene", "images", "evidence", "visual"],
++  "budget": {
++    "cpus": [32, 33],
++    "stage_seconds": 120,
++    "visual_seconds": 240,
++    "visual_calls": 12,
++    "visual_port": 19865
++  }
++}
+diff --git a/scene-rsi/docs/STAGE_05_EVALUATION_REVIEW.md b/scene-rsi/docs/STAGE_05_EVALUATION_REVIEW.md
+new file mode 100644
+index 0000000..05f3cf9
+--- /dev/null
++++ b/scene-rsi/docs/STAGE_05_EVALUATION_REVIEW.md
+@@ -0,0 +1,161 @@
++# 第五阶段代码审查：通用独立 Evaluation 入口
++
++基于 `13c2417`，仅建立“已结束 Student → 独立 Evaluation → 外部反馈输入”。不要求 A0–A5、任务名或03-A目录，不启动新学生、不调用真实模型，不运行候选改进、晋升或迭代。
++
++## 实际修改
++
++| 文件 | 作用 |
++|---|---|
++| [analysis/evaluate_student.py](../analysis/evaluate_student.py)（新增） | 外部配置、实际输入定位、既有技术评价调度、匿名RGB会话准备/调用及结构化反馈。 |
++| [analysis/summarize_run.py](../analysis/summarize_run.py) | `summarize(directory, output=None)` 可将证据索引写到独立评价目录；缺失监督器状态保留null。默认仍写原运行的 `analysis/`。 |
++| [analysis/review_capability_acquisition.py](../analysis/review_capability_acquisition.py) | `session_file(..., path=None)` 可指定新会话配置路径；原默认目录、参数、工具和视觉Prompt不变。 |
++| [configs/evaluation_inputs/](../configs/evaluation_inputs/)（新增三份JSON） | 技术评价、含独立RGB评价、下一次外部Improvement输入例子。 |
++| [tests/test_evaluation.py](../tests/test_evaluation.py)（新增） | 13项离线检查：新入口、缺失交付、未知视觉、旧默认行为、外部反馈接入及隔离输入构造。 |
++| [tests/preflight_evaluation.py](../tests/preflight_evaluation.py)（新增） | 一次真实旧交付再生成、真实RGB隔离输入、部分/无交付以及Improvement准备的工程预检。 |
++| README、本说明、[工程记录](../experiments/student_evaluation/stage_05_code_review/) | 使用方法、实际差异、真实反馈、验证结果与本地大文件索引。 |
++
++集中差异见 [implementation.diff](../experiments/student_evaluation/stage_05_code_review/implementation.diff)。没有修改Student、Improvement、知识获取、教师Hint、SDK、Bridge、隔离、场景/图像评价算法、原03-A评价批处理或研究记录。两处既有函数的可选参数均保留原调用方式。
++
++## 外部配置和调用关系
++
++路径相对**配置文件所在目录**解析，也接受绝对路径。例如：
++
++```json
++{
++  "student_run": "/absolute/path/to/any-ended-student",
++  "output_directory": "/absolute/path/to/new-evaluation",
++  "items": ["reproduction", "scene", "images", "evidence", "visual"],
++  "budget": {
++    "cpus": [32, 33],
++    "stage_seconds": 120,
++    "visual_seconds": 240,
++    "visual_calls": 12,
++    "visual_port": 19865
++  }
++}
++```
++
++`items` 由外部选择已有项目。`stage_seconds` 是每个Blender子进程上限，沿用原函数的语义：源码再生成及生成场景检查分别有此上限；不是整批总时限。Blender仍采用原32GiB地址空间上限、CPU渲染、nice15和指定CPU亲和性。`visual_*` 仅在准备实际RGB会话时需要，直接传入原SDK监督器。没有新安装或数据下载。
++
++配置示例中的Student路径对应第四阶段示例，须先存在一个已结束的实际运行。本次没有执行这些示例中的新Student。实际已执行预检的配置保存在 [preflight目录](../experiments/student_evaluation/stage_05_code_review/preflight/)。
++
++```text
++run_student.prepare → run_student.run/collect
++  → 已保存的参考图、library、workspace、capture、bridge、状态与成本
++  → evaluate_student.prepare(input_file)
++      → 保存外部配置和实际参考图
++      → 需要时准备盲评两图、原VISUAL_PROMPT、原隔离SDK会话
++  → evaluate_student.technical(directory)
++      → evaluate_capability_acquisition.reproduce
++      → environment / blender / invoke / acquisition_scene_metrics
++      → compare_images → image_metrics.metrics
++      → summarize_run.summarize + code_facts
++  → evaluate_student.visual(directory)（可选；本次未真实执行）
++      → run_sdk_session.execute → sdk_student → Claude Agent SDK
++      → Codex CLI Bridge → gpt-6.1-terra / low
++      → 原Read/Write工具 → 实际visual_evaluation.json
++  → evaluate_student.collect(directory)
++      → usage_summary.summarize + 原始状态/交付 + 实际评价结果
++      → feedback.json、costs.json、evaluation.json
++  → 外部Improvement配置：feedback=上述feedback.json
++      → run_capability_improvement.prepare（本次只验证到这里）
++```
++
++使用已有分析环境（含numpy、Pillow、scipy）：
++
++```bash
++/srv/lab-disks/disk2/users/xymo/miniforge3/envs/scenemosaic/bin/python -B analysis/evaluate_student.py prepare \
++  --input configs/evaluation_inputs/with_visual.json
++
++/srv/lab-disks/disk2/users/xymo/miniforge3/envs/scenemosaic/bin/python -B analysis/evaluate_student.py technical \
++  --directory /absolute/path/to/new-evaluation
++
++# 可选真实模型评价；本次没有执行
++/srv/lab-disks/disk2/users/xymo/miniforge3/envs/scenemosaic/bin/python -B analysis/evaluate_student.py visual \
++  --directory /absolute/path/to/new-evaluation
++
++/srv/lab-disks/disk2/users/xymo/miniforge3/envs/scenemosaic/bin/python -B analysis/evaluate_student.py collect \
++  --directory /absolute/path/to/new-evaluation
++```
++
++`run --directory ...` 顺序执行技术项目、已准备的RGB会话及最终收集；若选了visual且图像齐全，会真实调用模型。本次仅使用分步接口，RGB调用用离线mock验证。已有输出不覆盖，RGB不自动重试。原03-A的 `evaluate_capability_acquisition.py` 与 `review_capability_acquisition.py` CLI保留原逻辑。
++
++## 实际输入及评价范围
++
++参考图优先取该Student冻结的 `inputs/reference.png`，兼容旧运行时回退到它自身 `workspace/reference.png`；不从组名、split或GT查图。旧工作区副本未被独立冻结时，不能额外保证它未被历史学生改写，这一限制不以数据集图片补齐。
++
++能力库只认该运行实际保存的 `library/`，不重新读取来源库或按A组推断。实际库内容由该副本与学生初始Prompt保留；反馈记录来源与快照位置及SKILL正文是否在准备Prompt内。没有运行副本的旧有库运行标记 `runtime_library_status=unknown`；明确无库标记 `none`。库出现在上下文、工具Read、源码静态调用、实际执行和收益是不同证据，不会被汇总为自动能力采用或失败归因。
++
++技术端在**独立副本**中移除已有交付并调用原 `reproduce`，保持源码独立复现标准（不挂载能力库或GT）。原始场景检查同样先复制工作区；索引/源码事实写入评价目录。原始Student、原始库和候选均不改写。图像辅助指标继续使用原MAE与Gaussian SSIM，没有新综合分数或语义/三维质量算法。原场景提取保留包围盒候选、材质节点等事实及其不确定性，不启动GT对应、投影或统一光照评价。
++
++轨迹证据保留原SDK工具事件、模型记录、Blender实际命令/捕获源码和文件入口。静态源码调用不是实际执行证明，评价者再生成不是学生行为。没有相应原始记录时不能从空计数推断真实行为不存在，应读取反馈及原文件的可获取情况。
++
++## 独立RGB信息边界
++
++完整英文Prompt直接使用原 [VISUAL_PROMPT](../analysis/review_capability_acquisition.py)，没有新增评分要求。初始内容仅为该Prompt与两张真实PNG：`Reference image`、`Candidate reconstruction`。模型及effort仍为 `gpt-6.1-terra / low`，模型决策经原SDK工具循环执行。
++
++评审工作区只复制 `reference.png`、`final.png`；`/inputs` 只含 `prompt.txt`、`session.json`、`images.json`。只允许原Read/Write工具，Hint/持久能力/在线教师关闭。只读SDK副本沿用第三阶段明确清单中的七个SDK文件；通用SDK和工具本身仍然可用。宿主配置、Student路径、能力库、条件、旧分数、GT、历史资料不进入评审工作区或初始消息，也没有对应挂载。宿主 `visual/invocation.json` 不挂入评审 `/inputs`。
++
++实际评价JSON按原样保存，不重新生成缺失分数。自动模型判断保留 `annotation_kind`、证据、局限和未知，不能作为人工评价；`human_rating` 始终明确为null。SDK结束状态与报告是否存在分别记录，有报告不等于SDK正常结束或报告已获人工认可。
++
++## 反馈结构和缺失语义
++
++完整真实例子见 [preflight/complete/feedback.json](../experiments/student_evaluation/stage_05_code_review/preflight/complete/feedback.json)。它来自真实历史完整交付的明确标记副本，不是新学生成果；视觉模型没有运行。
++
++```text
++feedback.json
++  schema_version, kind=independent_student_evaluation
++  student
++    run, run_id, record, supervisor_state, sdk_status
++    delivery: kind, files(path/exists/bytes), required_files_present
++  inputs
++    reference_source, reference_used, runtime_library
++    runtime_library_status, skill_in_prepared_prompt
++  technical
++    reproduction / scene / images / evidence
++      status, result, seconds（执行过时）；missing/error（实际存在时）
++  visual
++    status, result(null或实际模型JSON), human_rating=null
++    session_state, execution_error, report（尝试执行后）
++  costs
++    student: 原汇总、日志是否可获取、请求总数是否已知
++    visual: 尝试后实际汇总，未执行则null
++    technical: 实际技术阶段耗时和命令记录入口
++  student_evidence, evaluator_evidence
++  data_policy, limits
++```
++
++交付状态只描述三个文件是否存在且非空：`complete_files_unvalidated`、`partial`、`none`，不把正常SDK退出等同交付完成，也不把文件齐全等同重建正确。
++
++技术项目分别记录 `completed`、`failed`、`skipped`（必要文件缺失）、`not_run`、`not_requested`。`completed` 表示评价函数完成，不代表质量通过；复现是否成功还需读实际退出状态、生成文件及原可移植交付判定。一个项目失败不会丢弃其他项目或整个Student结果。
++
++视觉分别记录 `not_requested`、`skipped`、`not_run`、实际报告或缺失/无效报告；没有真实报告时 `result=null`。原始无效报告保留，不补写分数。缺少Token/请求日志时明确总数是否已知，实际美元账单保持null；历史Student成本与本次评价成本分别记录，历史调用不是本次新增调用。
++
++反馈通过现有外部 `feedback` 字段直接传给Improvement。原始证据的文件路径不会自动赋予访问权限；后续若希望Agent读取轨迹、代码、场景、评价细节或模型原记录，必须像 [next_improvement.json](../configs/evaluation_inputs/next_improvement.json) 那样在 `evidence` 显式选择。开发GT和候选历史仍分别由外部配置，可为空。没有自动创建下一轮或执行改进；评价结果一旦用于改进即属历史开发经验，未来独立测试须用新留出场景。
++
++## 工程验收与边界
++
++[unit_tests.log](../experiments/student_evaluation/stage_05_code_review/unit_tests.log)：49项通过（原36项及本阶段13项）。覆盖任意名称/目录、实际冻结参考图、原库/历史候选/空库、旧库未知、完整/部分/无交付、失败留存、原函数调用、原索引默认路径、盲评两图及原Prompt、模型调用入口mock、无报告/坏JSON保留未知、反馈被既有Improvement直接接收。
++
++[真实预检 verification.json](../experiments/student_evaluation/stage_05_code_review/preflight/verification.json)：
++
++1. 将旧 `A-T01-A3` 的实际交付、轨迹及原记录复制到任意名 `arbitrary.name`，明确标记工程兼容副本。实际库从该Student归档命令的 `/capabilities` 来源复制，未按组名推断。
++2. 仅此副本执行一次真实源码再生成：CPU32/33、nice15、每子进程120秒上限；实际再生成16.12秒。生成场景与原场景均成功检查，189个对象、12个材质、未发现缺失外部图像；原交付与再生成均为640×360，RGBA逐像素一致。指标是旧交付的工程复验，不是新研究收益。
++3. 在真实隔离进程中运行原 `sdk_student.prompt_messages()`，实际解码两张图像并逐字节核对，核对原Prompt、Read/Write工具、模型标识及SDK客户端构造；宿主工程、能力库、GT和历史资料不可访问。SDK消息保存为“构造但未发送”，没有模型往返。
++4. 删除完整副本的一个场景文件建立明确标记的派生部分交付用例，不冒充历史学生失败。另直接使用第四阶段的原库、候选、空库三个已结束工程探针，正确保留无交付，跳过无法执行项目，保留可提取证据。
++5. 实际 `feedback.json` 被现有 `run_capability_improvement.prepare()` 原样复制，能力库起点匹配，显式证据可用，GT不挂载。该目录只准备，未启动改进Agent、未生成候选更新。
++6. 实际历史Student、原始能力库和三个旧探针文件内容不变；源码未修改对照另见 [preserved_sources.json](../experiments/student_evaluation/stage_05_code_review/preserved_sources.json)。
++
++真实预检共20.47秒，新模型调用0、新Student重建0、历史交付再生成1次。没有调用视觉模型、没有伪造视觉评分；RGB模型完整往返仍未在本阶段实测。可复查命令：
++
++```bash
++PYTHONDONTWRITEBYTECODE=1 /srv/lab-disks/disk2/users/xymo/miniforge3/envs/scenemosaic/bin/python -B -m unittest discover -s tests -v
++
++PYTHONDONTWRITEBYTECODE=1 /srv/lab-disks/disk2/users/xymo/miniforge3/envs/scenemosaic/bin/python -B tests/preflight_evaluation.py \
++  --output experiments/student_evaluation/new_offline_check \
++  --candidate-output experiments/capability_improvement/new_evaluation_check/prepared_only
++```
++
++预检输出和候选准备均须使用新目录，已有记录不覆盖。本次候选准备目录为 `experiments/capability_improvement/stage_05_evaluation_feedback/prepared_only`。大型重复输入、完整原始SDK图像消息、Blender场景状态与系统副本保存在本机，通过 [local_file_index.json](../experiments/student_evaluation/stage_05_code_review/local_file_index.json) 定位；GitHub保留源码、配置、实际反馈、命令/日志、场景摘要、指标和验证记录。
++
++本阶段停止在代码审查。未新增评价算法、失败原因归因、能力准入、候选选择/排名/晋升、多轮调度或任何建模能力。
+diff --git a/scene-rsi/tests/preflight_evaluation.py b/scene-rsi/tests/preflight_evaluation.py
+new file mode 100644
+index 0000000..182889e
+--- /dev/null
++++ b/scene-rsi/tests/preflight_evaluation.py
+@@ -0,0 +1,177 @@
++"""Reuse one real delivery and inspect blind RGB inputs without starting any model."""
++import argparse
++import base64
++import datetime
++import json
++from pathlib import Path
++import shutil
++import socket
++import subprocess
++import sys
++import tempfile
++import time
++
++ROOT = Path(__file__).resolve().parents[1]
++sys.path[:0] = [str(ROOT / 'analysis'), str(ROOT / 'harness')]
++import evaluate_student as evaluation
++import run_capability_improvement as improvement
++from isolation import command
++from run_capability_acquisition import write
++
++PROBE = '''import anyio, base64, json, sys
++from pathlib import Path
++sys.path.insert(0, '/harness')
++import sdk_student, run_cc_sdk, codex_cli_bridge
++from claude_agent_sdk import ClaudeSDKClient
++session = json.loads(Path('/inputs/session.json').read_text())
++assert session['role'] == 'visual_evaluator'
++assert session['tools'] == ['Read', 'Write']
++assert not session['hint_enabled'] and not session['persistent_capability_enabled']
++assert not session.get('online_teacher_enabled') and 'condition' not in session
++assert sorted(p.name for p in Path('/app').iterdir()) == ['final.png', 'reference.png']
++assert sorted(p.name for p in Path('/inputs').iterdir()) == ['images.json', 'prompt.txt', 'session.json']
++for path in [sys.argv[1], '/capabilities', '/evidence', '/development_gt', '/dev_gt',
++             '/initial', '/analysis', '/candidate_history', '/harness/run_exploration.py']:
++    assert not Path(path).exists(), path
++async def messages():
++    return [item async for item in sdk_student.prompt_messages()]
++messages = anyio.run(messages)
++content = messages[0]['message']['content']
++assert len(content) == 5
++assert content[0]['text'] == Path('/inputs/prompt.txt').read_text()
++assert [content[1]['text'], content[3]['text']] == ['Reference image', 'Candidate reconstruction']
++images = [item['source'] for item in content if item['type'] == 'image']
++assert len(images) == 2
++for image, name in zip(images, ['reference.png', 'final.png']):
++    assert image['media_type'] == 'image/png'
++    assert base64.b64decode(image['data']) == (Path('/app') / name).read_bytes()
++assert codex_cli_bridge.MODEL == 'gpt-6.1-terra' and codex_cli_bridge.EFFORT == 'low'
++options = run_cc_sdk.create_agent_options('/app')
++options.tools = session['tools']
++client = ClaudeSDKClient(options=options)  # Do not connect or query.
++Path('/capture/preflight_sdk_input.json').write_text(json.dumps({'kind': 'constructed_not_sent', 'messages': messages}))
++Path('/capture/probe.json').write_text(json.dumps({
++    'anonymous_image_count': len(images), 'media_types': [item['media_type'] for item in images],
++    'image_bytes_base64': [item['data'] for item in images],
++    'tools': options.tools, 'sdk_client_constructed_without_connecting': True,
++    'gt_library_history_and_host_project_unavailable': True, 'model_calls': 0}))
++'''
++
++
++def contents(directory):
++    return {str(path.relative_to(directory)): path.read_bytes() for path in directory.rglob('*') if path.is_file()}
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('--output', type=Path, required=True)
++    parser.add_argument('--candidate-output', type=Path,
++                        default=ROOT / 'experiments/capability_improvement/stage_05_evaluation_feedback/prepared_only')
++    args = parser.parse_args()
++    output = args.output.resolve()
++    output.mkdir(parents=True)
++    started = time.monotonic()
++    source = ROOT / 'experiments/experiment_03a_capability_acquisition/runs/A-T01-A3'
++    argv = evaluation.read(source / 'sdk_command.json')
++    library_source = Path(next(argv[i + 1] for i, value in enumerate(argv[:-2])
++                               if value == '--ro-bind' and argv[i + 2] == '/capabilities'))
++    before = {str(source): contents(source), str(library_source): contents(library_source)}
++    fixture = output / 'fixtures/arbitrary.name'
++    for folder in ['workspace', 'capture', 'bridge', 'inputs']:
++        shutil.copytree(source / folder, fixture / folder)
++    for name in ['status.json', 'sdk_command.json']:
++        shutil.copy2(source / name, fixture / name)
++    shutil.copytree(library_source, fixture / 'library')
++    write(fixture / 'run.json', {'status': 'collected', 'run_id': 'arbitrary.name',
++        'engineering_compatibility_fixture': True, 'source_student_run': str(source),
++        'library_snapshot_provenance': 'Copied from the archived /capabilities mount recorded by this student.',
++        'runtime_library': str(fixture / 'library')})
++    records = []
++
++    def prepare(name, student, items):
++        input_file = output / (name + '_input.json')
++        write(input_file, {'student_run': str(student), 'output_directory': str(output / name),
++            'items': items, 'budget': {'cpus': [32, 33], 'stage_seconds': 120,
++                'visual_seconds': 60, 'visual_calls': 2, 'visual_port': 19865}})
++        return evaluation.prepare(input_file)
++
++    complete = prepare('complete', fixture, evaluation.ITEMS)
++    results = evaluation.technical(complete)
++    assert all(row['status'] == 'completed' for row in results.values()), results
++    assert results['reproduction']['result']['source_portable_deliverables']
++    assert results['images']['result']['rgba_pixel_identical']
++    session = complete / 'visual/session'
++    with tempfile.TemporaryDirectory(prefix='scene-evaluation-probe-') as temporary, socket.socket(socket.AF_UNIX) as channel:
++        channel.bind(str(Path(temporary) / 'proxy.sock'))
++        sdk_command = command(session, Path(temporary) / 'proxy.sock', 2)
++        argv = ['nice', '-n', '15', 'taskset', '-c', '32,33'] + sdk_command[:sdk_command.index('--')] + [
++            '--', '/opt/python/bin/python3.12', '-c', PROBE, str(ROOT)]
++        write(output / 'visual_namespace_command.json', argv)
++        with (output / 'visual_namespace.log').open('wb') as log:
++            subprocess.run(argv, stdout=log, stderr=subprocess.STDOUT, timeout=60, check=True)
++    probe = evaluation.read(session / 'capture/probe.json')
++    assert [base64.b64decode(value) for value in probe.pop('image_bytes_base64')] == [
++        (complete / 'reference.png').read_bytes(), (fixture / 'workspace/final.png').read_bytes()]
++    actual = evaluation.read(session / 'capture/preflight_sdk_input.json')
++    assert actual['messages'][0]['message']['content'][0]['text'] == evaluation.VISUAL_PROMPT
++    feedback = evaluation.collect(complete)
++    assert feedback['visual']['status'] == 'not_run' and feedback['visual']['result'] is None
++    assert feedback['student']['delivery']['kind'] == 'complete_files_unvalidated'
++    records.append({'case': 'complete_real_delivery_copy', 'student': str(fixture),
++                    'feedback': str(complete / 'feedback.json'), 'delivery': feedback['student']['delivery']['kind']})
++
++    partial = output / 'fixtures/partial.engineering'
++    shutil.copytree(fixture, partial)
++    (partial / 'workspace/scene.blend').unlink()
++    write(partial / 'run.json', {'status': 'collected', 'run_id': 'partial.engineering',
++          'engineering_derived_partial_fixture': True, 'removed_file': 'workspace/scene.blend',
++          'source_student_run': str(source), 'not_a_historical_student_failure': True})
++    partial_output = prepare('partial', partial, ['scene', 'images', 'evidence'])
++    checks = evaluation.technical(partial_output)
++    assert checks['scene']['status'] == 'skipped' and checks['images']['status'] == 'completed'
++    partial_feedback = evaluation.collect(partial_output)
++    assert partial_feedback['student']['delivery']['kind'] == 'partial'
++    records.append({'case': 'derived_partial_fixture_not_student_failure', 'student': str(partial),
++                    'feedback': str(partial_output / 'feedback.json')})
++    for name in ['a3', 'candidate', 'base']:
++        student = ROOT / 'experiments/student_execution/stage_04_code_review/preflight' / name
++        before[str(student)] = contents(student)
++        directory = prepare('empty_delivery_' + name, student, evaluation.ITEMS)
++        checks = evaluation.technical(directory)
++        result = evaluation.collect(directory)
++        assert result['student']['delivery']['kind'] == 'none'
++        assert checks['evidence']['status'] == 'completed'
++        assert all(checks[item]['status'] == 'skipped' for item in ['reproduction', 'scene', 'images'])
++        assert result['visual']['status'] == 'skipped' and result['visual']['result'] is None
++        expected = contents(student / 'library') if (student / 'library').exists() else {}
++        assert expected == (contents(Path(evaluation.read(student / 'run.json')['library_source']))
++                            if name != 'base' else {})
++        records.append({'case': 'ended_stage04_engineering_' + name, 'student': str(student),
++            'feedback': str(directory / 'feedback.json'), 'library': result['inputs']['runtime_library_status'],
++            'delivery': 'none', 'not_a_research_student_failure': True})
++    next_input = output / 'improvement_input.json'
++    write(next_input, {'initial_library': str(fixture / 'library'), 'feedback': str(complete / 'feedback.json'),
++        'evidence': [str(fixture / 'workspace'), str(fixture / 'capture'), str(complete / 'technical')],
++        'development_gt': [], 'history': [], 'budget': {'seconds': 60, 'calls': 2, 'cpus': [32, 33], 'port': 19866}})
++    candidate = args.candidate_output.resolve()
++    improvement.prepare(candidate, next_input)
++    assert (candidate / 'inputs/recorded_feedback.json').read_bytes() == (complete / 'feedback.json').read_bytes()
++    assert contents(candidate / 'initial/library') == contents(fixture / 'library')
++    session = evaluation.read(candidate / 'inputs/session.json')
++    assert '/development_gt' not in [row['target'] for row in session['readonly_mounts']]
++    assert not (candidate / 'session').exists() and not (candidate / 'candidate').exists()
++    assert all(contents(Path(path)) == original for path, original in before.items())
++    write(output / 'verification.json', {'kind': 'engineering_evaluation_preflight_not_research',
++        'finished_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
++        'seconds': time.monotonic() - started, 'cases': records, 'visual_input_checks': probe,
++        'source_and_original_libraries_unchanged': True, 'historical_delivery_regenerations': 1,
++        'source_only_rgba_pixel_identical': True, 'improvement_prepare': str(candidate),
++        'feedback_copied_unchanged': True, 'development_gt_mounted': False,
++        'new_model_calls': 0, 'new_student_reconstructions': 0,
++        'limits': 'The actual two-image SDK input was constructed inside the filesystem namespace but never sent. Visual model dispatch is covered by offline mocks, not a model roundtrip. The partial fixture is derived; empty deliveries are prior engineering probes. No new research outcome, candidate update, validation, promotion or iteration.'})
++    print(json.dumps({'verification': str(output / 'verification.json'), 'new_model_calls': 0,
++                      'historical_delivery_regenerations': 1, 'seconds': time.monotonic() - started}))
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scene-rsi/tests/test_evaluation.py b/scene-rsi/tests/test_evaluation.py
+new file mode 100644
+index 0000000..65c4300
+--- /dev/null
++++ b/scene-rsi/tests/test_evaluation.py
+@@ -0,0 +1,201 @@
++"""Generic evaluation contracts, with no model calls or Blender reconstruction in unit tests."""
++import importlib.util
++import json
++from pathlib import Path
++import shutil
++import sys
++import tempfile
++import unittest
++from unittest.mock import patch
++
++ROOT = Path(__file__).resolve().parents[1]
++sys.path[:0] = [str(ROOT / 'analysis'), str(ROOT / 'harness')]
++AVAILABLE = importlib.util.find_spec('numpy') is not None
++if AVAILABLE:
++    import evaluate_student as evaluation
++    import run_capability_improvement as improvement
++
++EXPERIMENT = ROOT / 'experiments/experiment_03a_capability_acquisition'
++REFERENCE = Path(json.loads((ROOT / 'configs/scenes.json').read_text())['scenes'][0]['reference'])
++PREVIOUS = ROOT / 'experiments/capability_improvement/stage_01_verified_review/offline_candidate/candidate/library'
++
++
++def write(path, value):
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(json.dumps(value, indent=2))
++
++
++@unittest.skipUnless(AVAILABLE, 'Use the existing scenemosaic analysis environment for evaluation tests.')
++class IndependentEvaluation(unittest.TestCase):
++    def setUp(self):
++        temporary = tempfile.TemporaryDirectory(prefix='scene-evaluation-test-')
++        self.addCleanup(temporary.cleanup)
++        self.root = Path(temporary.name)
++        self.student = self.root / 'arbitrary.name-outside-experiment'
++        (self.student / 'workspace').mkdir(parents=True)
++        (self.student / 'inputs').mkdir()
++        shutil.copy2(REFERENCE, self.student / 'inputs/reference.png')
++        shutil.copy2(REFERENCE, self.student / 'workspace/reference.png')
++        shutil.copy2(REFERENCE, self.student / 'workspace/final.png')
++        (self.student / 'workspace/build.py').write_text('print("Engineering fixture only")\n')
++        (self.student / 'workspace/scene.blend').write_bytes(b'Engineering fixture, not opened in unit tests.')
++        shutil.copytree(EXPERIMENT / 'libraries/A3', self.student / 'library')
++        (self.student / 'inputs/prompt.txt').write_text((self.student / 'library/SKILL.md').read_text())
++        write(self.student / 'run.json', {'status': 'collected', 'run_id': 'external-id',
++                                         'runtime_library': str(self.student / 'library')})
++        write(self.student / 'status.json', {'status': 'completed', 'sdk_status': 'completed'})
++        write(self.student / 'sdk_command.json', ['engineering-command-not-executed'])
++
++    def prepare(self, name='evaluation', items=None):
++        configuration = self.root / (name + '.json')
++        write(configuration, {'student_run': self.student.name, 'output_directory': name,
++              'items': items if items is not None else evaluation.ITEMS,
++              'budget': {'cpus': [32, 33], 'stage_seconds': 30, 'visual_seconds': 40,
++                         'visual_calls': 2, 'visual_port': 19865}})
++        return evaluation.prepare(configuration)
++
++    def test_arbitrary_name_uses_saved_reference_and_library_snapshot(self):
++        (self.student / 'workspace/reference.png').write_bytes(b'Changed workspace copy')
++        output = self.prepare()
++        record = evaluation.read(output / 'evaluation.json')
++        self.assertEqual(record['run_id'], 'external-id')
++        self.assertEqual((output / 'reference.png').read_bytes(), REFERENCE.read_bytes())
++        self.assertEqual(record['runtime_library'], str(self.student / 'library'))
++        self.assertEqual(record['runtime_library_status'], 'snapshot_available')
++
++    def test_original_candidate_and_empty_library_runs_can_be_prepared(self):
++        self.prepare('original')
++        shutil.rmtree(self.student / 'library')
++        shutil.copytree(PREVIOUS, self.student / 'library')
++        output = self.prepare('candidate')
++        library = Path(evaluation.read(output / 'evaluation.json')['runtime_library'])
++        self.assertTrue((library / 'ENGINEERING_PROBE.md').exists())
++        shutil.rmtree(self.student / 'library')
++        write(self.student / 'run.json', {'status': 'collected', 'runtime_library': None})
++        output = self.prepare('base')
++        self.assertEqual(evaluation.read(output / 'evaluation.json')['runtime_library_status'], 'none')
++
++    def test_legacy_library_is_unknown_without_a_runtime_snapshot(self):
++        shutil.rmtree(self.student / 'library')
++        (self.student / 'run.json').unlink()
++        write(self.student / 'status.json', {'status': 'completed', 'condition': 'A3',
++                                            'persistent_capability_enabled': True})
++        output = self.prepare(items=[])
++        feedback = evaluation.collect(output)
++        self.assertIsNone(feedback['inputs']['runtime_library'])
++        self.assertEqual(feedback['inputs']['runtime_library_status'], 'unknown')
++
++    def test_old_evidence_default_output_is_preserved(self):
++        index = evaluation.summarize_evidence(self.student)
++        self.assertEqual(index['run'], self.student.name)
++        self.assertTrue((self.student / 'analysis/evidence_index.json').exists())
++
++    def test_complete_partial_and_no_delivery_remain_separate_outcomes(self):
++        for name, removed, expected in [('complete', [], 'complete_files_unvalidated'),
++             ('partial', ['scene.blend'], 'partial'), ('none', ['build.py', 'final.png'], 'none')]:
++            for path in removed:
++                (self.student / 'workspace' / path).unlink()
++            output = self.prepare(name)
++            result = evaluation.collect(output)
++            self.assertEqual(result['student']['delivery']['kind'], expected)
++            self.assertIsNone(result['visual']['result'])
++            self.assertEqual(result['technical']['reproduction']['status'], 'not_run')
++
++    def test_technical_functions_are_reused_without_writing_student_analysis(self):
++        output = self.prepare(items=['reproduction', 'images', 'evidence'])
++        before = (self.student / 'workspace/build.py').read_bytes()
++        with patch.object(evaluation.technical_checks, 'reproduce', return_value=(
++                {'exit_code': 0, 'timeout': False, 'source_portable_deliverables': False}, output / 'replica')) as reproduce:
++            results = evaluation.technical(output)
++        reproduce.assert_called_once_with(self.student, output / 'technical/source_only', '32,33', 30)
++        self.assertEqual(results['images']['status'], 'completed')
++        self.assertEqual(results['evidence']['status'], 'completed')
++        self.assertFalse((self.student / 'analysis').exists())
++        self.assertEqual((self.student / 'workspace/build.py').read_bytes(), before)
++        self.assertTrue((output / 'technical/evidence/code_facts.json').exists())
++
++    def test_missing_code_does_not_skip_available_images_or_evidence(self):
++        (self.student / 'workspace/build.py').unlink()
++        (self.student / 'workspace/scene.blend').unlink()
++        output = self.prepare()
++        results = evaluation.technical(output)
++        self.assertEqual(results['reproduction']['status'], 'skipped')
++        self.assertEqual(results['scene']['status'], 'skipped')
++        self.assertEqual(results['images']['status'], 'completed')
++        self.assertEqual(results['evidence']['status'], 'completed')
++
++    def test_visual_input_is_exact_existing_prompt_and_only_two_images(self):
++        write(self.student / 'old_score.json', {'score': 'must not enter blind review'})
++        output = self.prepare(items=['visual'])
++        invocation = evaluation.read(output / 'visual/invocation.json')
++        self.assertEqual(invocation['prompt'], evaluation.VISUAL_PROMPT)
++        self.assertEqual(invocation['seconds'], 40)
++        self.assertEqual(invocation['calls'], 2)
++        self.assertEqual(invocation['session']['role'], 'visual_evaluator')
++        self.assertEqual(invocation['session']['tools'], ['Read', 'Write'])
++        self.assertNotIn('condition', invocation['session'])
++        self.assertFalse(invocation['session']['persistent_capability_enabled'])
++        self.assertEqual([row['target'] for row in invocation['session']['readonly_mounts']], ['/sdk'])
++        self.assertEqual({p.name for p in (output / 'visual/session/workspace').iterdir()}, {'reference.png', 'final.png'})
++        self.assertEqual({p.name for p in (output / 'visual/session/inputs').iterdir()}, {'prompt.txt', 'session.json', 'images.json'})
++        self.assertNotIn((self.student / 'library/SKILL.md').read_text(), invocation['prompt'])
++
++    def test_visual_dispatch_without_a_report_does_not_create_a_score(self):
++        output = self.prepare(items=['visual'])
++        with patch.object(evaluation, 'execute') as execute:
++            evaluation.visual(output)
++            execute.assert_called_once()
++        result = evaluation.collect(output)
++        self.assertEqual(result['visual']['status'], 'missing_or_invalid_report')
++        self.assertIsNone(result['visual']['result'])
++        self.assertIsNone(result['visual']['human_rating'])
++        self.assertFalse(result['costs']['visual']['total_calls_known'])
++
++    def test_invalid_visual_json_is_preserved_as_unknown(self):
++        output = self.prepare(items=['visual'])
++        def fixture(**invocation):
++            (Path(invocation['directory']) / 'workspace/visual_evaluation.json').write_text('{invalid engineering fixture')
++        with patch.object(evaluation, 'execute', side_effect=fixture):
++            evaluation.visual(output)
++        feedback = evaluation.collect(output)
++        self.assertEqual(feedback['visual']['status'], 'invalid_json_report')
++        self.assertIsNone(feedback['visual']['result'])
++        self.assertEqual((output / 'visual/session/workspace/visual_evaluation.json').read_text(), '{invalid engineering fixture')
++
++    def test_failed_reproduction_does_not_discard_other_checks(self):
++        output = self.prepare(items=['reproduction', 'images'])
++        with patch.object(evaluation.technical_checks, 'reproduce', side_effect=OSError('Engineering fixture execution error')):
++            result = evaluation.technical(output)
++        self.assertEqual(result['reproduction']['status'], 'failed')
++        self.assertEqual(result['images']['status'], 'completed')
++
++    def test_active_runs_and_existing_outputs_are_not_evaluated_or_overwritten(self):
++        write(self.student / 'status.json', {'status': 'running'})
++        with self.assertRaises(ValueError):
++            self.prepare()
++        write(self.student / 'status.json', {'status': 'completed'})
++        output = self.prepare()
++        with self.assertRaises(FileExistsError):
++            self.prepare()
++        evaluation.collect(output)
++        with self.assertRaises(FileExistsError):
++            evaluation.collect(output)
++
++    def test_feedback_is_accepted_by_existing_external_improvement_prepare(self):
++        output = self.prepare(items=[])
++        feedback = evaluation.collect(output)
++        for folder in ['sdk', 'harness', 'analysis', 'configs']:
++            shutil.copytree(ROOT / folder, self.root / folder)
++        input_file = self.root / 'improvement_input.json'
++        write(input_file, {'initial_library': str(self.student / 'library'), 'feedback': str(output / 'feedback.json'),
++                          'evidence': [str(self.student / 'workspace')], 'development_gt': [], 'history': [],
++                          'budget': {'seconds': 20, 'calls': 1, 'cpus': [32, 33], 'port': 19665}})
++        candidate = self.root / 'experiments/capability_improvement/offline'
++        with patch.object(improvement, 'ROOT', self.root):
++            improvement.prepare(candidate, input_file)
++        self.assertEqual(evaluation.read(candidate / 'inputs/recorded_feedback.json'), feedback)
++        self.assertEqual(evaluation.read(candidate / 'inputs/feedback.json')['allowed_development_gt'], [])
++
++
++if __name__ == '__main__':
++    unittest.main()

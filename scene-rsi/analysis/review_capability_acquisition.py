@@ -150,8 +150,8 @@ def freeze_blind_order():
     return order
 
 
-def session_file(stage,mounts=None,visual=False):
-    path=EXP/'configs'/('acquisition_review_'+stage+'.json')
+def session_file(stage,mounts=None,visual=False,path=None):
+    path=Path(path) if path is not None else EXP/'configs'/('acquisition_review_'+stage+'.json')
     write(path,{'role':'visual_evaluator' if visual else ('research_reporter' if stage=='report' else ('projection_identity_reviewer' if stage in ('projection-review','projection-followup') else 'posthoc_annotator')),
                 'tools':['Read','Grep','Write'] if stage=='report' else (['Read','Write'] if visual else TOOLS),
                 'initial_images':[{'path':'/app/reference.png','label':'Reference image'},

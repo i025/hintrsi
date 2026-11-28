@@ -41,3 +41,5 @@
 第三阶段代码修改已分离默认运行源码与宿主完整源码归档。改进Agent默认仅可查看17个明确列出的SDK、Bridge、运行接口和共同Prompt；历史研究源码通过原 `evidence` 显式提供。详见 [第三阶段审查说明](docs/STAGE_03_RUNTIME_VISIBILITY_REVIEW.md) 与 [真实隔离验收](experiments/capability_improvement/stage_03_runtime_visibility/preflight/verification.json)。25项离线检查通过，新模型调用和正式重建均为0，停在代码审查阶段。
 
 第四阶段已增加 [通用独立学生入口](harness/run_student.py)：外部指定参考图、可选能力库、预算、运行标识和新输出目录，复用原SDK、共同Prompt和能力注入方式。支持原始库、历史候选和空库；来源资料与GT不随库开放。详见 [完整审查说明](docs/STAGE_04_STUDENT_REVIEW.md)、[三份配置](configs/student_inputs/)和[真实隔离验收](experiments/student_execution/stage_04_code_review/preflight/verification.json)。36项离线检查通过；没有模型调用、正式重建、独立评价或晋升。
+
+第五阶段增加 [通用独立评价入口](analysis/evaluate_student.py)：读取任意已结束Student的实际参考图、库快照、交付和轨迹，复用原源码再生成、场景检查、图像辅助指标和匿名双图RGB评价，输出可直接接入Improvement的 `feedback.json`。详见 [完整代码审查](docs/STAGE_05_EVALUATION_REVIEW.md)、[外部配置](configs/evaluation_inputs/)和[真实工程验收](experiments/student_evaluation/stage_05_code_review/preflight/verification.json)。49项离线检查通过，一份旧交付成功再生成且RGBA像素一致；RGB只验证真实隔离输入及离线调用接口，没有模型评分。新模型调用0、新Student重建0，未启动候选改进、晋升或多轮调度。

@@ -1,0 +1,98 @@
+--- previous/external/acquisition_scene_metrics.py
++++ external/acquisition_scene_metrics.py
+@@ -0,0 +1,95 @@
++"""Deterministic scene facts; geometric candidates are not physical diagnoses."""
++import argparse
++from itertools import combinations
++import json
++from pathlib import Path
++import runpy
++import sys
++
++import bpy
++from mathutils import Vector
++
++
++parser = argparse.ArgumentParser()
++parser.add_argument('--input', required=True)
++parser.add_argument('--output', required=True)
++args = parser.parse_args(sys.argv[sys.argv.index('--') + 1:])
++output = Path(args.output)
++output.mkdir(parents=True, exist_ok=True)
++
++# Keep the existing state format and add the richer, deterministic GT inspector.
++sys.argv = ['inspect_scene.py', '--', '--input', args.input,
++            '--output', str(output / 'state.json')]
++runpy.run_path('/analysis/inspect_scene.py', run_name='__main__')
++sys.argv = ['inspect_gt_03.py', '--', '--input', args.input,
++            '--output', str(output / 'detailed_state.json')]
++runpy.run_path('/analysis/inspect_gt_03.py', run_name='__main__')
++state = json.loads((output / 'detailed_state.json').read_text())
++inventory = []
++for row in state['objects']:
++    projection = row.get('bbox_projection_unclipped')
++    inventory.append({'name': row['name'], 'type': row['type'], 'parent': row['parent'],
++                      'children': row['children'], 'material_names': row['materials'],
++                      'world_location': [row['matrix_world'][axis][3] for axis in range(3)],
++                      'dimensions': row['dimensions'], 'world_bounds': row.get('world_bounds'),
++                      'projected_bounds_xy_bottom_up': {'min': projection['min_xy'], 'max': projection['max_xy']} if projection else None,
++                      'projected_bbox_center_xy_bottom_up': [(projection['min_xy'][axis] + projection['max_xy'][axis]) / 2
++                                                             for axis in range(2)] if projection else None})
++(output / 'object_inventory.jsonl').write_text(''.join(json.dumps(row, separators=(',', ':')) + '\n' for row in inventory))
++scene = bpy.context.scene
++depsgraph = bpy.context.evaluated_depsgraph_get()
++mesh_rows = [row for row in state['objects']
++             if row['type'] == 'MESH' and not row['hide_render'] and 'world_bounds' in row]
++overlaps = []
++for left, right in combinations(mesh_rows, 2):
++    a, b = left['world_bounds'], right['world_bounds']
++    widths = [min(a['max'][axis], b['max'][axis]) - max(a['min'][axis], b['min'][axis])
++              for axis in range(3)]
++    if all(width > 0 for width in widths):
++        overlaps.append({'objects': [left['name'], right['name']],
++                         'axis_overlap': widths, 'aabb_overlap_volume': widths[0] * widths[1] * widths[2],
++                         'physical_interpenetration': 'unknown'})
++all_corners = [Vector(corner) for row in mesh_rows for corner in row['evaluated_world_bbox_corners']]
++diagonal = (Vector([max(p[i] for p in all_corners) for i in range(3)]) -
++            Vector([min(p[i] for p in all_corners) for i in range(3)])).length if all_corners else 0
++surface_samples = []
++for row in mesh_rows:
++    low, high = row['world_bounds']['min'], row['world_bounds']['max']
++    epsilon = max(diagonal * 1e-7, 1e-6)
++    samples = []
++    for fx, fy in ((.5, .5), (.1, .1), (.1, .9), (.9, .1), (.9, .9)):
++        origin = Vector((low[0] + fx * (high[0] - low[0]),
++                         low[1] + fy * (high[1] - low[1]), low[2] - epsilon))
++        hit, location, normal, face, obj, matrix = scene.ray_cast(
++            depsgraph, origin, Vector((0, 0, -1)), distance=max(diagonal * 2, 1))
++        samples.append({'origin': list(origin), 'hit': hit,
++                        'surface_object': obj.name if hit else None,
++                        'surface_point': list(location) if hit else None,
++                        'surface_normal': list(normal) if hit else None,
++                        'bbox_bottom_to_hit_vertical_distance': float(low[2] - location.z) if hit else None,
++                        'support_relation': 'unknown'})
++    surface_samples.append({'object': row['name'], 'samples': samples,
++                             'actual_contact': 'unknown', 'intended_support': 'unknown'})
++facts = {'file': args.input, 'visible_mesh_objects': len(mesh_rows),
++         'aabb_overlap_candidates': overlaps,
++         'downward_surface_samples': surface_samples,
++         'limits': ['AABB overlap is a candidate for inspection, never proof of collision or penetration.',
++                    'Five rays begin immediately below the evaluated world bounding-box minimum.',
++                    'A ray hit identifies geometry below a sample, not the intended support surface.',
++                    'Near-zero ray gaps do not prove physical contact, stability, or part attachment.',
++                    'Negative penetration, thin geometry, nonvertical support and semantic relations may be missed.',
++                    'Object names, local axes and projections have no automatic GT semantic correspondence.',
++                    'No GT, scene-specific correspondence, aligned 3D error, or modeling repair is used.']}
++(output / 'geometry_candidates.json').write_text(json.dumps(facts, indent=2))
++(output / 'summary.json').write_text(json.dumps({
++    'file': args.input, 'object_count': len(state['objects']),
++    'mesh_count': len(mesh_rows), 'material_count': len(state['materials']),
++    'node_group_count': len(state['node_groups']),
++    'missing_external_images': [row for row in state['images'] if row['missing_external']],
++    'aabb_overlap_candidates': len(overlaps), 'surface_sample_objects': len(surface_samples),
++    'semantic_gt_matching': 'not attempted', 'aligned_3d_errors': None,
++    'state_file': str(output / 'state.json'),
++    'detailed_state_file': str(output / 'detailed_state.json'),
++    'object_inventory_file': str(output / 'object_inventory.jsonl'),
++    'inventory_projection_limits': 'Unclipped projected evaluated bounding boxes, normalized x rightward and y upward; these are not visible masks or mask centroids.',
++    'geometry_candidates_file': str(output / 'geometry_candidates.json')}, indent=2))

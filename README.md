@@ -2,6 +2,12 @@
 
 这里整理了原始 Hint 实验交接包、Ofox 补充 baseline，以及后续通过 Codex CLI 运行的各版代码、配置、测试、实验成绩和诊断记录。上传整理时间：2026-11-24。原始实验目录保留，仓库是独立的脱敏副本。
 
+## 2026-11-28：Scene 第五阶段通用独立评价入口审查
+
+[通用Evaluation入口](scene-rsi/analysis/evaluate_student.py)接受任意已结束Student目录、评价输出和预算，复用原技术检查及独立匿名RGB评价，输出可供外部Improvement直接使用的结构化反馈。没有组名或03-A目录要求，缺失评价保持未知。
+
+[完整审查说明](scene-rsi/docs/STAGE_05_EVALUATION_REVIEW.md)、[配置示例](scene-rsi/configs/evaluation_inputs/)、[真实反馈](scene-rsi/experiments/student_evaluation/stage_05_code_review/preflight/complete/feedback.json)和[工程验收](scene-rsi/experiments/student_evaluation/stage_05_code_review/preflight/verification.json)。49项离线检查通过；一次旧交付再生成成功且RGBA像素一致，真实隔离中核对了仅含两张图的SDK输入。没有模型调用、新Student重建、候选改进、晋升或多轮调度；停止在代码审查阶段。
+
 ## 2026-11-28：Scene 第四阶段通用学生入口审查
 
 [通用Student入口](scene-rsi/harness/run_student.py)接受外部参考图、原始/候选/空能力库、预算和新输出目录，复用原SDK、共同Prompt和知识注入。正常SDK结束与交付文件状态分别保存；不自动提供来源轨迹或GT，不执行评价或晋升。

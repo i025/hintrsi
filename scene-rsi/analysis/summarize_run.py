@@ -21,7 +21,7 @@ def compact(value):
     return value
 
 
-def summarize(directory):
+def summarize(directory, output=None):
     directory = Path(directory)
     requests = rows(directory / 'bridge/model_requests.jsonl')
     responses = rows(directory / 'bridge/model_responses.jsonl')
@@ -53,7 +53,7 @@ def summarize(directory):
         executions[-1]['python_traceback_logs'] = [str((capture / name).relative_to(directory))
             for name in ('stdout.log', 'stderr.log') if (capture / name).exists()
             and 'Traceback (most recent call last)' in (capture / name).read_text(errors='replace')]
-    result = {'run': directory.name, 'status': json.loads((directory / 'status.json').read_text()),
+    result = {'run': directory.name, 'status': json.loads((directory / 'status.json').read_text()) if (directory / 'status.json').exists() else None,
               'model_requests': len(requests), 'model_responses': len(responses),
               'model_errors': rows(directory / 'bridge/model_errors.jsonl'),
               'tokens': dict(totals), 'sdk_result': metadata.get('ResultMessage'),
@@ -64,8 +64,8 @@ def summarize(directory):
                             for p in (directory / 'workspace').rglob('*') if p.is_file() and '.git' not in p.parts],
               'image_requests': [{'request_id': p.parent.name, 'attachments': json.loads(p.read_text())}
                                  for p in (directory / 'bridge').glob('*/image_attachments.json')]}
-    output = directory / 'analysis'
-    output.mkdir(exist_ok=True)
+    output = Path(output) if output is not None else directory / 'analysis'
+    output.mkdir(parents=True, exist_ok=True)
     (output / 'evidence_index.json').write_text(json.dumps(result, indent=2))
     (output / 'sdk_events.json').write_text(json.dumps(events, ensure_ascii=False, indent=2))
     return result
